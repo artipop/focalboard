@@ -7,6 +7,12 @@ type TelemetryProps = {
 export interface IAppWindow extends Window {
     baseURL?: string
     frontendBaseURL?: string
+
+    // Absolute base URL the WebSocket client should connect to, overriding the
+    // page origin. Set by native desktop wrappers (e.g. the Wails macOS app)
+    // whose webview origin differs from the server, so the socket reaches the
+    // real server directly. Unused in browser/plugin deployments.
+    webSocketBaseURL?: string
     isFocalboardPlugin?: boolean
     getCurrentTeamId?: () => string
     msCrypto: Crypto

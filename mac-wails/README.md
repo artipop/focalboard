@@ -12,10 +12,19 @@ subprocess), so the app ships as one code-signed executable.
   `~/Library/Application Support/Focalboard/server` because the `.app` bundle is
   read-only once signed. The webapp `pack` is loaded from `Contents/MacOS/pack`.
 - `proxy.go` — a reverse proxy to the in-process server, wired into Wails as the
-  `AssetServer.Handler`, so HTTP and the `/ws` WebSocket share one origin. It
-  injects a bootstrap `<script>` into the served HTML that seeds the single-user
-  session token into `localStorage` and routes `target=_blank` links to the
-  system browser.
+  `AssetServer.Handler`, so HTML/assets/API share the Wails origin. It injects a
+  bootstrap `<script>` into the served HTML that: seeds the single-user session
+  token into `localStorage`; sets `window.webSocketBaseURL` to the real server;
+  and wires `window.openInNewBrowser` to open external links in the system
+  browser.
+
+  **WebSockets do not go through this proxy.** On macOS Wails serves the page
+  from a WKWebView custom-scheme origin, and that scheme handler cannot carry a
+  WebSocket upgrade. So the injected `window.webSocketBaseURL` makes the webapp's
+  WS client connect straight to `ws://localhost:<port>/ws` (a real socket the
+  webview opens directly). This relies on a small, additive hook in the shared
+  webapp: `wsclient.ts` honors `window.webSocketBaseURL` when set (inert in
+  browser/plugin builds). Plain HTTP/`fetch` still flows through the proxy.
 - `app.go` — `App.OpenInBrowser`, bound into JS and called by that script.
 - `main.go` — wires it all together and runs the Wails window.
 

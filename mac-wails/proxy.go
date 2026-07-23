@@ -15,22 +15,33 @@ import (
 
 // bootstrapScript is injected into the served index.html <head>, before any app
 // JS runs. It mirrors the init scripts of linux/main.go:
-//   - seeds the single-user session token into localStorage, and
-//   - routes target=_blank link clicks to the system browser via the bound
-//     App.OpenInBrowser method (window.go.main.App is provided by Wails).
-func bootstrapScript(sessionToken string) string {
+//   - seeds the single-user session token into localStorage,
+//   - points the WebSocket client at the real server (window.webSocketBaseURL),
+//     since Wails serves the page from its own webview origin whose custom
+//     scheme cannot carry a WebSocket upgrade, and
+//   - wires window.openInNewBrowser (a hook the webapp already calls for
+//     external links, CSV export, etc.) to the bound App.OpenInBrowser method,
+//     plus a catch-all for plain target=_blank anchors.
+func bootstrapScript(serverURL, sessionToken string) string {
 	return fmt.Sprintf(`<script>
 (function () {
   try { localStorage.setItem('focalboardSessionId', %q); } catch (e) {}
+  window.webSocketBaseURL = %q;
+  window.openInNewBrowser = function (href) {
+    if (href && window.go && window.go.main && window.go.main.App) {
+      window.go.main.App.OpenInBrowser(href);
+    }
+  };
   document.addEventListener('click', function (e) {
     var a = e.target.closest && e.target.closest('a[target="_blank"]');
-    if (a && window.go && window.go.main && window.go.main.App) {
+    // Markdown links already invoke openInNewBrowser via their inline onclick.
+    if (a && !a.getAttribute('onclick')) {
       e.preventDefault();
-      window.go.main.App.OpenInBrowser(a.getAttribute('href'));
+      window.openInNewBrowser(a.getAttribute('href'));
     }
   });
 })();
-</script>`, sessionToken)
+</script>`, sessionToken, serverURL)
 }
 
 // newServerProxy builds a reverse proxy to the in-process Focalboard server.
@@ -53,7 +64,7 @@ func newServerProxy(port int, sessionToken string) (http.Handler, error) {
 		req.Header.Del("Accept-Encoding")
 	}
 
-	inject := []byte(bootstrapScript(sessionToken))
+	inject := []byte(bootstrapScript(target.String(), sessionToken))
 	proxy.ModifyResponse = func(resp *http.Response) error {
 		if !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/html") {
 			return nil

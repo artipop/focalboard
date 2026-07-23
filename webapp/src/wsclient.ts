@@ -8,6 +8,7 @@ import {Block} from './blocks/block'
 import {Board, BoardMember} from './blocks/board'
 import {OctoUtils} from './octoUtils'
 import {BoardCategoryWebsocketData, Category} from './store/sidebar'
+import {IAppWindow} from './types'
 
 // These are outgoing commands to the server
 type WSCommand = {
@@ -142,7 +143,16 @@ class WSClient {
     // Avoiding the race condition becomes more complex than making
     // the base URL dynamic though a function
     private getBaseURL(): string {
-        const baseURL = (this.serverUrl || Utils.getBaseURL(true)).replace(/\/$/, '')
+        // Desktop wrappers may serve the page from a webview origin that is not
+        // the server. The Wails macOS app serves HTML/assets through a WKWebView
+        // custom-scheme handler, and that scheme cannot carry a WebSocket
+        // upgrade -- so a socket built from window.location.origin never
+        // connects. When window.webSocketBaseURL is set, connect straight to the
+        // real server (a plain ws:// socket the webview opens directly) instead
+        // of deriving the URL from the page origin. Unset in browser/plugin
+        // builds, where the page origin is already the server.
+        const nativeBaseURL = (typeof window !== 'undefined') ? (window as unknown as IAppWindow).webSocketBaseURL : undefined
+        const baseURL = (this.serverUrl || nativeBaseURL || Utils.getBaseURL(true)).replace(/\/$/, '')
 
         // Logging this for debugging.
         // Logging just once to avoid log noise.
