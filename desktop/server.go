@@ -34,10 +34,12 @@ func getFreePort() (int, error) {
 }
 
 // dataDir returns the writable location for the database and uploaded files.
-// The .app bundle is read-only (and code-signed), so persistent state must live
-// under ~/Library/Application Support/Focalboard instead of next to the binary.
+// A packaged/signed app directory is read-only, so persistent state must live in
+// the OS user config dir instead of next to the binary. os.UserConfigDir()
+// resolves per platform: ~/Library/Application Support on macOS,
+// %AppData% on Windows, ~/.config (or $XDG_CONFIG_HOME) on Linux.
 func dataDir() (string, error) {
-	base, err := os.UserConfigDir() // ~/Library/Application Support on macOS
+	base, err := os.UserConfigDir()
 	if err != nil {
 		return "", err
 	}
@@ -48,8 +50,9 @@ func dataDir() (string, error) {
 	return dir, nil
 }
 
-// webPath resolves the bundled webapp `pack` directory, shipped inside the
-// app bundle's Resources next to the executable.
+// webPath resolves the bundled webapp `pack` directory, shipped next to the
+// executable on every platform (Contents/MacOS/pack in the macOS bundle,
+// alongside Focalboard.exe / the Linux binary otherwise).
 func webPath() string {
 	executable, err := os.Executable()
 	if err != nil {

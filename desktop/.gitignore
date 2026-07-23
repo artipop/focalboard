@@ -1,0 +1,4 @@
+build/bin/
+frontend/node_modules/
+# stray binary from `go build ./...` in the module dir
+/desktop

@@ -12,9 +12,9 @@ import (
 
 	acpsdk "github.com/coder/acp-go-sdk"
 
-	"github.com/mattermost/focalboard/mac-wails/internal/acp/claudebridge"
-	"github.com/mattermost/focalboard/mac-wails/internal/acp/codexbridge"
-	"github.com/mattermost/focalboard/mac-wails/internal/procgroup"
+	"github.com/mattermost/focalboard/desktop/internal/acp/claudebridge"
+	"github.com/mattermost/focalboard/desktop/internal/acp/codexbridge"
+	"github.com/mattermost/focalboard/desktop/internal/procgroup"
 )
 
 // Session is one agent run bound to a card.

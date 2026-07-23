@@ -10,7 +10,7 @@ import (
 
 	wruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/mattermost/focalboard/mac-wails/internal/acp"
+	"github.com/mattermost/focalboard/desktop/internal/acp"
 )
 
 // errACPDisabled is returned by bindings when the integration is off.

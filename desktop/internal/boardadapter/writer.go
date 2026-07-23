@@ -8,7 +8,7 @@ import (
 	"github.com/mattermost/focalboard/server/model"
 	"github.com/mattermost/focalboard/server/utils"
 
-	"github.com/mattermost/focalboard/mac-wails/internal/acp"
+	"github.com/mattermost/focalboard/desktop/internal/acp"
 )
 
 // Writer implements acp.BoardWriter over the server's app layer. All writes

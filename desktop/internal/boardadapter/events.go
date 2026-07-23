@@ -18,7 +18,7 @@ import (
 	"github.com/mattermost/focalboard/server/services/notify"
 	"github.com/mattermost/mattermost/server/public/shared/mlog"
 
-	"github.com/mattermost/focalboard/mac-wails/internal/acp"
+	"github.com/mattermost/focalboard/desktop/internal/acp"
 )
 
 // EventsBackend is a notify.Backend that normalizes card select-property

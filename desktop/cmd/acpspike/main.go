@@ -33,7 +33,7 @@ import (
 
 	"github.com/beyond5959/acp-adapter/pkg/claudeacp"
 
-	"github.com/mattermost/focalboard/mac-wails/internal/acp/claudebridge"
+	"github.com/mattermost/focalboard/desktop/internal/acp/claudebridge"
 )
 
 func main() {

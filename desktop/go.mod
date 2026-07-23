@@ -1,4 +1,4 @@
-module github.com/mattermost/focalboard/mac-wails
+module github.com/mattermost/focalboard/desktop
 
 go 1.25.0
 

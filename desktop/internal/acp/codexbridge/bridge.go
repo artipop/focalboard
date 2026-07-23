@@ -32,7 +32,7 @@ import (
 
 	acp "github.com/coder/acp-go-sdk"
 
-	"github.com/mattermost/focalboard/mac-wails/internal/procgroup"
+	"github.com/mattermost/focalboard/desktop/internal/procgroup"
 )
 
 // Options configures the bridge.

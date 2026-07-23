@@ -18,8 +18,8 @@ import (
 
 	"github.com/mattermost/focalboard/server/services/notify"
 
-	"github.com/mattermost/focalboard/mac-wails/internal/acp"
-	"github.com/mattermost/focalboard/mac-wails/internal/boardadapter"
+	"github.com/mattermost/focalboard/desktop/internal/acp"
+	"github.com/mattermost/focalboard/desktop/internal/boardadapter"
 )
 
 // acpDataDir returns the ACP integration's own state directory

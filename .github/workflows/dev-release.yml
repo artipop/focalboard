@@ -48,8 +48,13 @@ jobs:
     - name: apt-get install -y libwebkit2gtk-4.0-dev
       run: sudo apt-get install -y libwebkit2gtk-4.0-dev
 
-    - name: Build Linux server and app
-      run: cd focalboard/; make server-linux-package linux-app
+    - name: Install Wails CLI
+      run: |
+        go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
+        echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
+    - name: Build Linux server and Wails app
+      run: cd focalboard/; make server-linux-package linux-app-wails
       env:
         BUILD_NUMBER: ${{ github.run_id }}
 
@@ -63,7 +68,7 @@ jobs:
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       with:
         name: focalboard-linux.tar.gz
-        path: ${{ github.workspace }}/focalboard/linux/dist/focalboard-linux.tar.gz
+        path: ${{ github.workspace }}/focalboard/desktop/build/bin/focalboard-linux.tar.gz
 
   macos:
     runs-on: macos-15
@@ -106,7 +111,7 @@ jobs:
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       with:
         name: focalboard-mac.zip
-        path: ${{ github.workspace }}/focalboard/mac-wails/build/bin/focalboard-mac.zip
+        path: ${{ github.workspace }}/focalboard/desktop/build/bin/focalboard-mac.zip
 
   windows:
     runs-on: windows-2022
@@ -119,9 +124,6 @@ jobs:
     - name: Replace token 1 server
       run: sed -i -e "s,placeholder_rudder_dataplane_url,${{ secrets.RUDDER_DATAPLANE_URL }},g" ${{ github.workspace }}/focalboard/server/services/telemetry/telemetry.go
 
-    - name: Add msbuild to PATH
-      uses: microsoft/setup-msbuild@v1.3
-
     - name: npm ci
       run: cd focalboard/webapp; npm ci --no-optional
 
@@ -130,27 +132,38 @@ jobs:
       with:
         go-version: 1.21
 
-    - name: Setup NuGet
-      uses: nuget/setup-nuget@323ab0502cd38fdc493335025a96c8fdb0edc71f
-      with:
-        nuget-version: '5.x'
+    - name: Install Wails CLI
+      shell: bash
+      run: |
+        go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
+        echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
-    - name: NuGet Restore
-      run: nuget restore focalboard\win-wpf\Focalboard.sln
+    - name: Setup MinGW (cgo compiler for SQLite)
+      shell: pwsh
+      run: choco install mingw -y --no-progress
 
-    - name: Build Windows WPF app
-      run: cd focalboard; make win-wpf-app
+    - name: Verify C toolchain (cgo SQLite)
+      shell: bash
+      run: gcc --version
+
+    - name: Build Windows Wails app
+      shell: bash
+      run: cd focalboard; make win-app-wails
       env:
         BUILD_NUMBER: ${{ github.run_id }}
+        CGO_ENABLED: 1
 
-    - name: Upload app msix package
-      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-      with:
-        name: focalboard.msix
-        path: ${{ github.workspace }}/focalboard/win-wpf/focalboard.msix
+    - name: Package Windows app
+      shell: pwsh
+      run: |
+        $bin = "focalboard/desktop/build/bin"
+        Copy-Item -Recurse -Force focalboard/webapp/pack "$bin/pack"
+        Copy-Item -Force focalboard/NOTICE.txt "$bin/NOTICE.txt"
+        Copy-Item -Force focalboard/webapp/NOTICE.txt "$bin/webapp-NOTICE.txt"
+        Compress-Archive -Path "$bin/Focalboard.exe","$bin/pack","$bin/NOTICE.txt","$bin/webapp-NOTICE.txt" -DestinationPath "$bin/focalboard-win.zip" -Force
 
     - name: Upload app zip package
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       with:
         name: focalboard-win.zip
-        path: ${{ github.workspace }}/focalboard/win-wpf/dist/focalboard-win.zip
+        path: ${{ github.workspace }}/focalboard/desktop/build/bin/focalboard-win.zip

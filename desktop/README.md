@@ -1,0 +1,92 @@
+# Focalboard desktop app (Wails)
+
+A single-binary desktop wrapper for Focalboard, built with
+[Wails v2](https://wails.io). One Go codebase builds **macOS, Windows and Linux**,
+replacing the three legacy wrappers (`mac/` Swift, `win-wpf/` C#/WPF, `linux/`
+WebKitGTK): the Focalboard server runs **in-process** (no spawned
+`focalboard-server` subprocess), so each platform ships as one executable.
+
+## How it works
+
+The Go code is platform-agnostic — the same files build for every OS:
+
+- `server.go` — starts the Focalboard server in-process in single-user mode on a
+  free port. The SQLite database and uploaded files live under the OS user config
+  dir (`os.UserConfigDir()` → `~/Library/Application Support/Focalboard` on macOS,
+  `%AppData%\Focalboard` on Windows, `~/.config/Focalboard` on Linux), **not** next
+  to the binary, because a signed/packaged app dir is read-only. The webapp `pack`
+  is loaded from next to the executable (`webPath()`).
+- `proxy.go` — a reverse proxy to the in-process server, wired into Wails as the
+  `AssetServer.Handler`, so HTML/assets/API share the Wails origin. It injects a
+  bootstrap `<script>` into the served HTML that: seeds the single-user session
+  token into `localStorage`; sets `window.webSocketBaseURL` to the real server;
+  and wires `window.openInNewBrowser` to open external links in the system
+  browser.
+
+  **WebSockets do not go through this proxy.** On macOS (and Linux) Wails serves
+  the page from a WebKit custom-scheme origin, and that scheme handler cannot
+  carry a WebSocket upgrade — this is a WebKit limitation, not a Wails bug, and it
+  is unchanged in Wails v3. So the injected `window.webSocketBaseURL` makes the
+  webapp's WS client connect straight to `ws://localhost:<port>/ws` (a real socket
+  the webview opens directly). On Windows (WebView2/Chromium) the same direct
+  socket simply works. This relies on a small, additive hook in the shared webapp:
+  `wsclient.ts` honors `window.webSocketBaseURL` when set (inert in browser/plugin
+  builds). Plain HTTP/`fetch` still flows through the proxy.
+- `app.go` — `App.OpenInBrowser`, bound into JS and called by that script.
+- `main.go` — wires it all together and runs the Wails window.
+
+This mirrors the already-working in-process approach the old `linux/main.go` used.
+
+Builds are **native per platform** (each on its own machine/CI runner) — cgo
+SQLite is not cross-compiled. macOS targets Apple Silicon (`arm64`); Windows and
+Linux target `amd64`.
+
+## Prerequisites
+
+- Wails CLI:
+  ```
+  go install github.com/wailsapp/wails/v2/cmd/wails@latest
+  ```
+- A C toolchain for the cgo SQLite build:
+  - **macOS**: Xcode Command Line Tools.
+  - **Linux**: `gcc`, plus `libgtk-3-dev` and `libwebkit2gtk-4.0-dev` (Wails).
+  - **Windows**: MinGW-w64 `gcc` on `PATH`, and the WebView2 runtime (bundled with
+    modern Windows).
+
+## Develop
+
+```
+make webapp                 # build webapp/pack (once, or after frontend changes)
+cd desktop
+wails dev -tags "json1 sqlite3"
+```
+
+## Build a release bundle
+
+From the repo root, per platform:
+
+```
+make mac-app-wails      # macOS  → desktop/build/bin/Focalboard.app  (+ focalboard-mac.zip)
+make linux-app-wails    # Linux  → desktop/build/bin/Focalboard      (+ focalboard-linux.tar.gz)
+make win-app-wails      # Windows→ desktop/build/bin/Focalboard.exe  (packaged in CI)
+```
+
+## Sign & notarize macOS (single pass — one binary)
+
+```
+codesign --deep --force --options runtime \
+  --entitlements build/darwin/entitlements.plist \
+  --sign "Developer ID Application: <TEAM>" \
+  desktop/build/bin/Focalboard.app
+
+xcrun notarytool submit desktop/build/bin/Focalboard.app \
+  --apple-id <id> --team-id <team> --password <app-specific-pw> --wait
+
+xcrun stapler staple desktop/build/bin/Focalboard.app
+```
+
+## Out of scope (MVP)
+
+Not yet ported from the legacy wrappers: the `nativeApp` bridge for persisting
+user settings, the What's New dialog, multi-window, in-app downloads / file
+picker, and window-position autosave.

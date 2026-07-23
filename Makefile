@@ -1,4 +1,4 @@
-.PHONY: prebuild clean cleanall ci server server-mac server-linux server-win server-linux-package generate watch-server webapp mac-app mac-app-wails wails-precheck win-app-wpf linux-app modd-precheck templates-archive
+.PHONY: prebuild clean cleanall ci server server-mac server-linux server-win server-linux-package generate watch-server webapp mac-app mac-app-wails win-app-wails linux-app-wails wails-precheck win-app-wpf linux-app modd-precheck templates-archive
 
 PACKAGE_FOLDER = focalboard
 
@@ -209,14 +209,28 @@ wails-precheck:
 	fi;
 
 mac-app-wails: wails-precheck webapp ## Build Mac application via Wails (single in-process binary, Apple Silicon).
-	cd mac-wails && wails build -platform darwin/arm64 -tags "json1 sqlite3" -clean
+	cd desktop && wails build -platform darwin/arm64 -tags "json1 sqlite3" -clean
 	# webPath() resolves `pack` next to the executable (Contents/MacOS).
-	rm -rf mac-wails/build/bin/Focalboard.app/Contents/MacOS/pack
-	cp -R webapp/pack mac-wails/build/bin/Focalboard.app/Contents/MacOS/pack
-	cp NOTICE.txt mac-wails/build/bin/
-	cp webapp/NOTICE.txt mac-wails/build/bin/webapp-NOTICE.txt
-	cd mac-wails/build/bin && zip -r focalboard-mac.zip Focalboard.app NOTICE.txt webapp-NOTICE.txt
-	@echo "Built mac-wails/build/bin/Focalboard.app (+ focalboard-mac.zip)"
+	rm -rf desktop/build/bin/Focalboard.app/Contents/MacOS/pack
+	cp -R webapp/pack desktop/build/bin/Focalboard.app/Contents/MacOS/pack
+	cp NOTICE.txt desktop/build/bin/
+	cp webapp/NOTICE.txt desktop/build/bin/webapp-NOTICE.txt
+	cd desktop/build/bin && zip -r focalboard-mac.zip Focalboard.app NOTICE.txt webapp-NOTICE.txt
+	@echo "Built desktop/build/bin/Focalboard.app (+ focalboard-mac.zip)"
+
+linux-app-wails: wails-precheck webapp ## Build Linux application via Wails (single in-process binary, amd64).
+	cd desktop && wails build -platform linux/amd64 -tags "json1 sqlite3" -clean
+	# webPath() resolves `pack` next to the Focalboard binary.
+	rm -rf desktop/build/bin/pack
+	cp -R webapp/pack desktop/build/bin/pack
+	cp NOTICE.txt desktop/build/bin/
+	cp webapp/NOTICE.txt desktop/build/bin/webapp-NOTICE.txt
+	cd desktop/build/bin && tar -zcf focalboard-linux.tar.gz Focalboard pack NOTICE.txt webapp-NOTICE.txt
+	@echo "Built desktop/build/bin/Focalboard (+ focalboard-linux.tar.gz)"
+
+win-app-wails: wails-precheck webapp ## Build Windows application via Wails (single in-process binary, amd64). Packaging (copy pack + zip) is done by CI/pwsh.
+	cd desktop && wails build -platform windows/amd64 -tags "json1 sqlite3" -clean
+	@echo "Built desktop/build/bin/Focalboard.exe (copy webapp/pack next to it, then zip)"
 
 win-wpf-app: server-dll webapp ## Build Windows WPF application.
 	cd win-wpf && ./build.bat
@@ -255,7 +269,7 @@ clean: ## Clean build artifacts.
 	rm -rf webapp/pack
 	rm -rf mac/temp
 	rm -rf mac/dist
-	rm -rf mac-wails/build/bin
+	rm -rf desktop/build/bin
 	rm -rf linux/dist
 	rm -rf win-wpf/msix
 	rm -f win-wpf/focalboard.msix
