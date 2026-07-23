@@ -215,7 +215,8 @@ mac-app-wails: wails-precheck webapp ## Build Mac application via Wails (single 
 	cp -R webapp/pack mac-wails/build/bin/Focalboard.app/Contents/MacOS/pack
 	cp NOTICE.txt mac-wails/build/bin/
 	cp webapp/NOTICE.txt mac-wails/build/bin/webapp-NOTICE.txt
-	@echo "Built mac-wails/build/bin/Focalboard.app"
+	cd mac-wails/build/bin && zip -r focalboard-mac.zip Focalboard.app NOTICE.txt webapp-NOTICE.txt
+	@echo "Built mac-wails/build/bin/Focalboard.app (+ focalboard-mac.zip)"
 
 win-wpf-app: server-dll webapp ## Build Windows WPF application.
 	cd win-wpf && ./build.bat

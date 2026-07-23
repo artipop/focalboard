@@ -89,8 +89,13 @@ jobs:
     - name: List Xcode versions
       run: ls -n /Applications/ | grep Xcode*
 
+    - name: Install Wails CLI
+      run: |
+        go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
+        echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
+
     - name: Build macOS
-      run: cd focalboard; make mac-app
+      run: cd focalboard; make mac-app-wails
       env:
         DEVELOPER_DIR: /Applications/Xcode_16.0.app/Contents/Developer
         BUILD_NUMBER: ${{ github.run_id }}
@@ -99,7 +104,7 @@ jobs:
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       with:
         name: focalboard-mac.zip
-        path: ${{ github.workspace }}/focalboard/mac/dist/focalboard-mac.zip
+        path: ${{ github.workspace }}/focalboard/mac-wails/build/bin/focalboard-mac.zip
 
   windows:
     runs-on: windows-2025
