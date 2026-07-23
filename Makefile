@@ -1,4 +1,4 @@
-.PHONY: prebuild clean cleanall ci server server-mac server-linux server-win server-linux-package generate watch-server webapp mac-app win-app-wpf linux-app modd-precheck templates-archive
+.PHONY: prebuild clean cleanall ci server server-mac server-linux server-win server-linux-package generate watch-server webapp mac-app mac-app-wails wails-precheck win-app-wpf linux-app modd-precheck templates-archive
 
 PACKAGE_FOLDER = focalboard
 
@@ -202,6 +202,21 @@ mac-app: server-mac webapp ## Build Mac application.
 	cp webapp/NOTICE.txt mac/dist/webapp-NOTICE.txt
 	cd mac/dist; zip -r focalboard-mac.zip Focalboard.app MIT-COMPILED-LICENSE.md NOTICE.txt webapp-NOTICE.txt
 
+wails-precheck:
+	@if ! [ -x "$$(command -v wails)" ]; then \
+		echo "wails is not installed. Install with: go install github.com/wailsapp/wails/v2/cmd/wails@latest"; \
+		exit 1; \
+	fi;
+
+mac-app-wails: wails-precheck webapp ## Build Mac application via Wails (single in-process binary, Apple Silicon).
+	cd mac-wails && wails build -platform darwin/arm64 -tags "json1 sqlite3" -clean
+	# webPath() resolves `pack` next to the executable (Contents/MacOS).
+	rm -rf mac-wails/build/bin/Focalboard.app/Contents/MacOS/pack
+	cp -R webapp/pack mac-wails/build/bin/Focalboard.app/Contents/MacOS/pack
+	cp NOTICE.txt mac-wails/build/bin/
+	cp webapp/NOTICE.txt mac-wails/build/bin/webapp-NOTICE.txt
+	@echo "Built mac-wails/build/bin/Focalboard.app"
+
 win-wpf-app: server-dll webapp ## Build Windows WPF application.
 	cd win-wpf && ./build.bat
 	cd win-wpf && ./package.bat
@@ -239,6 +254,7 @@ clean: ## Clean build artifacts.
 	rm -rf webapp/pack
 	rm -rf mac/temp
 	rm -rf mac/dist
+	rm -rf mac-wails/build/bin
 	rm -rf linux/dist
 	rm -rf win-wpf/msix
 	rm -f win-wpf/focalboard.msix

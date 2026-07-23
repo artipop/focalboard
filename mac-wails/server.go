@@ -1,0 +1,119 @@
+// Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
+// See LICENSE.txt for license information.
+
+package main
+
+import (
+	"fmt"
+	"net"
+	"os"
+	"path"
+	"path/filepath"
+
+	"github.com/mattermost/focalboard/server/server"
+	"github.com/mattermost/focalboard/server/services/config"
+	"github.com/mattermost/focalboard/server/services/permissions/localpermissions"
+
+	"github.com/mattermost/mattermost/server/public/shared/mlog"
+)
+
+// getFreePort asks the kernel for a free open port that is ready to use.
+func getFreePort() (int, error) {
+	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	if err != nil {
+		return 0, err
+	}
+
+	l, err := net.ListenTCP("tcp", addr)
+	if err != nil {
+		return 0, err
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port, nil
+}
+
+// dataDir returns the writable location for the database and uploaded files.
+// The .app bundle is read-only (and code-signed), so persistent state must live
+// under ~/Library/Application Support/Focalboard instead of next to the binary.
+func dataDir() (string, error) {
+	base, err := os.UserConfigDir() // ~/Library/Application Support on macOS
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(base, "Focalboard", "server")
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		return "", err
+	}
+	return dir, nil
+}
+
+// webPath resolves the bundled webapp `pack` directory, shipped inside the
+// app bundle's Resources next to the executable.
+func webPath() string {
+	executable, err := os.Executable()
+	if err != nil {
+		return "./pack"
+	}
+	executableDir, err := filepath.EvalSymlinks(filepath.Dir(executable))
+	if err != nil {
+		executableDir = filepath.Dir(executable)
+	}
+	return path.Join(executableDir, "pack")
+}
+
+// runServer starts the Focalboard server in-process (single-user mode) on the
+// given port, returning the running server so the caller can Shutdown() it.
+func runServer(port int, sessionToken string) (*server.Server, error) {
+	logger, _ := mlog.NewLogger()
+
+	data, err := dataDir()
+	if err != nil {
+		return nil, fmt.Errorf("resolving data dir: %w", err)
+	}
+
+	cfg := &config.Configuration{
+		ServerRoot:              fmt.Sprintf("http://localhost:%d", port),
+		Port:                    port,
+		DBType:                  "sqlite3",
+		DBConfigString:          path.Join(data, "focalboard.db"),
+		UseSSL:                  false,
+		SecureCookie:            true,
+		WebPath:                 webPath(),
+		FilesDriver:             "local",
+		FilesPath:               path.Join(data, "files"),
+		Telemetry:               true,
+		WebhookUpdate:           []string{},
+		SessionExpireTime:       259200000000,
+		SessionRefreshTime:      18000,
+		LocalOnly:               false,
+		EnableLocalMode:         false,
+		LocalModeSocketLocation: "",
+		AuthMode:                "native",
+	}
+
+	singleUser := len(sessionToken) > 0
+	db, err := server.NewStore(cfg, singleUser, logger)
+	if err != nil {
+		return nil, fmt.Errorf("initializing store: %w", err)
+	}
+
+	permissionsService := localpermissions.New(db, logger)
+
+	params := server.Params{
+		Cfg:                cfg,
+		SingleUserToken:    sessionToken,
+		DBStore:            db,
+		Logger:             logger,
+		PermissionsService: permissionsService,
+	}
+
+	srv, err := server.New(params)
+	if err != nil {
+		return nil, fmt.Errorf("initializing server: %w", err)
+	}
+
+	if err := srv.Start(); err != nil {
+		return nil, fmt.Errorf("starting server: %w", err)
+	}
+	return srv, nil
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "Focalboard",
+  "outputfilename": "Focalboard",
+  "frontend:dir": "frontend",
+  "frontend:install": "",
+  "frontend:build": "",
+  "author": {
+    "name": "Mattermost, Inc."
+  },
+  "info": {
+    "productName": "Focalboard",
+    "productVersion": "0.0.0",
+    "copyright": "Copyright (c) 2015-present Mattermost, Inc."
+  }
+}
