@@ -1,0 +1,69 @@
+.AgentReposDialog {
+    .AgentReposDialog__content {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 0 24px 24px;
+        min-width: 480px;
+    }
+
+    .AgentReposDialog__empty {
+        color: rgba(var(--center-channel-color-rgb), 0.64);
+        padding: 8px 0;
+    }
+
+    .AgentReposDialog__row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+
+        .AgentReposDialog__name {
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .AgentReposDialog__path {
+            flex: 1;
+            color: rgba(var(--center-channel-color-rgb), 0.64);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            direction: rtl;
+            text-align: left;
+        }
+
+        .AgentReposDialog__nameInput {
+            border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+            border-radius: 4px;
+            padding: 4px 8px;
+            background: rgb(var(--center-channel-bg-rgb));
+            color: rgb(var(--center-channel-color-rgb));
+        }
+    }
+
+    .AgentReposDialog__actions {
+        padding-top: 4px;
+    }
+
+    .AgentReposDialog__sync {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(var(--center-channel-color-rgb), 0.08);
+
+        select {
+            border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+            border-radius: 4px;
+            padding: 4px 8px;
+            background: rgb(var(--center-channel-bg-rgb));
+            color: rgb(var(--center-channel-color-rgb));
+        }
+    }
+
+    .AgentReposDialog__error {
+        color: rgb(var(--error-text-color-rgb, 210, 75, 78));
+        padding-top: 8px;
+    }
+}

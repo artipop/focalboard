@@ -12,6 +12,7 @@ import (
 
 	"github.com/mattermost/focalboard/server/server"
 	"github.com/mattermost/focalboard/server/services/config"
+	"github.com/mattermost/focalboard/server/services/notify"
 	"github.com/mattermost/focalboard/server/services/permissions/localpermissions"
 
 	"github.com/mattermost/mattermost/server/public/shared/mlog"
@@ -61,11 +62,17 @@ func webPath() string {
 	return path.Join(executableDir, "pack")
 }
 
-// runServer starts the Focalboard server in-process (single-user mode) on the
-// given port, returning the running server so the caller can Shutdown() it.
-func runServer(port int, sessionToken string) (*server.Server, error) {
+// newServerLogger builds the logger shared by the server and the ACP backend.
+func newServerLogger() mlog.LoggerIFace {
 	logger, _ := mlog.NewLogger()
+	return logger
+}
 
+// runServerWithLogger starts the Focalboard server in-process (single-user
+// mode) on the given port, returning the running server so the caller can
+// Shutdown() it. notifyBackends are registered with the server's notification
+// service (used by the ACP agent integration to observe card moves).
+func runServerWithLogger(logger mlog.LoggerIFace, port int, sessionToken string, notifyBackends []notify.Backend) (*server.Server, error) {
 	data, err := dataDir()
 	if err != nil {
 		return nil, fmt.Errorf("resolving data dir: %w", err)
@@ -105,6 +112,7 @@ func runServer(port int, sessionToken string) (*server.Server, error) {
 		DBStore:            db,
 		Logger:             logger,
 		PermissionsService: permissionsService,
+		NotifyBackends:     notifyBackends,
 	}
 
 	srv, err := server.New(params)

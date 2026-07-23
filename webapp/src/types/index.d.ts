@@ -17,6 +17,21 @@ export interface IAppWindow extends Window {
     getCurrentTeamId?: () => string
     msCrypto: Crypto
     openInNewBrowser?: ((href: string) => void) | null
+
+    // Bindings injected by the Wails desktop wrapper (window.go.main.App.*).
+    // Absent in browser/plugin deployments; feature-detect before use.
+    go?: {
+        main?: {
+            App?: {
+                ListAgentRepos(): Promise<string>
+                PickDirectory(title: string): Promise<string>
+                AddAgentRepo(name: string, path: string): Promise<string>
+                RemoveAgentRepo(name: string): Promise<void>
+                GetCardSessions(cardId: string): Promise<string>
+                CancelSession(cardId: string): Promise<boolean>
+            }
+        }
+    }
     webkit?: {messageHandlers: {nativeApp?: {postMessage: <T>(message: T) => void}}}
     openPricingModal?: () => (telemetry: TelemetryProps) => void
 }

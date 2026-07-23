@@ -5,9 +5,12 @@ go 1.25.0
 replace github.com/mattermost/focalboard/server => ../server
 
 require (
+	github.com/beyond5959/acp-adapter v0.3.8
+	github.com/coder/acp-go-sdk v0.13.5
 	github.com/google/uuid v1.6.0
 	github.com/mattermost/focalboard/server v0.0.0-20230104182634-f909c2552e37
 	github.com/mattermost/mattermost/server/public v0.1.3
+	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/wailsapp/wails/v2 v2.13.0
 )
 
@@ -61,7 +64,6 @@ require (
 	github.com/mattermost/morph v1.1.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	github.com/mattn/go-sqlite3 v2.0.3+incompatible // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/minio/minio-go/v7 v7.0.70 // indirect
 	github.com/mitchellh/go-testing-interface v1.14.1 // indirect

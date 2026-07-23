@@ -151,7 +151,7 @@ class WSClient {
         // real server (a plain ws:// socket the webview opens directly) instead
         // of deriving the URL from the page origin. Unset in browser/plugin
         // builds, where the page origin is already the server.
-        const nativeBaseURL = (typeof window !== 'undefined') ? (window as unknown as IAppWindow).webSocketBaseURL : undefined
+        const nativeBaseURL = (typeof window === 'undefined') ? undefined : (window as unknown as IAppWindow).webSocketBaseURL
         const baseURL = (this.serverUrl || nativeBaseURL || Utils.getBaseURL(true)).replace(/\/$/, '')
 
         // Logging this for debugging.

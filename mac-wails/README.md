@@ -73,6 +73,41 @@ xcrun notarytool submit mac-wails/build/bin/Focalboard.app \
 xcrun stapler staple mac-wails/build/bin/Focalboard.app
 ```
 
+## ACP agent integration
+
+Moving a card into the trigger column (default: select property **Status**,
+option **To Agent**) starts a Claude Code session in a fresh git worktree and
+reports progress/results as comments on the card. Spec: `../TZ_ACP_wails_v0.2.md`;
+protocol findings: `cmd/acpspike/NOTES.md`.
+
+- **No Node.js.** The app talks ACP in pure Go (`coder/acp-go-sdk`);
+  `internal/acp/claudebridge` translates ACP ⇄ the `claude` binary's native
+  stream-json stdio protocol in-process. The only external dependency is the
+  `claude` CLI (native installer).
+- Layout: `internal/acp` (board-agnostic: manager, sessions, trigger policy,
+  worktrees, SQLite state) + `internal/boardadapter` (the only package that
+  imports both the Focalboard server and `internal/acp`: a `notify.Backend`
+  observing card moves, and a writer posting comments via `srv.App()`).
+- **Mapping cards to repositories**: register local repos in the board menu
+  (“…” → *Agent repositories…*, desktop only) — each entry is a name + a path
+  chosen with the native folder picker. A card is matched to a repo when one
+  of its select/multiSelect option names (e.g. a tag) equals a registry entry
+  name (case-insensitive); the dialog can also push the registry names as
+  options into any select/multiSelect property of the current board. A
+  `repo_path` text property remains as an explicit per-card override
+  (validated against `repoWhitelist` + registered paths). Optional card
+  property `branch` picks the worktree base.
+- Config: `~/Library/Application Support/Focalboard/acp/config.json` (created
+  with defaults on first run; the repo registry is stored there too). If the
+  app can't find `claude` (GUI apps get a minimal `PATH`), set `claudePath`
+  to an absolute path.
+- Session state and logs: `~/Library/Application Support/Focalboard/acp/acp.db`;
+  worktrees: `.../acp/worktrees` (kept after successful sessions for review —
+  the result comment includes the path, branch and a diff hint).
+- Not yet wired: streaming panel and permission modal in the UI (Phase 2);
+  until then permissions are auto-decided by the `autoAllowTools` list and
+  everything else is denied.
+
 ## Out of scope (MVP)
 
 Not yet ported from the Swift wrapper: the `nativeApp` bridge for persisting user

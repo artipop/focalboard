@@ -22,6 +22,8 @@ Desktop app builds package the server against SQLite (each needs `make prebuild`
 - **macOS — `make mac-app-wails`** (current): a [Wails v2](https://wails.io) app in `mac-wails/` that runs the Focalboard server **in-process** in a single Apple-Silicon (`arm64`) binary — no spawned `focalboard-server` subprocess — which collapses signing/notarization to one binary. Needs the Wails CLI (`go install github.com/wailsapp/wails/v2/cmd/wails@latest`). See `mac-wails/README.md` for architecture (in-process server, reverse-proxy AssetServer, and the WebKit WebSocket workaround). The legacy Swift/`WKWebView` wrapper (`mac/`, `make mac-app`) is kept as a fallback.
 - **Windows — `make win-wpf-app`** (C#/WPF, `win-wpf/`) and **Linux — `make linux-app`** (Go/WebKitGTK, `linux/`): unchanged. See README.md for platform prerequisites.
 
+The macOS Wails app also embeds the **ACP agent integration** (spec: `TZ_ACP_wails_v0.2.md`): moving a card into the "To Agent" column starts a Claude Code session in a per-session git worktree and posts progress/results as card comments. All of it lives in `mac-wails/` — `internal/acp` (board-agnostic manager/sessions/trigger/worktrees/SQLite state), `internal/acp/claudebridge` (pure-Go bridge: ACP ⇄ the `claude` binary's stream-json stdio protocol; **no Node.js**, protocol notes in `mac-wails/cmd/acpspike/NOTES.md`), and `internal/boardadapter` (the only package importing both the server and `internal/acp`; hooks in via `server.Params.NotifyBackends` — no changes inside `server/`). Tests: `cd mac-wails; go test ./internal/...`.
+
 ## Test & lint
 
 - `make ci` — full local CI (`webapp-ci` + `server-test`). Run before committing.

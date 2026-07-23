@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React from 'react'
+import React, {useState} from 'react'
 import {useIntl, IntlShape} from 'react-intl'
 
 import {CsvExporter} from '../../csvExporter'
@@ -16,6 +16,7 @@ import {Utils} from '../../utils'
 
 import ModalWrapper from '../modalWrapper'
 import {sendFlashMessage} from '../flashMessages'
+import AgentReposDialog, {isAgentReposAvailable} from '../acp/agentReposDialog'
 
 type Props = {
     board: Board
@@ -97,6 +98,7 @@ function onExportCsvTrigger(board: Board, activeView: BoardView, cards: Card[], 
 const ViewHeaderActionsMenu = (props: Props) => {
     const {board, activeView, cards} = props
     const intl = useIntl()
+    const [showAgentRepos, setShowAgentRepos] = useState(false)
 
     return (
         <ModalWrapper>
@@ -113,6 +115,16 @@ const ViewHeaderActionsMenu = (props: Props) => {
                         name={intl.formatMessage({id: 'ViewHeader.export-board-archive', defaultMessage: 'Export board archive'})}
                         onClick={() => Archiver.exportBoardArchive(board)}
                     />
+                    {/* An empty array (unlike false/null) leaves no wrapper
+                        div behind: Menu wraps every child slot in a div. */}
+                    {isAgentReposAvailable() ? [
+                        <Menu.Text
+                            key='agentRepos'
+                            id='agentRepos'
+                            name={intl.formatMessage({id: 'ViewHeader.agent-repos', defaultMessage: 'Agent repositories…'})}
+                            onClick={() => setShowAgentRepos(true)}
+                        />,
+                    ] : []}
                     {/*
                     <Menu.Separator/>
 
@@ -139,6 +151,11 @@ const ViewHeaderActionsMenu = (props: Props) => {
                     */}
                 </Menu>
             </MenuWrapper>
+            {showAgentRepos &&
+                <AgentReposDialog
+                    board={board}
+                    onClose={() => setShowAgentRepos(false)}
+                />}
         </ModalWrapper>
     )
 }
