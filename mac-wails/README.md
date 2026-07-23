@@ -76,9 +76,17 @@ xcrun stapler staple mac-wails/build/bin/Focalboard.app
 ## ACP agent integration
 
 Moving a card into the trigger column (default: select property **Status**,
-option **To Agent**) starts a Claude Code session in a fresh git worktree and
-reports progress/results as comments on the card. Spec: `../TZ_ACP_wails_v0.2.md`;
-protocol findings: `cmd/acpspike/NOTES.md`.
+option **To Agent**) starts a Claude Code session and reports progress/results
+as comments on the card. Spec: `../TZ_ACP_wails_v0.2.md`; protocol findings:
+`cmd/acpspike/NOTES.md`.
+
+By default the agent works **directly in the repository working tree**
+(`worktreeMode: "never"`): it is instructed to leave changes uncommitted for
+review, and a second session for a busy repo is rejected with a clear card
+comment. Set `worktreeMode: "always"` to give every session a dedicated git
+worktree (branch `acp/<card>-<sess>`, kept after success). A smarter `auto`
+mode (escalate to a worktree when the repo is busy or dirty) is a candidate
+for later.
 
 - **No Node.js.** The app talks ACP in pure Go (`coder/acp-go-sdk`);
   `internal/acp/claudebridge` translates ACP ⇄ the `claude` binary's native
@@ -102,8 +110,9 @@ protocol findings: `cmd/acpspike/NOTES.md`.
   app can't find `claude` (GUI apps get a minimal `PATH`), set `claudePath`
   to an absolute path.
 - Session state and logs: `~/Library/Application Support/Focalboard/acp/acp.db`;
-  worktrees: `.../acp/worktrees` (kept after successful sessions for review —
-  the result comment includes the path, branch and a diff hint).
+  worktrees (in `worktreeMode: "always"`): `.../acp/worktrees`, kept after
+  successful sessions for review — the result comment includes the path,
+  branch and a diff hint.
 - Not yet wired: streaming panel and permission modal in the UI (Phase 2);
   until then permissions are auto-decided by the `autoAllowTools` list and
   everything else is denied.

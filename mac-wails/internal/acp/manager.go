@@ -100,13 +100,30 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Without worktrees, two agents must never share one working tree
+	// (spec §7): reject while another live session uses the same repo.
+	if !m.cfg.UseWorktrees() {
+		m.mu.Lock()
+		var busyCard string
+		for _, other := range m.active {
+			if other.RepoPath == repoPath {
+				busyCard = other.CardID
+				break
+			}
+		}
+		m.mu.Unlock()
+		if busyCard != "" {
+			return nil, fmt.Errorf("в репозитории %s уже работает сессия другой карточки (%s) — дождитесь её завершения", repoPath, busyCard)
+		}
+	}
+
 	s := &Session{
 		ID:         uuid.NewString(),
 		CardID:     ev.CardID,
 		BoardID:    ev.BoardID,
 		RepoPath:   repoPath,
 		BaseBranch: ev.Props["branch"],
-		PromptText: composePrompt(ev),
+		PromptText: composePrompt(ev, m.cfg.UseWorktrees()),
 		status:     StatusQueued,
 		allowTools: make(map[string]bool),
 	}
@@ -257,12 +274,16 @@ func (m *Manager) findClaude() (string, error) {
 }
 
 // composePrompt builds the agent task text from the card.
-func composePrompt(ev CardMoved) string {
+func composePrompt(ev CardMoved, useWorktree bool) string {
 	var b []byte
 	b = fmt.Appendf(b, "Задача: %s\n", ev.Title)
 	if ev.Body != "" {
 		b = fmt.Appendf(b, "\n%s\n", ev.Body)
 	}
-	b = fmt.Appendf(b, "\nРаботай в текущем каталоге — это отдельный git worktree, созданный специально для этой задачи. Можешь делать локальные коммиты. Не выполняй git push.")
+	if useWorktree {
+		b = fmt.Appendf(b, "\nРаботай в текущем каталоге — это отдельный git worktree, созданный специально для этой задачи. Можешь делать локальные коммиты. Не выполняй git push.")
+	} else {
+		b = fmt.Appendf(b, "\nРаботай в текущем каталоге — это рабочая копия репозитория пользователя. Не переключай ветки, не делай коммитов и git push: оставь изменения незакоммиченными для ревью.")
+	}
 	return string(b)
 }

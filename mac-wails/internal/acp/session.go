@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -24,7 +25,8 @@ type Session struct {
 	BaseBranch string
 	PromptText string
 
-	Worktree WorktreeInfo
+	Worktree     WorktreeInfo
+	usedWorktree bool // a dedicated worktree was actually created
 
 	mu         sync.Mutex
 	status     SessionStatus
@@ -83,17 +85,26 @@ func (m *Manager) runSession(s *Session) {
 	s.mu.Unlock()
 	m.persistStatus(s, StatusRunning, "")
 
-	// 1. Worktree.
-	wt, err := CreateWorktree(ctx, s.RepoPath, s.BaseBranch, s.CardID, s.ID, m.cfg.WorktreeDir)
-	if err != nil {
-		m.finishSession(s, StatusFailed, fmt.Sprintf("не удалось создать git worktree: %v", err))
-		return
+	// 1. Working directory: a dedicated worktree, or the repo itself.
+	if m.cfg.UseWorktrees() {
+		wt, err := CreateWorktree(ctx, s.RepoPath, s.BaseBranch, s.CardID, s.ID, m.cfg.WorktreeDir)
+		if err != nil {
+			m.finishSession(s, StatusFailed, fmt.Sprintf("не удалось создать git worktree: %v", err))
+			return
+		}
+		s.Worktree = wt
+		s.usedWorktree = true
+		if err := m.store.UpdateSession(s.ID, StatusRunning, "", wt.Path, wt.Path, wt.Branch, "", nil); err != nil {
+			m.log.Warn("acp: failed to persist worktree info", "session", s.ID, "err", err)
+		}
+		m.comment(s, fmt.Sprintf("🤖 Агент запущен.\nWorktree: `%s`\nВетка: `%s` (от `%s`)", wt.Path, wt.Branch, wt.BaseRef))
+	} else {
+		s.Worktree = WorktreeInfo{Path: s.RepoPath, BaseRef: "HEAD"}
+		if err := m.store.UpdateSession(s.ID, StatusRunning, "", s.RepoPath, "", "", "", nil); err != nil {
+			m.log.Warn("acp: failed to persist session cwd", "session", s.ID, "err", err)
+		}
+		m.comment(s, fmt.Sprintf("🤖 Агент запущен прямо в репозитории `%s`.", s.RepoPath))
 	}
-	s.Worktree = wt
-	if err := m.store.UpdateSession(s.ID, StatusRunning, "", wt.Path, wt.Path, wt.Branch, "", nil); err != nil {
-		m.log.Warn("acp: failed to persist worktree info", "session", s.ID, "err", err)
-	}
-	m.comment(s, fmt.Sprintf("🤖 Агент запущен.\nWorktree: `%s`\nВетка: `%s` (от `%s`)", wt.Path, wt.Branch, wt.BaseRef))
 
 	// 2. Agent connection.
 	finalText, runErr := m.runAgentTurn(ctx, s)
@@ -117,7 +128,7 @@ func (m *Manager) runSession(s *Session) {
 	}
 
 	// 4. Worktree cleanup for unsuccessful sessions.
-	if s.Status() != StatusDone && !m.cfg.KeepFailedWorktrees {
+	if s.usedWorktree && s.Status() != StatusDone && !m.cfg.KeepFailedWorktrees {
 		if removed, err := RemoveWorktreeIfClean(context.Background(), s.RepoPath, s.Worktree); err != nil {
 			m.log.Warn("acp: worktree cleanup failed", "session", s.ID, "err", err)
 		} else if removed {
@@ -158,7 +169,11 @@ func (m *Manager) runAgentTurn(ctx context.Context, s *Session) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("session/new: %w", err)
 	}
-	if err := m.store.UpdateSession(s.ID, StatusRunning, string(sess.SessionId), s.Worktree.Path, s.Worktree.Path, s.Worktree.Branch, "", nil); err != nil {
+	worktreePath := ""
+	if s.usedWorktree {
+		worktreePath = s.Worktree.Path
+	}
+	if err := m.store.UpdateSession(s.ID, StatusRunning, string(sess.SessionId), s.Worktree.Path, worktreePath, s.Worktree.Branch, "", nil); err != nil {
 		m.log.Warn("acp: failed to persist acp session id", "session", s.ID, "err", err)
 	}
 
@@ -196,6 +211,35 @@ func (m *Manager) runAgentTurn(ctx context.Context, s *Session) (string, error) 
 	return final, nil
 }
 
+// sdkLogger returns a session-scoped logger for SDK connections that drops
+// the SDK's routine INFO chatter (e.g. the "connection closed" notice emitted
+// on normal io.Pipe teardown after every session) but keeps warnings/errors.
+func (m *Manager) sdkLogger(sessionID string) *slog.Logger {
+	return slog.New(&minLevelHandler{next: m.log.Handler(), min: slog.LevelWarn}).With("session", sessionID)
+}
+
+// minLevelHandler forwards only records at or above min.
+type minLevelHandler struct {
+	next slog.Handler
+	min  slog.Level
+}
+
+func (h *minLevelHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return level >= h.min && h.next.Enabled(ctx, level)
+}
+
+func (h *minLevelHandler) Handle(ctx context.Context, r slog.Record) error {
+	return h.next.Handle(ctx, r)
+}
+
+func (h *minLevelHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &minLevelHandler{next: h.next.WithAttrs(attrs), min: h.min}
+}
+
+func (h *minLevelHandler) WithGroup(name string) slog.Handler {
+	return &minLevelHandler{next: h.next.WithGroup(name), min: h.min}
+}
+
 // connectClaude wires the in-process claude bridge over io.Pipe.
 func (m *Manager) connectClaude(ctx context.Context, s *Session) (*acpsdk.ClientSideConnection, func(), error) {
 	claudeBin, err := m.findClaude()
@@ -208,8 +252,10 @@ func (m *Manager) connectClaude(ctx context.Context, s *Session) (*acpsdk.Client
 	agentIn, clientOut := io.Pipe() // client writes → agent reads
 
 	agentConn := acpsdk.NewAgentSideConnection(bridge, agentOut, agentIn)
+	agentConn.SetLogger(m.sdkLogger(s.ID))
 	bridge.SetConn(agentConn)
 	clientConn := acpsdk.NewClientSideConnection(&sessionClient{m: m, s: s}, clientOut, clientIn)
+	clientConn.SetLogger(m.sdkLogger(s.ID))
 
 	cleanup := func() {
 		bridge.KillAll(2 * time.Second)
@@ -230,6 +276,7 @@ func (m *Manager) connectExternal(ctx context.Context, s *Session) (*acpsdk.Clie
 		return nil, nil, fmt.Errorf("spawn agent %q: %w", m.cfg.AgentCommand[0], err)
 	}
 	conn := acpsdk.NewClientSideConnection(&sessionClient{m: m, s: s}, proc.Stdin, proc.Stdout)
+	conn.SetLogger(m.sdkLogger(s.ID))
 	cleanup := func() {
 		proc.KillGroup(2 * time.Second)
 		_ = proc.Wait()
@@ -258,15 +305,20 @@ func doneComment(s *Session, finalText string) string {
 		b.WriteString(truncateRunes(t, 4000))
 		b.WriteString("\n\n")
 	}
-	fmt.Fprintf(&b, "Worktree: `%s`\nВетка: `%s`\n", s.Worktree.Path, s.Worktree.Branch)
-	fmt.Fprintf(&b, "Посмотреть дифф: `git -C %s diff %s`", s.Worktree.Path, s.Worktree.BaseRef)
+	if s.usedWorktree {
+		fmt.Fprintf(&b, "Worktree: `%s`\nВетка: `%s`\n", s.Worktree.Path, s.Worktree.Branch)
+		fmt.Fprintf(&b, "Посмотреть дифф: `git -C %s diff %s`", s.Worktree.Path, s.Worktree.BaseRef)
+	} else {
+		fmt.Fprintf(&b, "Изменения не закоммичены и лежат в рабочей копии `%s`.\n", s.RepoPath)
+		fmt.Fprintf(&b, "Посмотреть дифф: `git -C %s diff`", s.RepoPath)
+	}
 	return b.String()
 }
 
 func failComment(s *Session, reason string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "❌ Сессия агента завершилась с ошибкой: %s", truncateRunes(reason, 1500))
-	if s.Worktree.Path != "" {
+	if s.usedWorktree && s.Worktree.Path != "" {
 		fmt.Fprintf(&b, "\nWorktree (если остался): `%s`", s.Worktree.Path)
 	}
 	return b.String()

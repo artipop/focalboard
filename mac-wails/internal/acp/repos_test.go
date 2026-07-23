@@ -1,7 +1,6 @@
 package acp
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -134,8 +133,8 @@ func TestTriggerSessionViaTag(t *testing.T) {
 		return err == nil && len(sessions) == 1 && sessions[0].Status == StatusDone
 	})
 	sessions, _, _ := m.store.SessionsForCard("card10")
-	if _, err := os.Stat(sessions[0].WorktreePath); err != nil {
-		t.Errorf("worktree missing: %v", err)
+	if sessions[0].Cwd != repo {
+		t.Errorf("expected session cwd %q, got %q", repo, sessions[0].Cwd)
 	}
 	if got := writer.cardComments("card10"); len(got) < 2 {
 		t.Errorf("expected comments, got %v", got)

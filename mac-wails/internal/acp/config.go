@@ -41,6 +41,12 @@ type Config struct {
 	// matches a registry entry name. Registered paths are implicitly allowed.
 	Repos []RepoEntry `json:"repos"`
 
+	// WorktreeMode controls where sessions run: "never" (default) — directly
+	// in the repository working tree, with concurrent sessions per repo
+	// rejected; "always" — a dedicated git worktree per session. A smarter
+	// "auto" (escalate to a worktree when the repo is busy/dirty) may come later.
+	WorktreeMode string `json:"worktreeMode"`
+
 	MaxConcurrent            int      `json:"maxConcurrent"`
 	SessionTimeoutMinutes    int      `json:"sessionTimeoutMinutes"`
 	PermissionTimeoutMinutes int      `json:"permissionTimeoutMinutes"`
@@ -61,6 +67,7 @@ func DefaultConfig(dataDir string) Config {
 		TriggerColumn:            "To Agent",
 		RepoWhitelist:            []string{},
 		Repos:                    []RepoEntry{},
+		WorktreeMode:             "never",
 		MaxConcurrent:            3,
 		SessionTimeoutMinutes:    15,
 		PermissionTimeoutMinutes: 5,
@@ -104,6 +111,11 @@ func (c Config) PermissionTimeout() time.Duration {
 
 func (c Config) IdempotencyWindow() time.Duration {
 	return time.Duration(c.IdempotencyWindowSeconds) * time.Second
+}
+
+// UseWorktrees reports whether sessions get a dedicated git worktree.
+func (c Config) UseWorktrees() bool {
+	return c.WorktreeMode == "always"
 }
 
 // ToolAllowed reports whether toolName is on the auto-allow list.

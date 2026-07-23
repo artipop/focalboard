@@ -149,16 +149,61 @@ func TestTriggerRunsSessionToDone(t *testing.T) {
 		t.Fatalf("expected start + result comments, got %v", comments)
 	}
 	last := comments[len(comments)-1]
-	if !strings.Contains(last, "fake work done") || !strings.Contains(last, "Worktree") {
-		t.Errorf("final comment lacks agent output or worktree info: %q", last)
+	if !strings.Contains(last, "fake work done") || !strings.Contains(last, repo) {
+		t.Errorf("final comment lacks agent output or repo path: %q", last)
 	}
 
-	// The worktree of a successful session is kept for review.
+	// Default mode runs in the repo itself: no worktree is created.
 	sessions, _, _ := m.store.SessionsForCard("card1")
+	if sessions[0].Cwd != repo {
+		t.Errorf("expected session cwd %q, got %q", repo, sessions[0].Cwd)
+	}
+	if sessions[0].WorktreePath != "" {
+		t.Errorf("no worktree expected in default mode, got %q", sessions[0].WorktreePath)
+	}
+}
+
+func TestWorktreeModeAlways(t *testing.T) {
+	m, writer, events, repo := testManager(t, fakeClaudeHappy, func(c *Config) {
+		c.WorktreeMode = "always"
+	})
+
+	events.ch <- moveEvent("cardWT", repo, "opt-backlog", "opt-agent")
+	waitFor(t, 15*time.Second, "worktree session done", func() bool {
+		sessions, _, err := m.store.SessionsForCard("cardWT")
+		return err == nil && len(sessions) == 1 && sessions[0].Status == StatusDone
+	})
+
+	sessions, _, _ := m.store.SessionsForCard("cardWT")
 	if wt := sessions[0].WorktreePath; wt == "" {
-		t.Error("session record lost its worktree path")
+		t.Error("worktree path missing in always mode")
 	} else if _, err := os.Stat(wt); err != nil {
 		t.Errorf("worktree of done session was removed: %v", err)
+	}
+	comments := writer.cardComments("cardWT")
+	if last := comments[len(comments)-1]; !strings.Contains(last, "Worktree") {
+		t.Errorf("final comment lacks worktree info: %q", last)
+	}
+}
+
+func TestRepoBusyRejectedWithoutWorktrees(t *testing.T) {
+	m, writer, events, repo := testManager(t, fakeClaudeHang, nil)
+
+	events.ch <- moveEvent("cardA", repo, "opt-backlog", "opt-agent")
+	waitFor(t, 10*time.Second, "first session running", func() bool {
+		sessions, _, err := m.store.SessionsForCard("cardA")
+		return err == nil && len(sessions) == 1 && sessions[0].Status == StatusRunning
+	})
+
+	events.ch <- moveEvent("cardB", repo, "opt-backlog", "opt-agent")
+	waitFor(t, 5*time.Second, "busy-repo comment on second card", func() bool {
+		return len(writer.cardComments("cardB")) >= 1
+	})
+	if got := writer.cardComments("cardB")[0]; !strings.Contains(got, "уже работает") {
+		t.Errorf("expected busy-repo error comment, got %q", got)
+	}
+	if sessions, _, _ := m.store.SessionsForCard("cardB"); len(sessions) != 0 {
+		t.Errorf("second card must not get a session, got %d", len(sessions))
 	}
 }
 
