@@ -17,7 +17,10 @@ A `.env` file in the repo root with `EXCLUDE_ENTERPRISE="1"` is expected for OSS
 - `make watch` — run server + webapp with hot reload via `modd` (requires `modd` installed). `make watch-single-user` for single-user mode.
 - After the server is running, `make webapp` in another terminal rebuilds the frontend; reload the browser to see changes.
 
-Desktop app builds package the server against SQLite: `make mac-app`, `make win-wpf-app`, `make linux-app` (each needs `make prebuild` first). See README.md for platform prerequisites. Cross-compilation is not supported — build on the target platform.
+Desktop app builds package the server against SQLite (each needs `make prebuild` first; cross-compilation is not supported — build on the target platform):
+
+- **macOS — `make mac-app-wails`** (current): a [Wails v2](https://wails.io) app in `mac-wails/` that runs the Focalboard server **in-process** in a single Apple-Silicon (`arm64`) binary — no spawned `focalboard-server` subprocess — which collapses signing/notarization to one binary. Needs the Wails CLI (`go install github.com/wailsapp/wails/v2/cmd/wails@latest`). See `mac-wails/README.md` for architecture (in-process server, reverse-proxy AssetServer, and the WebKit WebSocket workaround). The legacy Swift/`WKWebView` wrapper (`mac/`, `make mac-app`) is kept as a fallback.
+- **Windows — `make win-wpf-app`** (C#/WPF, `win-wpf/`) and **Linux — `make linux-app`** (Go/WebKitGTK, `linux/`): unchanged. See README.md for platform prerequisites.
 
 ## Test & lint
 
@@ -63,7 +66,7 @@ Layered, with dependencies pointing downward:
 
 - `store/` — Redux slices (`boards.ts`, `cards.ts`, `contents.ts`, `comments.ts`, …). The single source of client state; components read via selectors/hooks (`store/hooks.ts`).
 - `octoClient.ts` — the REST client wrapping every server API call. All HTTP goes through here.
-- `wsclient.ts` — WebSocket client; applies real-time block changes into the Redux store.
+- `wsclient.ts` — WebSocket client; applies real-time block changes into the Redux store. Honors `window.webSocketBaseURL` when set, so the Wails desktop wrapper can point the socket straight at the in-process server (its webview origin can't carry a WS upgrade); unset/inert in browser and plugin builds.
 - `mutator.ts` — **the mutation layer**. UI actions call the mutator, which performs the octoClient call *and* registers an undo/redo step with `undomanager.ts`. Prefer mutating through `mutator` rather than calling `octoClient` directly, so undo and optimistic updates stay correct.
 - `blocks/` — TypeScript models mirroring the server block types.
 - `components/`, `pages/`, `widgets/`, `properties/` — UI. `properties/` implements the per-type card property editors.
