@@ -39,6 +39,10 @@ type Props = {
     channelId?: string
 }
 
+// Only this template is offered in the selector; every other template
+// (default templates, the onboarding board, user-created ones) is hidden.
+const VISIBLE_TEMPLATE_TITLE = 'My Project Tasks'
+
 const BoardTemplateSelector = (props: Props) => {
     const globalTemplates = useAppSelector<Board[]>(getGlobalTemplates) || []
     const currentBoardId = useAppSelector<string>(getCurrentBoardId) || null
@@ -79,7 +83,7 @@ const BoardTemplateSelector = (props: Props) => {
 
     const unsortedTemplates = useAppSelector(getTemplates)
     const templates = useMemo(() => Object.values(unsortedTemplates).sort((a: Board, b: Board) => a.createAt - b.createAt), [unsortedTemplates])
-    const allTemplates = globalTemplates.concat(templates)
+    const allTemplates = globalTemplates.concat(templates).filter((template) => template.title === VISIBLE_TEMPLATE_TITLE)
 
     const resetTour = async () => {
         TelemetryClient.trackEvent(TelemetryCategory, TelemetryActions.StartTour)
@@ -119,7 +123,7 @@ const BoardTemplateSelector = (props: Props) => {
 
     useEffect(() => {
         if (!activeTemplate) {
-            setActiveTemplate(templates.concat(globalTemplates)[0])
+            setActiveTemplate(allTemplates[0])
         }
     }, [templates, globalTemplates])
 
