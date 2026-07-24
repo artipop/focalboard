@@ -297,8 +297,25 @@ func (m *Manager) resolveCodexBin(override string) (string, error) {
 	return lookupBin("codex", "codex binary not found (set binPath on the agent)")
 }
 
-// lookupBin finds name on PATH or in common install locations.
+// firstNonEmpty returns the first non-empty string.
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// lookupBin finds name on PATH or in common install locations. When name is an
+// absolute/explicit path (contains a separator) it is stat-checked directly.
 func lookupBin(name, notFoundMsg string) (string, error) {
+	if strings.ContainsRune(name, filepath.Separator) {
+		if _, err := os.Stat(name); err != nil {
+			return "", fmt.Errorf("%s: %w", name, err)
+		}
+		return name, nil
+	}
 	if p, err := exec.LookPath(name); err == nil {
 		return p, nil
 	}

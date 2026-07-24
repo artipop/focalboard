@@ -22,19 +22,29 @@ type RepoEntry struct {
 // each its own CODEX_HOME/OPENAI_API_KEY (or CLAUDE_CONFIG_DIR/ANTHROPIC_API_KEY).
 type AgentEntry struct {
 	Name    string            `json:"name"`              // registry key; matches the card "Agent" option
-	Kind    string            `json:"kind"`              // "claude" | "codex"
+	Kind    string            `json:"kind"`              // "claude" | "codex" | "antigravity" | "acp"
 	BinPath string            `json:"binPath,omitempty"` // overrides binary discovery
 	Model   string            `json:"model,omitempty"`   // --model passed to the CLI
 	Prompt  string            `json:"prompt,omitempty"`  // per-agent system prompt prepended to the task
 	Env     map[string]string `json:"env,omitempty"`     // per-process env (CODEX_HOME, OPENAI_API_KEY, …)
 	Args    []string          `json:"args,omitempty"`    // extra CLI args (sandbox/approval, etc.)
+	Command []string          `json:"command,omitempty"` // full argv override for ACP-native agents (kind "acp"/"antigravity")
 }
 
-// AgentKinds are the built-in agent kinds with a native bridge.
+// Agent kinds. claude/codex run through in-process bridges; antigravity and the
+// generic acp kind are ACP-native CLIs spawned over stdio (no bridge).
 const (
-	AgentKindClaude = "claude"
-	AgentKindCodex  = "codex"
+	AgentKindClaude      = "claude"
+	AgentKindCodex       = "codex"
+	AgentKindAntigravity = "antigravity"
+	AgentKindACP         = "acp"
 )
+
+// IsExternalACP reports whether the kind is an ACP-native external agent
+// (spawned over stdio and talked to in pure ACP, no bridge translation).
+func IsExternalACP(kind string) bool {
+	return kind == AgentKindAntigravity || kind == AgentKindACP
+}
 
 // Config controls the agent integration. It is stored as JSON in the app data
 // directory; the repo registry is edited through the desktop UI, the rest by

@@ -29,6 +29,7 @@ type AgentEntry = {
     prompt?: string
     env?: {[key: string]: string}
     args?: string[]
+    command?: string[]
 }
 
 export function isAgentsAvailable(): boolean {
@@ -76,6 +77,7 @@ const AgentsDialog = (props: Props) => {
     const [form, setForm] = useState<AgentEntry | null>(null)
     const [envText, setEnvText] = useState('')
     const [argsText, setArgsText] = useState('')
+    const [commandText, setCommandText] = useState('')
     const [editingName, setEditingName] = useState<string | null>(null)
     const [error, setError] = useState('')
 
@@ -101,6 +103,7 @@ const AgentsDialog = (props: Props) => {
         setForm({...emptyForm})
         setEnvText('')
         setArgsText('')
+        setCommandText('')
         setEditingName(null)
         setError('')
     }, [])
@@ -109,6 +112,7 @@ const AgentsDialog = (props: Props) => {
         setForm({...agent})
         setEnvText(envToText(agent.env))
         setArgsText((agent.args || []).join(' '))
+        setCommandText((agent.command || []).join(' '))
         setEditingName(agent.name)
         setError('')
     }, [])
@@ -123,6 +127,7 @@ const AgentsDialog = (props: Props) => {
             name: form.name.trim(),
             env: textToEnv(envText),
             args: argsText.split(/\s+/).filter(Boolean),
+            command: commandText.split(/\s+/).filter(Boolean),
         }
         try {
             if (editingName) {
@@ -135,7 +140,7 @@ const AgentsDialog = (props: Props) => {
         } catch (e) {
             setError(String(e))
         }
-    }, [bindings, form, envText, argsText, editingName, refresh])
+    }, [bindings, form, envText, argsText, commandText, editingName, refresh])
 
     const removeAgent = useCallback(async (name: string) => {
         if (!bindings?.RemoveAgent) {
@@ -259,6 +264,8 @@ const AgentsDialog = (props: Props) => {
                             >
                                 <option value='claude'>{'Claude'}</option>
                                 <option value='codex'>{'Codex'}</option>
+                                <option value='antigravity'>{'Antigravity'}</option>
+                                <option value='acp'>{'ACP (other)'}</option>
                             </select>
                         </label>
                         <label>
@@ -275,6 +282,15 @@ const AgentsDialog = (props: Props) => {
                                 onChange={(e) => updateForm({binPath: e.target.value})}
                             />
                         </label>
+                        {(form.kind === 'antigravity' || form.kind === 'acp') &&
+                            <label>
+                                {intl.formatMessage({id: 'Agents.command', defaultMessage: 'ACP launch command (argv) — required for "ACP (other)", overrides the default for Antigravity'})}
+                                <input
+                                    value={commandText}
+                                    placeholder={form.kind === 'antigravity' ? 'antigravity --acp' : 'gemini --acp'}
+                                    onChange={(e) => setCommandText(e.target.value)}
+                                />
+                            </label>}
                         <label>
                             {intl.formatMessage({id: 'Agents.prompt', defaultMessage: 'Agent system prompt'})}
                             <textarea

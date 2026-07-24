@@ -147,11 +147,16 @@ func (m *Manager) runAgentTurn(ctx context.Context, s *Session) (string, error) 
 		cleanup func()
 		err     error
 	)
-	switch s.Agent.Kind {
-	case AgentKindCodex:
+	switch {
+	case s.Agent.Kind == AgentKindCodex:
 		conn, cleanup, err = m.connectCodex(ctx, s)
-	case AgentKindClaude:
+	case s.Agent.Kind == AgentKindClaude:
 		conn, cleanup, err = m.connectClaude(ctx, s)
+	case IsExternalACP(s.Agent.Kind):
+		var argv []string
+		if argv, err = m.externalACPCommand(s.Agent); err == nil {
+			conn, cleanup, err = m.connectACPAgent(ctx, s, argv)
+		}
 	default:
 		// Backward-compat fallback: the global acp-command external agent.
 		conn, cleanup, err = m.connectExternal(ctx, s)
@@ -317,15 +322,48 @@ func (m *Manager) connectCodex(ctx context.Context, s *Session) (*acpsdk.ClientS
 	return clientConn, cleanup, nil
 }
 
-// connectExternal spawns an arbitrary external ACP agent (config agentMode
-// "acp-command") and connects over its stdio.
+// connectExternal spawns the global acp-command external ACP agent (config
+// agentMode "acp-command") — the empty-registry backward-compat fallback.
 func (m *Manager) connectExternal(ctx context.Context, s *Session) (*acpsdk.ClientSideConnection, func(), error) {
 	if len(m.cfg.AgentCommand) == 0 {
 		return nil, nil, fmt.Errorf("agentMode is acp-command but agentCommand is empty")
 	}
-	proc, err := procgroup.Spawn(m.rootCtx, m.cfg.AgentCommand, s.Worktree.Path, nil)
+	return m.connectACPAgent(ctx, s, m.cfg.AgentCommand)
+}
+
+// externalACPCommand builds the argv for an ACP-native external agent
+// (antigravity or the generic acp kind). Command overrides everything; kind
+// "antigravity" defaults to `<bin> --acp`. Args are appended in both cases.
+func (m *Manager) externalACPCommand(a AgentEntry) ([]string, error) {
+	var argv []string
+	switch {
+	case len(a.Command) > 0:
+		argv = append(argv, a.Command...)
+	case a.Kind == AgentKindAntigravity:
+		bin, err := lookupBin(firstNonEmpty(a.BinPath, "antigravity"), "antigravity binary not found (set binPath or command on the agent)")
+		if err != nil {
+			return nil, err
+		}
+		argv = append(argv, bin, "--acp")
+		if a.Model != "" {
+			argv = append(argv, "--model", a.Model)
+		}
+	default:
+		return nil, fmt.Errorf("agent %q (kind %s) has no launch command", a.Name, a.Kind)
+	}
+	return append(argv, a.Args...), nil
+}
+
+// connectACPAgent spawns an ACP-native external agent (argv) over stdio with
+// the agent's per-process env, and talks pure ACP to it — no bridge.
+func (m *Manager) connectACPAgent(ctx context.Context, s *Session, argv []string) (*acpsdk.ClientSideConnection, func(), error) {
+	if len(argv) == 0 {
+		return nil, nil, fmt.Errorf("empty agent command")
+	}
+	env, drop := agentSpawnEnv(s.Agent)
+	proc, err := procgroup.Spawn(m.rootCtx, argv, s.Worktree.Path, env, drop...)
 	if err != nil {
-		return nil, nil, fmt.Errorf("spawn agent %q: %w", m.cfg.AgentCommand[0], err)
+		return nil, nil, fmt.Errorf("spawn agent %q: %w", argv[0], err)
 	}
 	conn := acpsdk.NewClientSideConnection(&sessionClient{m: m, s: s}, proc.Stdin, proc.Stdout)
 	conn.SetLogger(m.sdkLogger(s.ID))

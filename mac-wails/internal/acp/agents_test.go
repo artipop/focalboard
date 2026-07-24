@@ -66,6 +66,49 @@ func TestAddUpdateRemoveAgentPersists(t *testing.T) {
 	}
 }
 
+func TestAgentKindValidation(t *testing.T) {
+	m := agentManager(t, "")
+
+	// antigravity needs no command; the generic acp kind does.
+	if _, err := m.AddAgent(AgentEntry{Name: "grav", Kind: "antigravity"}); err != nil {
+		t.Errorf("antigravity without command should be valid: %v", err)
+	}
+	if _, err := m.AddAgent(AgentEntry{Name: "gen", Kind: "acp"}); err == nil {
+		t.Error("acp kind without command should be rejected")
+	}
+	if _, err := m.AddAgent(AgentEntry{Name: "gem", Kind: "acp", Command: []string{"gemini", "--acp"}}); err != nil {
+		t.Errorf("acp kind with command should be valid: %v", err)
+	}
+}
+
+func TestExternalACPCommand(t *testing.T) {
+	m := agentManager(t, "")
+
+	// Explicit command overrides everything and appends Args.
+	argv, err := m.externalACPCommand(AgentEntry{Name: "gem", Kind: "acp", Command: []string{"gemini", "--acp"}, Args: []string{"--yolo"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(argv, " "); got != "gemini --acp --yolo" {
+		t.Errorf("acp command argv = %q", got)
+	}
+
+	// antigravity with an explicit binPath defaults to `<bin> --acp` + model.
+	bin := writeFakeClaude(t, "#!/bin/sh\n") // any existing executable
+	argv, err = m.externalACPCommand(AgentEntry{Name: "g", Kind: "antigravity", BinPath: bin, Model: "gemini-3-pro"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(argv, " "); got != bin+" --acp --model gemini-3-pro" {
+		t.Errorf("antigravity argv = %q", got)
+	}
+
+	// antigravity with a missing binary errors clearly.
+	if _, err := m.externalACPCommand(AgentEntry{Name: "g", Kind: "antigravity", BinPath: "/no/such/antigravity"}); err == nil {
+		t.Error("missing antigravity binary should error")
+	}
+}
+
 func TestResolveAgentByOption(t *testing.T) {
 	m := agentManager(t, "",
 		AgentEntry{Name: "claude", Kind: "claude"},

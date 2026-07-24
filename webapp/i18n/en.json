@@ -18,6 +18,7 @@
   "Agents.args": "Extra CLI args (space-separated)",
   "Agents.binPath": "Binary path (optional)",
   "Agents.cancel": "Cancel",
+  "Agents.command": "ACP launch command (argv) — required for \"ACP (other)\", overrides the default for Antigravity",
   "Agents.edit": "Edit",
   "Agents.empty": "No agents registered yet.",
   "Agents.env": "Environment (KEY=VALUE per line — e.g. CODEX_HOME, OPENAI_API_KEY)",
