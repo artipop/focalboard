@@ -7,7 +7,7 @@ export function AddAgentRepo(arg1:string,arg2:string):Promise<string>;
 
 export function CancelSession(arg1:string):Promise<boolean>;
 
-export function GetAgentPreamble():Promise<string>;
+export function GetAgentSystemPrompt():Promise<string>;
 
 export function GetCardSessions(arg1:string):Promise<string>;
 
@@ -23,6 +23,6 @@ export function RemoveAgent(arg1:string):Promise<void>;
 
 export function RemoveAgentRepo(arg1:string):Promise<void>;
 
-export function SetAgentPreamble(arg1:string):Promise<void>;
+export function SetAgentSystemPrompt(arg1:string):Promise<void>;
 
 export function UpdateAgent(arg1:string):Promise<string>;

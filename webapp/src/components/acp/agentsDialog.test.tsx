@@ -31,8 +31,8 @@ describe('components/acp/agentsDialog', () => {
     test('lists agents and adds a codex agent with env', async () => {
         const bindings = {
             ListAgents: jest.fn().mockResolvedValue(JSON.stringify([{name: 'default-agent', kind: 'claude'}])),
-            GetAgentPreamble: jest.fn().mockResolvedValue(''),
-            SetAgentPreamble: jest.fn().mockResolvedValue(undefined),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn().mockResolvedValue(undefined),
             AddAgent: jest.fn().mockResolvedValue(JSON.stringify({name: 'codex-a', kind: 'codex'})),
             UpdateAgent: jest.fn(),
             RemoveAgent: jest.fn(),
@@ -67,8 +67,8 @@ describe('components/acp/agentsDialog', () => {
                 {name: 'claude', kind: 'claude'},
                 {name: 'codex-a', kind: 'codex'},
             ])),
-            GetAgentPreamble: jest.fn().mockResolvedValue(''),
-            SetAgentPreamble: jest.fn(),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
             AddAgent: jest.fn(),
             UpdateAgent: jest.fn(),
             RemoveAgent: jest.fn(),

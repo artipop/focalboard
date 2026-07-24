@@ -72,7 +72,7 @@ const AgentsDialog = (props: Props) => {
     const bindings = agentBindings()
 
     const [agents, setAgents] = useState<AgentEntry[]>([])
-    const [preamble, setPreamble] = useState('')
+    const [systemPrompt, setSystemPrompt] = useState('')
     const [form, setForm] = useState<AgentEntry | null>(null)
     const [envText, setEnvText] = useState('')
     const [argsText, setArgsText] = useState('')
@@ -85,8 +85,8 @@ const AgentsDialog = (props: Props) => {
         }
         try {
             setAgents(JSON.parse(await bindings.ListAgents()) || [])
-            if (bindings.GetAgentPreamble) {
-                setPreamble(await bindings.GetAgentPreamble())
+            if (bindings.GetAgentSystemPrompt) {
+                setSystemPrompt(await bindings.GetAgentSystemPrompt())
             }
         } catch (e) {
             setError(String(e))
@@ -150,18 +150,18 @@ const AgentsDialog = (props: Props) => {
         }
     }, [bindings, refresh])
 
-    const savePreamble = useCallback(async () => {
-        if (!bindings?.SetAgentPreamble) {
+    const saveSystemPrompt = useCallback(async () => {
+        if (!bindings?.SetAgentSystemPrompt) {
             return
         }
         setError('')
         try {
-            await bindings.SetAgentPreamble(preamble)
-            sendFlashMessage({content: intl.formatMessage({id: 'Agents.preamble-saved', defaultMessage: 'Saved board preamble'}), severity: 'normal'})
+            await bindings.SetAgentSystemPrompt(systemPrompt)
+            sendFlashMessage({content: intl.formatMessage({id: 'Agents.system-prompt-saved', defaultMessage: 'Saved board system prompt'}), severity: 'normal'})
         } catch (e) {
             setError(String(e))
         }
-    }, [bindings, preamble, intl])
+    }, [bindings, systemPrompt, intl])
 
     // syncToBoard adds every registered agent name as an option of the board's
     // "Agent" (single-)select property, creating the property when absent.
@@ -276,7 +276,7 @@ const AgentsDialog = (props: Props) => {
                             />
                         </label>
                         <label>
-                            {intl.formatMessage({id: 'Agents.prompt', defaultMessage: 'Agent prompt (preamble)'})}
+                            {intl.formatMessage({id: 'Agents.prompt', defaultMessage: 'Agent system prompt'})}
                             <textarea
                                 rows={3}
                                 value={form.prompt || ''}
@@ -327,17 +327,17 @@ const AgentsDialog = (props: Props) => {
                             </Button>}
                     </div>}
 
-                <div className='AgentsDialog__preamble'>
+                <div className='AgentsDialog__systemPrompt'>
                     <label>
-                        {intl.formatMessage({id: 'Agents.preamble', defaultMessage: 'Board preamble (prepended to every agent prompt)'})}
+                        {intl.formatMessage({id: 'Agents.system-prompt', defaultMessage: 'Board system prompt (prepended to every agent prompt)'})}
                         <textarea
                             rows={3}
-                            value={preamble}
-                            onChange={(e) => setPreamble(e.target.value)}
+                            value={systemPrompt}
+                            onChange={(e) => setSystemPrompt(e.target.value)}
                         />
                     </label>
-                    <Button onClick={savePreamble}>
-                        {intl.formatMessage({id: 'Agents.save-preamble', defaultMessage: 'Save preamble'})}
+                    <Button onClick={saveSystemPrompt}>
+                        {intl.formatMessage({id: 'Agents.save-system-prompt', defaultMessage: 'Save system prompt'})}
                     </Button>
                 </div>
 

@@ -14,8 +14,8 @@ export function CancelSession(arg1) {
   return window['go']['main']['App']['CancelSession'](arg1);
 }
 
-export function GetAgentPreamble() {
-  return window['go']['main']['App']['GetAgentPreamble']();
+export function GetAgentSystemPrompt() {
+  return window['go']['main']['App']['GetAgentSystemPrompt']();
 }
 
 export function GetCardSessions(arg1) {
@@ -46,8 +46,8 @@ export function RemoveAgentRepo(arg1) {
   return window['go']['main']['App']['RemoveAgentRepo'](arg1);
 }
 
-export function SetAgentPreamble(arg1) {
-  return window['go']['main']['App']['SetAgentPreamble'](arg1);
+export function SetAgentSystemPrompt(arg1) {
+  return window['go']['main']['App']['SetAgentSystemPrompt'](arg1);
 }
 
 export function UpdateAgent(arg1) {

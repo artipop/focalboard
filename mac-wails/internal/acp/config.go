@@ -25,7 +25,7 @@ type AgentEntry struct {
 	Kind    string            `json:"kind"`              // "claude" | "codex"
 	BinPath string            `json:"binPath,omitempty"` // overrides binary discovery
 	Model   string            `json:"model,omitempty"`   // --model passed to the CLI
-	Prompt  string            `json:"prompt,omitempty"`  // per-agent preamble prepended to the task
+	Prompt  string            `json:"prompt,omitempty"`  // per-agent system prompt prepended to the task
 	Env     map[string]string `json:"env,omitempty"`     // per-process env (CODEX_HOME, OPENAI_API_KEY, …)
 	Args    []string          `json:"args,omitempty"`    // extra CLI args (sandbox/approval, etc.)
 }
@@ -68,10 +68,10 @@ type Config struct {
 	// AgentMode below drives the (single) built-in agent for backward compat.
 	Agents []AgentEntry `json:"agents"`
 
-	// Preamble is the board/column-level instruction prepended to every
-	// triggered session's prompt (before the agent's own preamble and the card
-	// task). One trigger column today; may become a per-column map later.
-	Preamble string `json:"preamble"`
+	// SystemPrompt is the board/column-level instruction prepended to every
+	// triggered session's prompt (before the agent's own system prompt and the
+	// card task). One trigger column today; may become a per-column map later.
+	SystemPrompt string `json:"systemPrompt"`
 
 	// WorktreeMode controls where sessions run: "never" (default) — directly
 	// in the repository working tree, with concurrent sessions per repo

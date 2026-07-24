@@ -154,20 +154,20 @@ func (a *App) RemoveAgent(name string) error {
 	return a.mgr.RemoveAgent(name)
 }
 
-// GetAgentPreamble returns the board/column-level prompt preamble.
-func (a *App) GetAgentPreamble() (string, error) {
+// GetAgentSystemPrompt returns the board/column-level system prompt.
+func (a *App) GetAgentSystemPrompt() (string, error) {
 	if a.mgr == nil {
 		return "", nil
 	}
-	return a.mgr.Preamble(), nil
+	return a.mgr.SystemPrompt(), nil
 }
 
-// SetAgentPreamble stores the board/column-level prompt preamble.
-func (a *App) SetAgentPreamble(text string) error {
+// SetAgentSystemPrompt stores the board/column-level system prompt.
+func (a *App) SetAgentSystemPrompt(text string) error {
 	if a.mgr == nil {
 		return errACPDisabled
 	}
-	return a.mgr.SetPreamble(text)
+	return a.mgr.SetSystemPrompt(text)
 }
 
 // GetCardSessions returns the card's persisted agent sessions and their event

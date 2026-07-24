@@ -18,7 +18,7 @@ import (
 // and policies, and reports results back to the board and the UI.
 type Manager struct {
 	cfg     Config
-	cfgMu   sync.RWMutex // guards the UI-mutable parts of cfg (Repos, Agents, Preamble)
+	cfgMu   sync.RWMutex // guards the UI-mutable parts of cfg (Repos, Agents, SystemPrompt)
 	cfgPath string       // where registry edits are persisted; empty in tests
 	store   *Store
 	writer  BoardWriter
@@ -127,7 +127,7 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 	}
 
 	m.cfgMu.RLock()
-	preamble := m.cfg.Preamble
+	systemPrompt := m.cfg.SystemPrompt
 	m.cfgMu.RUnlock()
 	s := &Session{
 		ID:         uuid.NewString(),
@@ -136,7 +136,7 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 		RepoPath:   repoPath,
 		BaseBranch: ev.Props["branch"],
 		Agent:      agent,
-		PromptText: composePrompt(ev, agent, preamble, m.cfg.UseWorktrees()),
+		PromptText: composePrompt(ev, agent, systemPrompt, m.cfg.UseWorktrees()),
 		status:     StatusQueued,
 		allowTools: make(map[string]bool),
 	}
@@ -327,10 +327,11 @@ func agentSpawnEnv(a AgentEntry) (env []string, drop []string) {
 }
 
 // composePrompt builds the agent task text from the card. The final prompt is
-// the board/column preamble, then the agent's own preamble, then the card task.
-func composePrompt(ev CardMoved, agent AgentEntry, preamble string, useWorktree bool) string {
+// the board/column system prompt, then the agent's own system prompt, then the
+// card task.
+func composePrompt(ev CardMoved, agent AgentEntry, systemPrompt string, useWorktree bool) string {
 	var b []byte
-	if p := strings.TrimSpace(preamble); p != "" {
+	if p := strings.TrimSpace(systemPrompt); p != "" {
 		b = fmt.Appendf(b, "%s\n\n", p)
 	}
 	if p := strings.TrimSpace(agent.Prompt); p != "" {

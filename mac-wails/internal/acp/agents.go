@@ -66,18 +66,18 @@ func (m *Manager) UpdateAgent(a AgentEntry) (AgentEntry, error) {
 	return AgentEntry{}, fmt.Errorf("агент %q не найден", a.Name)
 }
 
-// Preamble returns the board/column-level prompt preamble.
-func (m *Manager) Preamble() string {
+// SystemPrompt returns the board/column-level system prompt.
+func (m *Manager) SystemPrompt() string {
 	m.cfgMu.RLock()
 	defer m.cfgMu.RUnlock()
-	return m.cfg.Preamble
+	return m.cfg.SystemPrompt
 }
 
-// SetPreamble stores the board/column-level prompt preamble and persists.
-func (m *Manager) SetPreamble(text string) error {
+// SetSystemPrompt stores the board/column-level system prompt and persists.
+func (m *Manager) SetSystemPrompt(text string) error {
 	m.cfgMu.Lock()
 	defer m.cfgMu.Unlock()
-	m.cfg.Preamble = text
+	m.cfg.SystemPrompt = text
 	return m.persistConfigLocked()
 }
 
