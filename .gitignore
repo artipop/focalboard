@@ -74,3 +74,6 @@ server/vendor
 docker/certs
 docker/data
 server/**/*.coverage
+
+# Internal spec, not for VCS
+TZ_ACP_wails_v0.2.md
