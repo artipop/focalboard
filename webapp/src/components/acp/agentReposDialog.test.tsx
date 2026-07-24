@@ -54,18 +54,18 @@ describe('components/acp/agentReposDialog', () => {
         await waitFor(() => expect(bindings.AddAgentRepo).toBeCalledWith('beta', '/tmp/beta'))
     })
 
-    test('adds only missing repo names as property options', async () => {
+    test('creates a Repositories field and adds missing repo options', async () => {
         const bindings = {
             ListAgentRepos: jest.fn().mockResolvedValue(JSON.stringify([
                 {name: 'alpha', path: '/tmp/alpha'},
-                {name: 'value 1', path: '/tmp/existing'}, // already an option of Property 1
+                {name: 'beta', path: '/tmp/beta'},
             ])),
             PickDirectory: jest.fn(),
             AddAgentRepo: jest.fn(),
             RemoveAgentRepo: jest.fn(),
         }
         anyWindow.go = {main: {App: bindings}}
-        mockedMutator.insertPropertyOption.mockResolvedValue()
+        mockedMutator.updateBoardCardProperties.mockResolvedValue()
 
         render(wrapIntl(
             <AgentReposDialog
@@ -75,9 +75,50 @@ describe('components/acp/agentReposDialog', () => {
         ))
         await waitFor(() => expect(screen.getByText('alpha')).toBeInTheDocument())
 
-        userEvent.selectOptions(screen.getByRole('combobox'), 'property1')
-        userEvent.click(screen.getByRole('button', {name: 'Add options'}))
-        await waitFor(() => expect(mockedMutator.insertPropertyOption).toBeCalledTimes(1))
-        expect(mockedMutator.insertPropertyOption.mock.calls[0][3].value).toBe('alpha')
+        userEvent.click(screen.getByRole('button', {name: 'Sync to board'}))
+        await waitFor(() => expect(mockedMutator.updateBoardCardProperties).toBeCalledTimes(1))
+
+        const newProps = mockedMutator.updateBoardCardProperties.mock.calls[0][2]
+        const repoProp = newProps.find((p) => p.name === 'Repositories')!
+        expect(repoProp).toBeDefined()
+        expect(repoProp.type).toBe('multiSelect')
+        expect(repoProp.options.map((o) => o.value)).toEqual(['alpha', 'beta'])
+    })
+
+    test('reuses an existing Repositories field and skips existing options', async () => {
+        const boardWithRepos = TestBlockFactory.createBoard()
+        boardWithRepos.cardProperties.push({
+            id: 'repoprop',
+            name: 'Repositories',
+            type: 'multiSelect',
+            options: [{id: 'o1', value: 'alpha', color: 'propColorDefault'}],
+        })
+        const bindings = {
+            ListAgentRepos: jest.fn().mockResolvedValue(JSON.stringify([
+                {name: 'alpha', path: '/tmp/alpha'}, // already an option
+                {name: 'beta', path: '/tmp/beta'},
+            ])),
+            PickDirectory: jest.fn(),
+            AddAgentRepo: jest.fn(),
+            RemoveAgentRepo: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+        mockedMutator.updateBoardCardProperties.mockResolvedValue()
+
+        render(wrapIntl(
+            <AgentReposDialog
+                board={boardWithRepos}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByText('beta')).toBeInTheDocument())
+
+        userEvent.click(screen.getByRole('button', {name: 'Sync to board'}))
+        await waitFor(() => expect(mockedMutator.updateBoardCardProperties).toBeCalledTimes(1))
+
+        const newProps = mockedMutator.updateBoardCardProperties.mock.calls[0][2]
+        const repoProps = newProps.filter((p) => p.name === 'Repositories')
+        expect(repoProps).toHaveLength(1) // reused, not duplicated
+        expect(repoProps[0].options.map((o) => o.value)).toEqual(['alpha', 'beta'])
     })
 })

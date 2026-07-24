@@ -98,13 +98,16 @@ for later.
   observing card moves, and a writer posting comments via `srv.App()`).
 - **Mapping cards to repositories**: register local repos in the board menu
   (“…” → *Agent repositories…*, desktop only) — each entry is a name + a path
-  chosen with the native folder picker. A card is matched to a repo when one
-  of its select/multiSelect option names (e.g. a tag) equals a registry entry
-  name (case-insensitive); the dialog can also push the registry names as
-  options into any select/multiSelect property of the current board. A
-  `repo_path` text property remains as an explicit per-card override
-  (validated against `repoWhitelist` + registered paths). Optional card
-  property `branch` picks the worktree base.
+  chosen with the native folder picker. The dialog’s *Sync to board* button
+  finds or creates a dedicated **Repositories** multiSelect property on the
+  board and adds the registry names as options (the “My Project Tasks”
+  template ships this field already). A card is matched to a repo when one of
+  its select/multiSelect option names (typically a Repositories tag, but any
+  option works) equals a registry entry name (case-insensitive), or when the
+  card is dragged out of a column named after a repo. A `repo_path` text
+  property remains as an explicit per-card override (validated against
+  `repoWhitelist` + registered paths). Optional card property `branch` picks
+  the worktree base (worktree mode only).
 - Config: `~/Library/Application Support/Focalboard/acp/config.json` (created
   with defaults on first run; the repo registry is stored there too). If the
   app can't find `claude` (GUI apps get a minimal `PATH`), set `claudePath`
