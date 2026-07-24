@@ -13,6 +13,7 @@ import (
 	acpsdk "github.com/coder/acp-go-sdk"
 
 	"github.com/mattermost/focalboard/mac-wails/internal/acp/claudebridge"
+	"github.com/mattermost/focalboard/mac-wails/internal/acp/codexbridge"
 	"github.com/mattermost/focalboard/mac-wails/internal/procgroup"
 )
 
@@ -24,6 +25,7 @@ type Session struct {
 	RepoPath   string
 	BaseBranch string
 	PromptText string
+	Agent      AgentEntry // resolved agent (kind/bin/model/env/prompt)
 
 	Worktree     WorktreeInfo
 	usedWorktree bool // a dedicated worktree was actually created
@@ -145,11 +147,14 @@ func (m *Manager) runAgentTurn(ctx context.Context, s *Session) (string, error) 
 		cleanup func()
 		err     error
 	)
-	switch m.cfg.AgentMode {
-	case "acp-command":
-		conn, cleanup, err = m.connectExternal(ctx, s)
-	default:
+	switch s.Agent.Kind {
+	case AgentKindCodex:
+		conn, cleanup, err = m.connectCodex(ctx, s)
+	case AgentKindClaude:
 		conn, cleanup, err = m.connectClaude(ctx, s)
+	default:
+		// Backward-compat fallback: the global acp-command external agent.
+		conn, cleanup, err = m.connectExternal(ctx, s)
 	}
 	if err != nil {
 		return "", err
@@ -242,11 +247,58 @@ func (h *minLevelHandler) WithGroup(name string) slog.Handler {
 
 // connectClaude wires the in-process claude bridge over io.Pipe.
 func (m *Manager) connectClaude(ctx context.Context, s *Session) (*acpsdk.ClientSideConnection, func(), error) {
-	claudeBin, err := m.findClaude()
+	claudeBin, err := m.resolveClaudeBin(s.Agent.BinPath)
 	if err != nil {
 		return nil, nil, err
 	}
-	bridge := claudebridge.New(claudebridge.Options{ClaudeBin: claudeBin, Logger: m.log})
+	var extraArgs []string
+	if s.Agent.Model != "" {
+		extraArgs = append(extraArgs, "--model", s.Agent.Model)
+	}
+	extraArgs = append(extraArgs, s.Agent.Args...)
+	env, drop := agentSpawnEnv(s.Agent)
+	bridge := claudebridge.New(claudebridge.Options{
+		ClaudeBin: claudeBin,
+		ExtraArgs: extraArgs,
+		Env:       env,
+		DropEnv:   drop,
+		Logger:    m.log,
+	})
+
+	clientIn, agentOut := io.Pipe() // agent writes → client reads
+	agentIn, clientOut := io.Pipe() // client writes → agent reads
+
+	agentConn := acpsdk.NewAgentSideConnection(bridge, agentOut, agentIn)
+	agentConn.SetLogger(m.sdkLogger(s.ID))
+	bridge.SetConn(agentConn)
+	clientConn := acpsdk.NewClientSideConnection(&sessionClient{m: m, s: s}, clientOut, clientIn)
+	clientConn.SetLogger(m.sdkLogger(s.ID))
+
+	cleanup := func() {
+		bridge.KillAll(2 * time.Second)
+		_ = clientOut.Close()
+		_ = agentOut.Close()
+	}
+	return clientConn, cleanup, nil
+}
+
+// connectCodex wires the in-process codex bridge over io.Pipe. The codex CLI
+// has no ACP mode, so the bridge drives `codex exec --json` and translates its
+// event stream; per-agent env (CODEX_HOME/OPENAI_API_KEY) is injected at spawn.
+func (m *Manager) connectCodex(ctx context.Context, s *Session) (*acpsdk.ClientSideConnection, func(), error) {
+	codexBin, err := m.resolveCodexBin(s.Agent.BinPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	env, drop := agentSpawnEnv(s.Agent)
+	bridge := codexbridge.New(codexbridge.Options{
+		CodexBin:  codexBin,
+		Model:     s.Agent.Model,
+		ExtraArgs: s.Agent.Args,
+		Env:       env,
+		DropEnv:   drop,
+		Logger:    m.log,
+	})
 
 	clientIn, agentOut := io.Pipe() // agent writes → client reads
 	agentIn, clientOut := io.Pipe() // client writes → agent reads

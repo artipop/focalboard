@@ -17,6 +17,7 @@ import {Utils} from '../../utils'
 import ModalWrapper from '../modalWrapper'
 import {sendFlashMessage} from '../flashMessages'
 import AgentReposDialog, {isAgentReposAvailable} from '../acp/agentReposDialog'
+import AgentsDialog, {isAgentsAvailable} from '../acp/agentsDialog'
 
 type Props = {
     board: Board
@@ -99,6 +100,7 @@ const ViewHeaderActionsMenu = (props: Props) => {
     const {board, activeView, cards} = props
     const intl = useIntl()
     const [showAgentRepos, setShowAgentRepos] = useState(false)
+    const [showAgents, setShowAgents] = useState(false)
 
     return (
         <ModalWrapper>
@@ -123,6 +125,14 @@ const ViewHeaderActionsMenu = (props: Props) => {
                             id='agentRepos'
                             name={intl.formatMessage({id: 'ViewHeader.agent-repos', defaultMessage: 'Agent repositories…'})}
                             onClick={() => setShowAgentRepos(true)}
+                        />,
+                    ] : []}
+                    {isAgentsAvailable() ? [
+                        <Menu.Text
+                            key='agents'
+                            id='agents'
+                            name={intl.formatMessage({id: 'ViewHeader.agents', defaultMessage: 'Agents…'})}
+                            onClick={() => setShowAgents(true)}
                         />,
                     ] : []}
                     {/*
@@ -155,6 +165,11 @@ const ViewHeaderActionsMenu = (props: Props) => {
                 <AgentReposDialog
                     board={board}
                     onClose={() => setShowAgentRepos(false)}
+                />}
+            {showAgents &&
+                <AgentsDialog
+                    board={board}
+                    onClose={() => setShowAgents(false)}
                 />}
         </ModalWrapper>
     )

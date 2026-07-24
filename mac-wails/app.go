@@ -98,6 +98,78 @@ func (a *App) RemoveAgentRepo(name string) error {
 	return a.mgr.RemoveRepo(name)
 }
 
+// ListAgents returns the agent registry as JSON: [{"name","kind",…}, …].
+func (a *App) ListAgents() (string, error) {
+	if a.mgr == nil {
+		return "[]", nil
+	}
+	out, err := json.Marshal(a.mgr.Agents())
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// AddAgent registers a new agent from a JSON-encoded AgentEntry and returns the
+// created entry as JSON.
+func (a *App) AddAgent(entryJSON string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	var entry acp.AgentEntry
+	if err := json.Unmarshal([]byte(entryJSON), &entry); err != nil {
+		return "", err
+	}
+	saved, err := a.mgr.AddAgent(entry)
+	if err != nil {
+		return "", err
+	}
+	out, _ := json.Marshal(saved)
+	return string(out), nil
+}
+
+// UpdateAgent replaces an existing agent (matched by name) from a JSON-encoded
+// AgentEntry and returns the saved entry as JSON.
+func (a *App) UpdateAgent(entryJSON string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	var entry acp.AgentEntry
+	if err := json.Unmarshal([]byte(entryJSON), &entry); err != nil {
+		return "", err
+	}
+	saved, err := a.mgr.UpdateAgent(entry)
+	if err != nil {
+		return "", err
+	}
+	out, _ := json.Marshal(saved)
+	return string(out), nil
+}
+
+// RemoveAgent deletes an agent registry entry by name.
+func (a *App) RemoveAgent(name string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	return a.mgr.RemoveAgent(name)
+}
+
+// GetAgentPreamble returns the board/column-level prompt preamble.
+func (a *App) GetAgentPreamble() (string, error) {
+	if a.mgr == nil {
+		return "", nil
+	}
+	return a.mgr.Preamble(), nil
+}
+
+// SetAgentPreamble stores the board/column-level prompt preamble.
+func (a *App) SetAgentPreamble(text string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	return a.mgr.SetPreamble(text)
+}
+
 // GetCardSessions returns the card's persisted agent sessions and their event
 // logs as JSON: {"sessions": [...], "events": [...]}.
 func (a *App) GetCardSessions(cardID string) (string, error) {
