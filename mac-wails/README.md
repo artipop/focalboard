@@ -130,12 +130,33 @@ for later.
   `NO_PROXY` and the per-runtime CA variables (`NODE_EXTRA_CA_CERTS`,
   `SSL_CERT_FILE`, …), covering a plain HTTP proxy without any wrapper; an
   agent's own `env` still overrides them (an empty value opts it out of an
-  inherited proxy). Guardrails: a proxy URL without a scheme is rejected, and
-  since Claude Code documents no SOCKS support a `socks…://` configuration
-  cannot be paired with a `claude` agent — neither when saving the agent nor by
-  editing the configuration afterwards. Removing an entry still referenced by
-  an agent is refused. A per-agent *VPN* needs the `command` wrapper — env
-  alone cannot change routing.
+  inherited proxy). Guardrails: a proxy address that does not parse as a URL
+  with a scheme and host is rejected, and since Claude Code documents no SOCKS
+  support a `socks…://` configuration cannot be paired with a `claude` agent —
+  neither when saving the agent nor by editing the configuration afterwards.
+  Removing an entry still referenced by an agent is refused. A per-agent *VPN*
+  needs the `command` wrapper — env alone cannot change routing.
+
+  **Proxies that require authentication.** A proxy answering `407` wants
+  credentials (the CLI surfaces this as a bare `API Error: 407 status code (no
+  body)`, so the failure comment adds a hint). Only basic auth works — for
+  NTLM/Kerberos, run a local relay (`cntlm`, `px`) and point the entry at
+  `http://127.0.0.1:3128`. Two ways to supply them:
+
+  - **Separate `username` / `password` fields** (preferred). Entered raw and
+    percent-encoded into the URL at spawn (`NetworkSettings.ProxyURL`), so a
+    password containing `@ : / #` needs no hand-encoding. The field is masked in
+    the UI, never rendered in the configuration list, and redacted from card
+    comments and the session log if a CLI echoes the proxy URL back in an error.
+  - **Inline in the URL** — `http://user:pass@proxy.example.com:8080` also
+    works, and is what the CLIs document, but every special character must be
+    percent-encoded by hand (`@` → `%40`, `:` → `%3A`, `/` → `%2F`, `#` →
+    `%23`), and the credentials show up (elided) in the configuration list. When
+    both are given, the fields win over whatever the URL carries.
+
+  Either way the credentials are stored in plain text in the config file below,
+  which is why it is written `0600` (existing files are tightened on the next
+  save). To keep the secret out of the file entirely, use the local relay.
 - Config: `~/Library/Application Support/Focalboard/acp/config.json` (created
   with defaults on first run; the repo registry is stored there too). If the
   app can't find `claude` (GUI apps get a minimal `PATH`), set `claudePath`

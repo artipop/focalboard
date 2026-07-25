@@ -1,7 +1,9 @@
 package acp
 
 import (
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -106,6 +108,81 @@ func TestAgentReferencesProxyByName(t *testing.T) {
 	// The registry entry is in use, so removing it must not silently unlink it.
 	if err := m.RemoveProxy("office"); err == nil {
 		t.Error("removing a referenced configuration should be refused")
+	}
+}
+
+func TestProxyCredentialsComposeAndStayOutOfSight(t *testing.T) {
+	m := agentManager(t, "")
+	entry := proxyEntry("office", "http://proxy.example.com:8080")
+	entry.Username = "user@corp"
+	entry.Password = "p@ss:w/rd #1"
+	if _, err := m.AddProxy(entry); err != nil {
+		t.Fatal(err)
+	}
+
+	// The password is percent-encoded into the URL, so it survives characters
+	// that would otherwise break parsing.
+	got, err := m.Proxies()[0].ProxyURL()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "http://user%40corp:p%40ss%3Aw%2Frd%20%231@proxy.example.com:8080"
+	if got != want {
+		t.Errorf("proxy URL = %q, want %q", got, want)
+	}
+
+	// …and that composed URL is what the agent process actually gets.
+	env, _ := spawnEnv(AgentEntry{}, m.Proxies()[0].NetworkSettings)
+	var seen bool
+	for _, kv := range env {
+		if kv == "HTTPS_PROXY="+want {
+			seen = true
+		}
+	}
+	if !seen {
+		t.Errorf("HTTPS_PROXY did not carry the credentials: %v", env)
+	}
+
+	// Credentials without an address are a configuration mistake, not a
+	// silent no-op.
+	bad := proxyEntry("creds-only", "")
+	bad.Username = "user"
+	if _, err := m.AddProxy(bad); err == nil {
+		t.Error("credentials without a proxy address should be rejected")
+	}
+
+	// A CLI echoing the proxy URL back must not leak the password into a card
+	// comment, in either form.
+	net := m.Proxies()[0].NetworkSettings
+	reason := "failed to connect to " + want + " (p@ss:w/rd #1)"
+	redacted := net.redactProxySecret(reason)
+	for _, secret := range []string{"p@ss:w/rd #1", "p%40ss%3Aw%2Frd%20%231"} {
+		if strings.Contains(redacted, secret) {
+			t.Errorf("password leaked in %q", redacted)
+		}
+	}
+	s := &Session{Net: net}
+	if c := failComment(s, "API Error: 407 status code (no body)"); !strings.Contains(c, "407") || !strings.Contains(c, "аутентификацию") {
+		t.Errorf("a 407 should be explained as proxy auth, got %q", c)
+	}
+}
+
+func TestConfigFileIsPrivate(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "config.json")
+	// A pre-existing world-readable config is tightened on the next save: it
+	// can hold proxy credentials and agent API keys.
+	if err := os.WriteFile(cfgPath, []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := SaveConfig(cfgPath, DefaultConfig(t.TempDir())); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(cfgPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		t.Errorf("config permissions = %o, want 600", perm)
 	}
 }
 

@@ -21,6 +21,17 @@ export type ProxyEntry = {
     proxy?: string
     noProxy?: string
     caCert?: string
+    username?: string
+    password?: string
+}
+
+// displayProxy hides any credentials the URL itself carries, so the list never
+// renders a password (the dedicated fields are masked in the form).
+function displayProxy(proxy?: string): string {
+    if (!proxy) {
+        return '—'
+    }
+    return proxy.replace(/\/\/[^/@]*@/, '//…@')
 }
 
 export function isProxiesAvailable(): boolean {
@@ -125,7 +136,7 @@ const ProxiesDialog = (props: Props) => {
                         key={entry.name}
                     >
                         <span className='ProxiesDialog__name'>{entry.name}</span>
-                        <span className='ProxiesDialog__proxy'>{entry.proxy || '—'}</span>
+                        <span className='ProxiesDialog__proxy'>{displayProxy(entry.proxy)}</span>
                         <Button onClick={() => startEdit(entry)}>
                             {intl.formatMessage({id: 'Proxies.edit', defaultMessage: 'Edit'})}
                         </Button>
@@ -152,6 +163,23 @@ const ProxiesDialog = (props: Props) => {
                                 value={form.proxy || ''}
                                 placeholder={'http://proxy.example.com:8080'}
                                 onChange={(e) => updateForm({proxy: e.target.value})}
+                            />
+                        </label>
+                        <label>
+                            {intl.formatMessage({id: 'Proxies.username', defaultMessage: 'Username (optional)'})}
+                            <input
+                                value={form.username || ''}
+                                autoComplete='off'
+                                onChange={(e) => updateForm({username: e.target.value})}
+                            />
+                        </label>
+                        <label>
+                            {intl.formatMessage({id: 'Proxies.password', defaultMessage: 'Password (optional) — stored in the local config file'})}
+                            <input
+                                type='password'
+                                value={form.password || ''}
+                                autoComplete='new-password'
+                                onChange={(e) => updateForm({password: e.target.value})}
                             />
                         </label>
                         <label>

@@ -408,8 +408,14 @@ func doneComment(s *Session, finalText string) string {
 }
 
 func failComment(s *Session, reason string) string {
+	reason = s.Net.redactProxySecret(reason)
 	var b strings.Builder
 	fmt.Fprintf(&b, "❌ Сессия агента завершилась с ошибкой: %s", truncateRunes(reason, 1500))
+	// 407 arrives as a bare status code from the CLI, with no hint that the
+	// proxy — not the model API — refused the request.
+	if s.Net.Proxy != "" && strings.Contains(reason, "407") {
+		b.WriteString("\n\nПрокси требует аутентификацию (407): задай логин и пароль в конфигурации прокси (меню доски → Proxy configurations).")
+	}
 	if s.usedWorktree && s.Worktree.Path != "" {
 		fmt.Fprintf(&b, "\nWorktree (если остался): `%s`", s.Worktree.Path)
 	}

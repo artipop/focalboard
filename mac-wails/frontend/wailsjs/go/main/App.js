@@ -10,6 +10,10 @@ export function AddAgentRepo(arg1, arg2) {
   return window['go']['main']['App']['AddAgentRepo'](arg1, arg2);
 }
 
+export function AddProxy(arg1) {
+  return window['go']['main']['App']['AddProxy'](arg1);
+}
+
 export function CancelSession(arg1) {
   return window['go']['main']['App']['CancelSession'](arg1);
 }
@@ -30,6 +34,10 @@ export function ListAgents() {
   return window['go']['main']['App']['ListAgents']();
 }
 
+export function ListProxies() {
+  return window['go']['main']['App']['ListProxies']();
+}
+
 export function OpenInBrowser(arg1) {
   return window['go']['main']['App']['OpenInBrowser'](arg1);
 }
@@ -46,10 +54,18 @@ export function RemoveAgentRepo(arg1) {
   return window['go']['main']['App']['RemoveAgentRepo'](arg1);
 }
 
+export function RemoveProxy(arg1) {
+  return window['go']['main']['App']['RemoveProxy'](arg1);
+}
+
 export function SetAgentSystemPrompt(arg1) {
   return window['go']['main']['App']['SetAgentSystemPrompt'](arg1);
 }
 
 export function UpdateAgent(arg1) {
   return window['go']['main']['App']['UpdateAgent'](arg1);
+}
+
+export function UpdateProxy(arg1) {
+  return window['go']['main']['App']['UpdateProxy'](arg1);
 }

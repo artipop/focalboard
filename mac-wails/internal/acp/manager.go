@@ -219,6 +219,8 @@ func (m *Manager) Shutdown(grace time.Duration) {
 
 // finishSession transitions to a terminal status exactly once.
 func (m *Manager) finishSession(s *Session, status SessionStatus, errText string) {
+	// A CLI failing to reach its proxy may echo the proxy URL back at us.
+	errText = s.Net.redactProxySecret(errText)
 	s.mu.Lock()
 	if s.status.Terminal() {
 		s.mu.Unlock()

@@ -3,6 +3,7 @@ package acp
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,6 +52,63 @@ type NetworkSettings struct {
 	Proxy   string `json:"proxy,omitempty"`   // http(s)/socks5 URL → HTTP(S)_PROXY, ALL_PROXY
 	NoProxy string `json:"noProxy,omitempty"` // comma-separated hosts/suffixes → NO_PROXY
 	CACert  string `json:"caCert,omitempty"`  // PEM bundle for a TLS-inspecting proxy
+
+	// Username/Password are the proxy's basic-auth credentials, kept apart from
+	// the URL so they are entered raw (percent-encoding is applied when the URL
+	// is composed), masked in the UI and never rendered in a proxy list. They
+	// still live in the config file, which is why SaveConfig keeps it 0600; to
+	// keep the secret out of it entirely, point Proxy at a local relay that
+	// holds the credentials itself (cntlm, px).
+	Username string `json:"username,omitempty"`
+	Password string `json:"password,omitempty"`
+}
+
+// ProxyURL returns the proxy address with credentials applied, percent-encoding
+// whatever the password contains. Credentials given as fields win over any
+// carried by the URL itself.
+func (n NetworkSettings) ProxyURL() (string, error) {
+	raw := strings.TrimSpace(n.Proxy)
+	if raw == "" {
+		return "", nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", fmt.Errorf("не удалось разобрать адрес прокси %q: %w", raw, err)
+	}
+	if u.Scheme == "" || u.Host == "" {
+		return "", fmt.Errorf("в адресе прокси %q не хватает схемы или хоста, например http://%s", raw, raw)
+	}
+	if user := strings.TrimSpace(n.Username); user != "" {
+		if n.Password == "" {
+			u.User = url.User(user)
+		} else {
+			u.User = url.UserPassword(user, n.Password)
+		}
+	}
+	return u.String(), nil
+}
+
+// redactProxySecret replaces the proxy password wherever it appears in text
+// (raw or percent-encoded), so a CLI error echoing the proxy URL cannot carry
+// the credential into a card comment or the session log.
+func (n NetworkSettings) redactProxySecret(text string) string {
+	if n.Password == "" {
+		return text
+	}
+	forms := []string{n.Password, url.QueryEscape(n.Password)}
+	// The form that actually travels in the URL: userinfo escaping is its own
+	// set (":" becomes %3A, unlike PathEscape), and Userinfo.String() is the
+	// only way to get exactly what ProxyURL emitted. The username is escaped
+	// the same way, so the first literal ":" is the separator.
+	if enc := url.UserPassword("u", n.Password).String(); strings.Contains(enc, ":") {
+		forms = append(forms, enc[strings.Index(enc, ":")+1:])
+	}
+	for _, secret := range forms {
+		if secret != "" {
+			text = strings.ReplaceAll(text, secret, "***")
+		}
+	}
+	return text
 }
 
 // ProxyEntry is one named network configuration in the registry, referenced by
@@ -73,11 +131,15 @@ func (n NetworkSettings) Validate(kind string) (NetworkSettings, error) {
 	n.Proxy = strings.TrimSpace(n.Proxy)
 	n.NoProxy = strings.TrimSpace(n.NoProxy)
 	n.CACert = strings.TrimSpace(n.CACert)
+	n.Username = strings.TrimSpace(n.Username)
+	if n.Proxy == "" && (n.Username != "" || n.Password != "") {
+		return n, fmt.Errorf("логин/пароль заданы без адреса прокси")
+	}
 	if n.Proxy != "" {
 		// The CLIs read the proxy variables as URLs; a bare host:port is
 		// silently ignored, which looks like "the proxy setting does nothing".
-		if !strings.Contains(n.Proxy, "://") {
-			return n, fmt.Errorf("в адресе прокси %q не хватает схемы, например http://%s", n.Proxy, n.Proxy)
+		if _, err := n.ProxyURL(); err != nil {
+			return n, err
 		}
 		// Claude Code documents no SOCKS support (code.claude.com/docs/en/network-config),
 		// so a socks:// value would be accepted here and then quietly ignored.
@@ -113,9 +175,15 @@ func spawnEnv(a AgentEntry, net NetworkSettings) (env []string, drop []string) {
 		env = append(env, k+"="+v)
 		drop = append(drop, k)
 	}
-	if p := strings.TrimSpace(net.Proxy); p != "" {
+	// Validate has already rejected an unparseable address, so a late error
+	// here would only mean a hand-edited config: fall back to the raw value.
+	proxy, err := net.ProxyURL()
+	if err != nil {
+		proxy = strings.TrimSpace(net.Proxy)
+	}
+	if proxy != "" {
 		for _, k := range proxyEnvNames {
-			add(k, p)
+			add(k, proxy)
 		}
 		// Managed as a pair: an inherited NO_PROXY must not leak into an agent
 		// that goes through its own proxy.
@@ -239,7 +307,7 @@ func LoadConfig(path, dataDir string) (Config, error) {
 			return cfg, err
 		}
 		out, _ := json.MarshalIndent(cfg, "", "  ")
-		if err := os.WriteFile(path, append(out, '\n'), 0o644); err != nil {
+		if err := os.WriteFile(path, append(out, '\n'), 0o600); err != nil {
 			return cfg, err
 		}
 		return cfg, nil
@@ -287,7 +355,13 @@ func SaveConfig(path string, cfg Config) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(out, '\n'), 0o644)
+	if err := os.WriteFile(path, append(out, '\n'), 0o600); err != nil {
+		return err
+	}
+	// WriteFile's mode only applies when it creates the file, so an existing
+	// config keeps whatever it had — tighten it, the file can hold proxy
+	// credentials and API keys (agent env).
+	return os.Chmod(path, 0o600)
 }
 
 // ValidateRepoPath checks a card's repo_path against the whitelist, the repo
