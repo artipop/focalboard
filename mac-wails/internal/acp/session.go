@@ -252,7 +252,7 @@ func (h *minLevelHandler) WithGroup(name string) slog.Handler {
 
 // connectClaude wires the in-process claude bridge over io.Pipe.
 func (m *Manager) connectClaude(ctx context.Context, s *Session) (*acpsdk.ClientSideConnection, func(), error) {
-	claudeBin, err := m.resolveClaudeBin(s.Agent.BinPath)
+	launch, err := agentLaunchArgv(s.Agent, m.resolveClaudeBin)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -261,9 +261,9 @@ func (m *Manager) connectClaude(ctx context.Context, s *Session) (*acpsdk.Client
 		extraArgs = append(extraArgs, "--model", s.Agent.Model)
 	}
 	extraArgs = append(extraArgs, s.Agent.Args...)
-	env, drop := agentSpawnEnv(s.Agent)
+	env, drop := s.Agent.spawnEnv()
 	bridge := claudebridge.New(claudebridge.Options{
-		ClaudeBin: claudeBin,
+		Launch:    launch,
 		ExtraArgs: extraArgs,
 		Env:       env,
 		DropEnv:   drop,
@@ -291,13 +291,13 @@ func (m *Manager) connectClaude(ctx context.Context, s *Session) (*acpsdk.Client
 // has no ACP mode, so the bridge drives `codex exec --json` and translates its
 // event stream; per-agent env (CODEX_HOME/OPENAI_API_KEY) is injected at spawn.
 func (m *Manager) connectCodex(ctx context.Context, s *Session) (*acpsdk.ClientSideConnection, func(), error) {
-	codexBin, err := m.resolveCodexBin(s.Agent.BinPath)
+	launch, err := agentLaunchArgv(s.Agent, m.resolveCodexBin)
 	if err != nil {
 		return nil, nil, err
 	}
-	env, drop := agentSpawnEnv(s.Agent)
+	env, drop := s.Agent.spawnEnv()
 	bridge := codexbridge.New(codexbridge.Options{
-		CodexBin:  codexBin,
+		Launch:    launch,
 		Model:     s.Agent.Model,
 		ExtraArgs: s.Agent.Args,
 		Env:       env,
@@ -360,7 +360,8 @@ func (m *Manager) connectACPAgent(ctx context.Context, s *Session, argv []string
 	if len(argv) == 0 {
 		return nil, nil, fmt.Errorf("empty agent command")
 	}
-	env, drop := agentSpawnEnv(s.Agent)
+	env, drop := s.Agent.spawnEnv()
+	argv = resolveArgv0(argv)
 	proc, err := procgroup.Spawn(m.rootCtx, argv, s.Worktree.Path, env, drop...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("spawn agent %q: %w", argv[0], err)

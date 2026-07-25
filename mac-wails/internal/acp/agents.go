@@ -23,6 +23,15 @@ func validateAgent(a AgentEntry) (AgentEntry, error) {
 	if a.Name == "" {
 		return AgentEntry{}, fmt.Errorf("имя агента не может быть пустым")
 	}
+	// An empty element (a stray space in the UI input, a hand-edited config)
+	// would become an empty argv[0] and a confusing exec error.
+	command := a.Command[:0:0]
+	for _, arg := range a.Command {
+		if arg = strings.TrimSpace(arg); arg != "" {
+			command = append(command, arg)
+		}
+	}
+	a.Command = command
 	a.Kind = strings.TrimSpace(strings.ToLower(a.Kind))
 	switch a.Kind {
 	case AgentKindClaude, AgentKindCodex, AgentKindAntigravity:

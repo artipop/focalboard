@@ -108,6 +108,25 @@ for later.
   property remains as an explicit per-card override (validated against
   `repoWhitelist` + registered paths). Optional card property `branch` picks
   the worktree base (worktree mode only).
+- **Mapping cards to agents**: register named agents in the board menu (“…” →
+  *Agents*, desktop only); a card routes to one by its **Agent** select option.
+  Each entry carries its own kind, model, system prompt and, for running several
+  accounts or network segments side by side on one machine:
+  - `env` — per-process environment, e.g. `CLAUDE_CONFIG_DIR` /
+    `ANTHROPIC_API_KEY` or `CODEX_HOME` / `OPENAI_API_KEY` for a second account.
+    It is injected at spawn (`procgroup.Spawn`), no terminal isolation needed.
+  - `command` — the launch argv. For `claude`/`codex` it replaces the binary the
+    bridge invokes, so the CLI can be wrapped: `proxychains4 -q -f corp.conf
+    claude` routes one agent through the corporate segment, a shim script can do
+    anything else (`tsh`, `nsenter`, a VPN namespace). The bridge still appends
+    its own protocol flags, and `args` still appends CLI flags. For the
+    ACP-native kinds it is the whole command, as before.
+  - `proxy` / `noProxy` / `caCert` — expanded into `HTTP(S)_PROXY`, `ALL_PROXY`,
+    `NO_PROXY` and the per-runtime CA variables (`NODE_EXTRA_CA_CERTS`,
+    `SSL_CERT_FILE`, …). This covers a plain corporate proxy without a wrapper;
+    `env` overrides them (an empty value opts an agent out of an inherited
+    proxy). A per-agent *VPN* needs the `command` wrapper — env alone cannot
+    change routing.
 - Config: `~/Library/Application Support/Focalboard/acp/config.json` (created
   with defaults on first run; the repo registry is stored there too). If the
   app can't find `claude` (GUI apps get a minimal `PATH`), set `claudePath`

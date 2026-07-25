@@ -44,3 +44,44 @@ func TestCodexAgentRunsWithIsolatedEnv(t *testing.T) {
 		t.Errorf("per-agent CODEX_HOME did not reach the codex process; final comment: %q", last)
 	}
 }
+
+// fakeCodexProxy echoes the proxy env back, so the test can assert the agent's
+// network settings reached the process.
+const fakeCodexProxy = `#!/bin/sh
+printf '%s\n' '{"type":"thread.started"}'
+printf '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"proxy=%s ca=%s"}}\n' "$HTTPS_PROXY" "$NODE_EXTRA_CA_CERTS"
+printf '%s\n' '{"type":"turn.completed"}'
+`
+
+// A wrapper command in front of the CLI (proxychains and friends) plus per-agent
+// proxy settings: both must survive all the way to the spawned process.
+func TestCodexAgentWrapperCommandAndProxy(t *testing.T) {
+	script := writeFakeClaude(t, fakeCodexProxy)
+	m, writer, events, repo := testManager(t, fakeClaudeHappy, func(c *Config) {
+		c.Agents = []AgentEntry{{
+			Name:    "corpcodex",
+			Kind:    "codex",
+			Command: []string{"/bin/sh", script}, // stands in for `proxychains4 -f … codex`
+			Proxy:   "http://proxy.corp:3128",
+			CACert:  "/etc/corp-ca.pem",
+		}}
+	})
+
+	ev := moveEvent("cardProxy", repo, "opt-backlog", "opt-agent")
+	ev.OptionNames = []string{"corpcodex"}
+	events.ch <- ev
+
+	waitFor(t, 15*time.Second, "wrapped codex session done", func() bool {
+		sessions, _, err := m.store.SessionsForCard("cardProxy")
+		return err == nil && len(sessions) == 1 && sessions[0].Status == StatusDone
+	})
+
+	comments := writer.cardComments("cardProxy")
+	last := comments[len(comments)-1]
+	if !strings.Contains(last, "proxy=http://proxy.corp:3128") {
+		t.Errorf("per-agent proxy did not reach the process; final comment: %q", last)
+	}
+	if !strings.Contains(last, "ca=/etc/corp-ca.pem") {
+		t.Errorf("per-agent CA bundle did not reach the process; final comment: %q", last)
+	}
+}

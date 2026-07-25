@@ -28,7 +28,70 @@ type AgentEntry struct {
 	Prompt  string            `json:"prompt,omitempty"`  // per-agent system prompt prepended to the task
 	Env     map[string]string `json:"env,omitempty"`     // per-process env (CODEX_HOME, OPENAI_API_KEY, …)
 	Args    []string          `json:"args,omitempty"`    // extra CLI args (sandbox/approval, etc.)
-	Command []string          `json:"command,omitempty"` // full argv override for ACP-native agents (kind "acp"/"antigravity")
+
+	// Command is the launch argv. For the ACP-native kinds it is the whole
+	// agent command (required for "acp"). For claude/codex it replaces the
+	// binary the bridge builds its invocation on: the last element is the CLI
+	// and anything before it is a wrapper — `proxychains4 -f corp.conf claude`,
+	// a per-account shim script — while the bridge still appends its own
+	// protocol flags. Takes precedence over BinPath.
+	Command []string `json:"command,omitempty"`
+
+	// Proxy/NoProxy/CACert are per-agent network settings, expanded into the
+	// standard proxy environment variables at spawn time (see spawnEnv). They
+	// let one agent reach the internet through a corporate proxy while another
+	// goes direct; Env wins over them on conflicts.
+	Proxy   string `json:"proxy,omitempty"`   // http(s)/socks5 URL → HTTP(S)_PROXY, ALL_PROXY
+	NoProxy string `json:"noProxy,omitempty"` // comma-separated hosts/suffixes → NO_PROXY
+	CACert  string `json:"caCert,omitempty"`  // PEM bundle for a TLS-inspecting proxy
+}
+
+// proxyEnvNames are the variables spawnEnv manages when Proxy is set. Both
+// cases are covered: Node-based CLIs (claude, gemini) read the upper-case ones,
+// most Rust/Go/curl-based ones accept either.
+var proxyEnvNames = []string{
+	"HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+	"http_proxy", "https_proxy", "all_proxy",
+}
+
+// caCertEnvNames map a PEM bundle onto the per-runtime variables: Node
+// (claude/gemini), Rust/Python (codex and friends), curl.
+var caCertEnvNames = []string{
+	"NODE_EXTRA_CA_CERTS", "SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE",
+}
+
+// spawnEnv returns the "KEY=value" pairs injected into the agent process and
+// the names dropped from the inherited environment first, so the agent's own
+// values win over whatever the desktop app itself was launched with. Network
+// settings are expanded first and the explicit Env map last, so Env can
+// override or blank out any of them (an empty value means "present but empty",
+// which is how an agent opts out of an inherited corporate proxy).
+func (a AgentEntry) spawnEnv() (env []string, drop []string) {
+	add := func(k, v string) {
+		env = append(env, k+"="+v)
+		drop = append(drop, k)
+	}
+	if p := strings.TrimSpace(a.Proxy); p != "" {
+		for _, k := range proxyEnvNames {
+			add(k, p)
+		}
+		// Managed as a pair: an inherited NO_PROXY must not leak into an agent
+		// that declares its own proxy.
+		add("NO_PROXY", a.NoProxy)
+		add("no_proxy", a.NoProxy)
+	} else if n := strings.TrimSpace(a.NoProxy); n != "" {
+		add("NO_PROXY", n)
+		add("no_proxy", n)
+	}
+	if c := strings.TrimSpace(a.CACert); c != "" {
+		for _, k := range caCertEnvNames {
+			add(k, c)
+		}
+	}
+	for k, v := range a.Env {
+		add(k, v)
+	}
+	return env, drop
 }
 
 // Agent kinds. claude/codex run through in-process bridges; antigravity and the

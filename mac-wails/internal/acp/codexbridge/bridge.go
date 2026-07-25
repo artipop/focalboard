@@ -37,7 +37,10 @@ import (
 
 // Options configures the bridge.
 type Options struct {
-	CodexBin string
+	// Launch is the base argv of the codex CLI: the resolved binary, or a
+	// wrapper command ending in it (e.g. `proxychains4 -f corp.conf codex`).
+	// The bridge appends `exec --json …` after it.
+	Launch []string
 	// Model is passed as -m when non-empty.
 	Model string
 	// ExtraArgs are inserted before the prompt (e.g. --sandbox, --ask-for-approval).
@@ -176,12 +179,12 @@ func (b *Bridge) SetSessionMode(ctx context.Context, params acp.SetSessionModeRe
 // runTurn spawns `codex exec --json`, feeds it the prompt as the final argument
 // and translates the NDJSON stream into ACP updates until turn.completed.
 func (b *Bridge) runTurn(ctx context.Context, s *session, prompt string) (acp.PromptResponse, error) {
-	argv := []string{
-		b.opts.CodexBin, "exec",
+	argv := append(append([]string(nil), b.opts.Launch...),
+		"exec",
 		"--json",
 		"--skip-git-repo-check",
 		"-C", s.cwd,
-	}
+	)
 	if b.opts.Model != "" {
 		argv = append(argv, "-m", b.opts.Model)
 	}

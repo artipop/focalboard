@@ -61,6 +61,50 @@ describe('components/acp/agentsDialog', () => {
         expect(payload).toMatchObject({name: 'codex-a', kind: 'codex', env: {CODEX_HOME: '/tmp/x'}})
     })
 
+    test('saves a wrapped launch command and per-agent proxy settings', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([])),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AddAgent: jest.fn().mockResolvedValue(JSON.stringify({name: 'corp', kind: 'claude'})),
+            UpdateAgent: jest.fn(),
+            RemoveAgent: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByRole('button', {name: 'Add agent…'})).toBeInTheDocument())
+
+        userEvent.click(screen.getByRole('button', {name: 'Add agent…'}))
+        await waitFor(() => expect(screen.getByRole('combobox')).toBeInTheDocument())
+
+        userEvent.type(screen.getByPlaceholderText('Name (matches the "Agent" option)'), 'corp')
+
+        // The launch command is offered for claude too, and quoted arguments
+        // stay a single argv element.
+        userEvent.type(screen.getByPlaceholderText('proxychains4 -q -f /etc/corp.conf claude'), 'proxychains4 -f "/etc/my conf.conf" claude')
+        userEvent.type(screen.getByPlaceholderText('http://proxy.corp:3128'), 'http://proxy.corp:3128')
+        userEvent.type(screen.getByPlaceholderText('localhost,127.0.0.1,.corp'), '.corp')
+        userEvent.type(screen.getByPlaceholderText('/etc/ssl/corp-ca.pem'), '/etc/ssl/corp-ca.pem')
+
+        userEvent.click(screen.getByRole('button', {name: 'Save'}))
+        await waitFor(() => expect(bindings.AddAgent).toBeCalled())
+        const payload = JSON.parse(bindings.AddAgent.mock.calls[0][0])
+        expect(payload).toMatchObject({
+            name: 'corp',
+            kind: 'claude',
+            command: ['proxychains4', '-f', '/etc/my conf.conf', 'claude'],
+            proxy: 'http://proxy.corp:3128',
+            noProxy: '.corp',
+            caCert: '/etc/ssl/corp-ca.pem',
+        })
+    })
+
     test('creates an Agent select field and adds missing options', async () => {
         const bindings = {
             ListAgents: jest.fn().mockResolvedValue(JSON.stringify([

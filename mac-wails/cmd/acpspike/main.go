@@ -238,7 +238,7 @@ func runBridge(ctx context.Context, cwd, prompt string) error {
 	if err != nil {
 		return fmt.Errorf("claude binary not found in PATH: %w", err)
 	}
-	bridge := claudebridge.New(claudebridge.Options{ClaudeBin: claudeBin})
+	bridge := claudebridge.New(claudebridge.Options{Launch: []string{claudeBin}})
 
 	clientIn, agentOut := io.Pipe()
 	agentIn, clientOut := io.Pipe()
