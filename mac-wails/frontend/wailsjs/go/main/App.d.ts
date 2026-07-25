@@ -5,6 +5,8 @@ export function AddAgent(arg1:string):Promise<string>;
 
 export function AddAgentRepo(arg1:string,arg2:string):Promise<string>;
 
+export function AddProxy(arg1:string):Promise<string>;
+
 export function CancelSession(arg1:string):Promise<boolean>;
 
 export function GetAgentSystemPrompt():Promise<string>;
@@ -15,6 +17,8 @@ export function ListAgentRepos():Promise<string>;
 
 export function ListAgents():Promise<string>;
 
+export function ListProxies():Promise<string>;
+
 export function OpenInBrowser(arg1:string):Promise<void>;
 
 export function PickDirectory(arg1:string):Promise<string>;
@@ -23,6 +27,10 @@ export function RemoveAgent(arg1:string):Promise<void>;
 
 export function RemoveAgentRepo(arg1:string):Promise<void>;
 
+export function RemoveProxy(arg1:string):Promise<void>;
+
 export function SetAgentSystemPrompt(arg1:string):Promise<void>;
 
 export function UpdateAgent(arg1:string):Promise<string>;
+
+export function UpdateProxy(arg1:string):Promise<string>;

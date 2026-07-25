@@ -18,6 +18,7 @@ import ModalWrapper from '../modalWrapper'
 import {sendFlashMessage} from '../flashMessages'
 import AgentReposDialog, {isAgentReposAvailable} from '../acp/agentReposDialog'
 import AgentsDialog, {isAgentsAvailable} from '../acp/agentsDialog'
+import ProxiesDialog, {isProxiesAvailable} from '../acp/proxiesDialog'
 
 type Props = {
     board: Board
@@ -101,6 +102,7 @@ const ViewHeaderActionsMenu = (props: Props) => {
     const intl = useIntl()
     const [showAgentRepos, setShowAgentRepos] = useState(false)
     const [showAgents, setShowAgents] = useState(false)
+    const [showProxies, setShowProxies] = useState(false)
 
     return (
         <ModalWrapper>
@@ -133,6 +135,14 @@ const ViewHeaderActionsMenu = (props: Props) => {
                             id='agents'
                             name={intl.formatMessage({id: 'ViewHeader.agents', defaultMessage: 'Agents…'})}
                             onClick={() => setShowAgents(true)}
+                        />,
+                    ] : []}
+                    {isProxiesAvailable() ? [
+                        <Menu.Text
+                            key='proxies'
+                            id='proxies'
+                            name={intl.formatMessage({id: 'ViewHeader.proxies', defaultMessage: 'Proxy configurations…'})}
+                            onClick={() => setShowProxies(true)}
                         />,
                     ] : []}
                     {/*
@@ -170,6 +180,10 @@ const ViewHeaderActionsMenu = (props: Props) => {
                 <AgentsDialog
                     board={board}
                     onClose={() => setShowAgents(false)}
+                />}
+            {showProxies &&
+                <ProxiesDialog
+                    onClose={() => setShowProxies(false)}
                 />}
         </ModalWrapper>
     )

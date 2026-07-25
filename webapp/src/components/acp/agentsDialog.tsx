@@ -14,6 +14,7 @@ import Dialog from '../dialog'
 import {sendFlashMessage} from '../flashMessages'
 
 import {agentBindings} from './agentReposDialog'
+import {ProxyEntry} from './proxiesDialog'
 
 import './agentsDialog.scss'
 
@@ -30,6 +31,16 @@ type AgentEntry = {
     env?: {[key: string]: string}
     args?: string[]
     command?: string[]
+    proxyName?: string
+}
+
+// Launch command placeholders per kind: for claude/codex the command wraps the
+// CLI (a proxy launcher, a per-account shim); the ACP kinds spawn it directly.
+const commandPlaceholders: {[kind: string]: string} = {
+    claude: 'proxychains4 -q -f /etc/myproxy.conf claude',
+    codex: 'proxychains4 -q -f /etc/myproxy.conf codex',
+    antigravity: 'antigravity --acp',
+    acp: 'gemini --acp',
 }
 
 export function isAgentsAvailable(): boolean {
@@ -60,6 +71,27 @@ function textToEnv(text: string): {[key: string]: string} {
     return env
 }
 
+// splitArgv / joinArgv convert between the single-line argv inputs and the
+// string arrays sent to Go, honouring quotes so paths with spaces survive
+// (a config under "~/Library/Application Support/…" is one argument).
+function splitArgv(text: string): string[] {
+    const argv: string[] = []
+    const token = /"([^"]*)"|'([^']*)'|(\S+)/g
+    let match = token.exec(text)
+    while (match) {
+        const [, doubleQuoted, singleQuoted, bare] = match
+        const arg = [doubleQuoted, singleQuoted, bare].find((v) => v !== undefined)
+        argv.push(arg as string)
+        match = token.exec(text)
+    }
+    return argv
+}
+
+function joinArgv(argv?: string[]): string {
+    const whitespace = (/\s/)
+    return (argv || []).map((a) => (whitespace.test(a) ? `"${a}"` : a)).join(' ')
+}
+
 const emptyForm: AgentEntry = {name: '', kind: 'claude'}
 
 type Props = {
@@ -73,6 +105,7 @@ const AgentsDialog = (props: Props) => {
     const bindings = agentBindings()
 
     const [agents, setAgents] = useState<AgentEntry[]>([])
+    const [proxies, setProxies] = useState<ProxyEntry[]>([])
     const [systemPrompt, setSystemPrompt] = useState('')
     const [form, setForm] = useState<AgentEntry | null>(null)
     const [envText, setEnvText] = useState('')
@@ -87,6 +120,9 @@ const AgentsDialog = (props: Props) => {
         }
         try {
             setAgents(JSON.parse(await bindings.ListAgents()) || [])
+            if (bindings.ListProxies) {
+                setProxies(JSON.parse(await bindings.ListProxies()) || [])
+            }
             if (bindings.GetAgentSystemPrompt) {
                 setSystemPrompt(await bindings.GetAgentSystemPrompt())
             }
@@ -111,8 +147,8 @@ const AgentsDialog = (props: Props) => {
     const startEdit = useCallback((agent: AgentEntry) => {
         setForm({...agent})
         setEnvText(envToText(agent.env))
-        setArgsText((agent.args || []).join(' '))
-        setCommandText((agent.command || []).join(' '))
+        setArgsText(joinArgv(agent.args))
+        setCommandText(joinArgv(agent.command))
         setEditingName(agent.name)
         setError('')
     }, [])
@@ -126,8 +162,8 @@ const AgentsDialog = (props: Props) => {
             ...form,
             name: form.name.trim(),
             env: textToEnv(envText),
-            args: argsText.split(/\s+/).filter(Boolean),
-            command: commandText.split(/\s+/).filter(Boolean),
+            args: splitArgv(argsText),
+            command: splitArgv(commandText),
         }
         try {
             if (editingName) {
@@ -220,7 +256,7 @@ const AgentsDialog = (props: Props) => {
         <Dialog
             className='AgentsDialog'
             title={<span>{intl.formatMessage({id: 'Agents.title', defaultMessage: 'Agents'})}</span>}
-            subtitle={<span>{intl.formatMessage({id: 'Agents.subtitle', defaultMessage: 'Register coding agents (Claude / Codex) with their own prompt, model and environment. Cards route to an agent by the "Agent" field.'})}</span>}
+            subtitle={<span>{intl.formatMessage({id: 'Agents.subtitle', defaultMessage: 'Register coding agents (Claude / Codex) with their own prompt, model, launch command, environment and proxy. Cards route to an agent by the "Agent" field.'})}</span>}
             onClose={onClose}
         >
             <div className='AgentsDialog__content'>
@@ -282,15 +318,14 @@ const AgentsDialog = (props: Props) => {
                                 onChange={(e) => updateForm({binPath: e.target.value})}
                             />
                         </label>
-                        {(form.kind === 'antigravity' || form.kind === 'acp') &&
-                            <label>
-                                {intl.formatMessage({id: 'Agents.command', defaultMessage: 'ACP launch command (argv) — required for "ACP (other)", overrides the default for Antigravity'})}
-                                <input
-                                    value={commandText}
-                                    placeholder={form.kind === 'antigravity' ? 'antigravity --acp' : 'gemini --acp'}
-                                    onChange={(e) => setCommandText(e.target.value)}
-                                />
-                            </label>}
+                        <label>
+                            {intl.formatMessage({id: 'Agents.command', defaultMessage: 'Launch command (argv) — overrides the binary path; wrap the CLI to route it through a proxy. Required for "ACP (other)".'})}
+                            <input
+                                value={commandText}
+                                placeholder={commandPlaceholders[form.kind] || ''}
+                                onChange={(e) => setCommandText(e.target.value)}
+                            />
+                        </label>
                         <label>
                             {intl.formatMessage({id: 'Agents.prompt', defaultMessage: 'Agent system prompt'})}
                             <textarea
@@ -299,6 +334,29 @@ const AgentsDialog = (props: Props) => {
                                 onChange={(e) => updateForm({prompt: e.target.value})}
                             />
                         </label>
+                        <label>
+                            {intl.formatMessage({id: 'Agents.proxyName', defaultMessage: 'Proxy configuration'})}
+                            <select
+                                value={form.proxyName || ''}
+                                onChange={(e) => updateForm({proxyName: e.target.value})}
+                            >
+                                <option value=''>
+                                    {intl.formatMessage({id: 'Agents.proxy-none', defaultMessage: 'No proxy (inherit the app environment)'})}
+                                </option>
+                                {proxies.map((p) => (
+                                    <option
+                                        key={p.name}
+                                        value={p.name}
+                                    >
+                                        {p.proxy ? `${p.name} — ${p.proxy}` : p.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                        {proxies.length === 0 &&
+                            <div className='AgentsDialog__hint'>
+                                {intl.formatMessage({id: 'Agents.proxy-hint', defaultMessage: 'Configurations are managed in the board menu → Proxy configurations…'})}
+                            </div>}
                         <label>
                             {intl.formatMessage({id: 'Agents.env', defaultMessage: 'Environment (KEY=VALUE per line — e.g. CODEX_HOME, OPENAI_API_KEY)'})}
                             <textarea

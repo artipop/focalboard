@@ -154,6 +154,62 @@ func (a *App) RemoveAgent(name string) error {
 	return a.mgr.RemoveAgent(name)
 }
 
+// ListProxies returns the proxy registry as JSON: [{"name","proxy",…}, …].
+func (a *App) ListProxies() (string, error) {
+	if a.mgr == nil {
+		return "[]", nil
+	}
+	out, err := json.Marshal(a.mgr.Proxies())
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// AddProxy registers a network configuration from a JSON-encoded ProxyEntry and
+// returns the created entry as JSON.
+func (a *App) AddProxy(entryJSON string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	var entry acp.ProxyEntry
+	if err := json.Unmarshal([]byte(entryJSON), &entry); err != nil {
+		return "", err
+	}
+	saved, err := a.mgr.AddProxy(entry)
+	if err != nil {
+		return "", err
+	}
+	out, _ := json.Marshal(saved)
+	return string(out), nil
+}
+
+// UpdateProxy replaces an existing network configuration (matched by name) from
+// a JSON-encoded ProxyEntry and returns the saved entry as JSON.
+func (a *App) UpdateProxy(entryJSON string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	var entry acp.ProxyEntry
+	if err := json.Unmarshal([]byte(entryJSON), &entry); err != nil {
+		return "", err
+	}
+	saved, err := a.mgr.UpdateProxy(entry)
+	if err != nil {
+		return "", err
+	}
+	out, _ := json.Marshal(saved)
+	return string(out), nil
+}
+
+// RemoveProxy deletes a network configuration by name.
+func (a *App) RemoveProxy(name string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	return a.mgr.RemoveProxy(name)
+}
+
 // GetAgentSystemPrompt returns the board/column-level system prompt.
 func (a *App) GetAgentSystemPrompt() (string, error) {
 	if a.mgr == nil {

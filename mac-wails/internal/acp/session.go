@@ -25,7 +25,8 @@ type Session struct {
 	RepoPath   string
 	BaseBranch string
 	PromptText string
-	Agent      AgentEntry // resolved agent (kind/bin/model/env/prompt)
+	Agent      AgentEntry      // resolved agent (kind/bin/model/env/prompt)
+	Net        NetworkSettings // resolved proxy configuration (Agent.ProxyName)
 
 	Worktree     WorktreeInfo
 	usedWorktree bool // a dedicated worktree was actually created
@@ -252,7 +253,7 @@ func (h *minLevelHandler) WithGroup(name string) slog.Handler {
 
 // connectClaude wires the in-process claude bridge over io.Pipe.
 func (m *Manager) connectClaude(ctx context.Context, s *Session) (*acpsdk.ClientSideConnection, func(), error) {
-	claudeBin, err := m.resolveClaudeBin(s.Agent.BinPath)
+	launch, err := agentLaunchArgv(s.Agent, m.resolveClaudeBin)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -261,9 +262,9 @@ func (m *Manager) connectClaude(ctx context.Context, s *Session) (*acpsdk.Client
 		extraArgs = append(extraArgs, "--model", s.Agent.Model)
 	}
 	extraArgs = append(extraArgs, s.Agent.Args...)
-	env, drop := agentSpawnEnv(s.Agent)
+	env, drop := spawnEnv(s.Agent, s.Net)
 	bridge := claudebridge.New(claudebridge.Options{
-		ClaudeBin: claudeBin,
+		Launch:    launch,
 		ExtraArgs: extraArgs,
 		Env:       env,
 		DropEnv:   drop,
@@ -291,13 +292,13 @@ func (m *Manager) connectClaude(ctx context.Context, s *Session) (*acpsdk.Client
 // has no ACP mode, so the bridge drives `codex exec --json` and translates its
 // event stream; per-agent env (CODEX_HOME/OPENAI_API_KEY) is injected at spawn.
 func (m *Manager) connectCodex(ctx context.Context, s *Session) (*acpsdk.ClientSideConnection, func(), error) {
-	codexBin, err := m.resolveCodexBin(s.Agent.BinPath)
+	launch, err := agentLaunchArgv(s.Agent, m.resolveCodexBin)
 	if err != nil {
 		return nil, nil, err
 	}
-	env, drop := agentSpawnEnv(s.Agent)
+	env, drop := spawnEnv(s.Agent, s.Net)
 	bridge := codexbridge.New(codexbridge.Options{
-		CodexBin:  codexBin,
+		Launch:    launch,
 		Model:     s.Agent.Model,
 		ExtraArgs: s.Agent.Args,
 		Env:       env,
@@ -360,7 +361,8 @@ func (m *Manager) connectACPAgent(ctx context.Context, s *Session, argv []string
 	if len(argv) == 0 {
 		return nil, nil, fmt.Errorf("empty agent command")
 	}
-	env, drop := agentSpawnEnv(s.Agent)
+	env, drop := spawnEnv(s.Agent, s.Net)
+	argv = resolveArgv0(argv)
 	proc, err := procgroup.Spawn(m.rootCtx, argv, s.Worktree.Path, env, drop...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("spawn agent %q: %w", argv[0], err)
@@ -406,8 +408,14 @@ func doneComment(s *Session, finalText string) string {
 }
 
 func failComment(s *Session, reason string) string {
+	reason = s.Net.redactProxySecret(reason)
 	var b strings.Builder
 	fmt.Fprintf(&b, "❌ Сессия агента завершилась с ошибкой: %s", truncateRunes(reason, 1500))
+	// 407 arrives as a bare status code from the CLI, with no hint that the
+	// proxy — not the model API — refused the request.
+	if s.Net.Proxy != "" && strings.Contains(reason, "407") {
+		b.WriteString("\n\nПрокси требует аутентификацию (407): задай логин и пароль в конфигурации прокси (меню доски → Proxy configurations).")
+	}
 	if s.usedWorktree && s.Worktree.Path != "" {
 		fmt.Fprintf(&b, "\nWorktree (если остался): `%s`", s.Worktree.Path)
 	}

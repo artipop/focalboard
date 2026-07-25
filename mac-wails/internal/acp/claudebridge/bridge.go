@@ -31,7 +31,10 @@ import (
 
 // Options configures the bridge.
 type Options struct {
-	ClaudeBin string
+	// Launch is the base argv of the claude CLI: the resolved binary, or a
+	// wrapper command ending in it (e.g. `proxychains4 -f myproxy.conf claude`).
+	// The bridge appends its own stream-json flags after it.
+	Launch []string
 	// ExtraArgs are appended to the claude invocation (e.g. --model).
 	ExtraArgs []string
 	// Env are "KEY=value" pairs injected into each claude process; DropEnv names
@@ -170,15 +173,15 @@ func (b *Bridge) SetSessionMode(ctx context.Context, params acp.SetSessionModeRe
 // runTurn spawns claude, feeds it the prompt and translates the NDJSON stream
 // into ACP session updates until the terminal "result" message.
 func (b *Bridge) runTurn(ctx context.Context, s *session, prompt string) (acp.PromptResponse, error) {
-	argv := append([]string{
-		b.opts.ClaudeBin,
+	argv := append(append([]string(nil), b.opts.Launch...),
 		"--input-format", "stream-json",
 		"--output-format", "stream-json",
 		"--verbose",
 		"--include-partial-messages",
 		"--permission-prompt-tool", "stdio",
 		"-p",
-	}, b.opts.ExtraArgs...)
+	)
+	argv = append(argv, b.opts.ExtraArgs...)
 
 	// CLAUDECODE in the environment triggers the CLI's nested-session guard.
 	dropEnv := append([]string{"CLAUDECODE"}, b.opts.DropEnv...)

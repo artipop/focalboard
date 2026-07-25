@@ -109,6 +109,10 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
+	net, err := m.resolveNetwork(agent)
+	if err != nil {
+		return nil, err
+	}
 	// Without worktrees, two agents must never share one working tree
 	// (spec §7): reject while another live session uses the same repo.
 	if !m.cfg.UseWorktrees() {
@@ -136,6 +140,7 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 		RepoPath:   repoPath,
 		BaseBranch: ev.Props["branch"],
 		Agent:      agent,
+		Net:        net,
 		PromptText: composePrompt(ev, agent, systemPrompt, m.cfg.UseWorktrees()),
 		status:     StatusQueued,
 		allowTools: make(map[string]bool),
@@ -214,6 +219,8 @@ func (m *Manager) Shutdown(grace time.Duration) {
 
 // finishSession transitions to a terminal status exactly once.
 func (m *Manager) finishSession(s *Session, status SessionStatus, errText string) {
+	// A CLI failing to reach its proxy may echo the proxy URL back at us.
+	errText = s.Net.redactProxySecret(errText)
 	s.mu.Lock()
 	if s.status.Terminal() {
 		s.mu.Unlock()
@@ -332,15 +339,34 @@ func lookupBin(name, notFoundMsg string) (string, error) {
 	return "", fmt.Errorf("%s", notFoundMsg)
 }
 
-// agentSpawnEnv turns an agent's Env map into the "KEY=value" slice and the
-// list of names to drop from the inherited environment, so per-agent values
-// (CODEX_HOME, OPENAI_API_KEY, CLAUDE_CONFIG_DIR, …) override the parent's.
-func agentSpawnEnv(a AgentEntry) (env []string, drop []string) {
-	for k, v := range a.Env {
-		env = append(env, k+"="+v)
-		drop = append(drop, k)
+// agentLaunchArgv returns the base argv a bridge builds its invocation on: the
+// agent's explicit Command when set — which is how a wrapper (a proxy launcher,
+// a per-account shim) gets in front of the CLI — otherwise the resolved binary.
+// The bridge appends its own protocol flags after it.
+func agentLaunchArgv(a AgentEntry, resolveBin func(override string) (string, error)) ([]string, error) {
+	if len(a.Command) == 0 {
+		bin, err := resolveBin(a.BinPath)
+		if err != nil {
+			return nil, err
+		}
+		return []string{bin}, nil
 	}
-	return env, drop
+	return resolveArgv0(a.Command), nil
+}
+
+// resolveArgv0 makes an argv runnable from a GUI process: a bare command name is
+// looked up on PATH and in the common install locations, because launchd hands
+// GUI apps a minimal PATH. Left as written when nothing matches, so the spawn
+// error names the command the user actually typed.
+func resolveArgv0(argv []string) []string {
+	if len(argv) == 0 {
+		return argv
+	}
+	out := append([]string(nil), argv...)
+	if p, err := lookupBin(argv[0], "not found"); err == nil {
+		out[0] = p
+	}
+	return out
 }
 
 // composePrompt builds the agent task text from the card. The final prompt is

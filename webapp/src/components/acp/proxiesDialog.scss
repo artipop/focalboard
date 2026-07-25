@@ -1,0 +1,73 @@
+.ProxiesDialog {
+    .ProxiesDialog__content {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 0 24px 24px;
+        min-width: 520px;
+    }
+
+    .ProxiesDialog__empty {
+        color: rgba(var(--center-channel-color-rgb), 0.64);
+        padding: 8px 0;
+    }
+
+    .ProxiesDialog__row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+
+        .ProxiesDialog__name {
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .ProxiesDialog__proxy {
+            flex: 1;
+            color: rgba(var(--center-channel-color-rgb), 0.64);
+            font-size: 12px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    }
+
+    .ProxiesDialog__form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin: 8px 0;
+        padding: 12px;
+        border: 1px solid rgba(var(--center-channel-color-rgb), 0.12);
+        border-radius: 6px;
+
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-weight: 600;
+        }
+
+        input {
+            border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+            border-radius: 4px;
+            padding: 6px 8px;
+            background: rgb(var(--center-channel-bg-rgb));
+            color: rgb(var(--center-channel-color-rgb));
+            font-weight: 400;
+            font-family: inherit;
+        }
+    }
+
+    .ProxiesDialog__formActions,
+    .ProxiesDialog__actions {
+        display: flex;
+        gap: 8px;
+        padding-top: 4px;
+    }
+
+    .ProxiesDialog__error {
+        color: rgb(var(--error-text-color-rgb, 210, 75, 78));
+        padding-top: 8px;
+    }
+}

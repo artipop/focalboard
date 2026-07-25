@@ -108,6 +108,55 @@ for later.
   property remains as an explicit per-card override (validated against
   `repoWhitelist` + registered paths). Optional card property `branch` picks
   the worktree base (worktree mode only).
+- **Mapping cards to agents**: register named agents in the board menu (“…” →
+  *Agents*, desktop only); a card routes to one by its **Agent** select option.
+  Each entry carries its own kind, model, system prompt and, for running several
+  accounts or network segments side by side on one machine:
+  - `env` — per-process environment, e.g. `CLAUDE_CONFIG_DIR` /
+    `ANTHROPIC_API_KEY` or `CODEX_HOME` / `OPENAI_API_KEY` for a second account.
+    It is injected at spawn (`procgroup.Spawn`), no terminal isolation needed.
+  - `command` — the launch argv. For `claude`/`codex` it replaces the binary the
+    bridge invokes, so the CLI can be wrapped: `proxychains4 -q -f myproxy.conf
+    claude` routes one agent through its own network path, a shim script can do
+    anything else (`tsh`, `nsenter`, a VPN namespace). The bridge still appends
+    its own protocol flags, and `args` still appends CLI flags. For the
+    ACP-native kinds it is the whole command, as before.
+  - `proxyName` — the network configuration the agent runs with, picked from
+    the proxy registry (below).
+- **Proxy configurations**: a separate registry (board menu → *Proxy
+  configurations…*), each entry a name plus `proxy` / `noProxy` / `caCert`.
+  Agents reference one by name, so a proxy is described once and shared by
+  several agents. At spawn the entry expands into `HTTP(S)_PROXY`, `ALL_PROXY`,
+  `NO_PROXY` and the per-runtime CA variables (`NODE_EXTRA_CA_CERTS`,
+  `SSL_CERT_FILE`, …), covering a plain HTTP proxy without any wrapper; an
+  agent's own `env` still overrides them (an empty value opts it out of an
+  inherited proxy). Guardrails: a proxy address that does not parse as a URL
+  with a scheme and host is rejected, and since Claude Code documents no SOCKS
+  support a `socks…://` configuration cannot be paired with a `claude` agent —
+  neither when saving the agent nor by editing the configuration afterwards.
+  Removing an entry still referenced by an agent is refused. A per-agent *VPN*
+  needs the `command` wrapper — env alone cannot change routing.
+
+  **Proxies that require authentication.** A proxy answering `407` wants
+  credentials (the CLI surfaces this as a bare `API Error: 407 status code (no
+  body)`, so the failure comment adds a hint). Only basic auth works — for
+  NTLM/Kerberos, run a local relay (`cntlm`, `px`) and point the entry at
+  `http://127.0.0.1:3128`. Two ways to supply them:
+
+  - **Separate `username` / `password` fields** (preferred). Entered raw and
+    percent-encoded into the URL at spawn (`NetworkSettings.ProxyURL`), so a
+    password containing `@ : / #` needs no hand-encoding. The field is masked in
+    the UI, never rendered in the configuration list, and redacted from card
+    comments and the session log if a CLI echoes the proxy URL back in an error.
+  - **Inline in the URL** — `http://user:pass@proxy.example.com:8080` also
+    works, and is what the CLIs document, but every special character must be
+    percent-encoded by hand (`@` → `%40`, `:` → `%3A`, `/` → `%2F`, `#` →
+    `%23`), and the credentials show up (elided) in the configuration list. When
+    both are given, the fields win over whatever the URL carries.
+
+  Either way the credentials are stored in plain text in the config file below,
+  which is why it is written `0600` (existing files are tightened on the next
+  save). To keep the secret out of the file entirely, use the local relay.
 - Config: `~/Library/Application Support/Focalboard/acp/config.json` (created
   with defaults on first run; the repo registry is stored there too). If the
   app can't find `claude` (GUI apps get a minimal `PATH`), set `claudePath`

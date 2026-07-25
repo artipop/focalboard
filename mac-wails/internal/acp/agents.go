@@ -23,6 +23,15 @@ func validateAgent(a AgentEntry) (AgentEntry, error) {
 	if a.Name == "" {
 		return AgentEntry{}, fmt.Errorf("имя агента не может быть пустым")
 	}
+	// An empty element (a stray space in the UI input, a hand-edited config)
+	// would become an empty argv[0] and a confusing exec error.
+	command := a.Command[:0:0]
+	for _, arg := range a.Command {
+		if arg = strings.TrimSpace(arg); arg != "" {
+			command = append(command, arg)
+		}
+	}
+	a.Command = command
 	a.Kind = strings.TrimSpace(strings.ToLower(a.Kind))
 	switch a.Kind {
 	case AgentKindClaude, AgentKindCodex, AgentKindAntigravity:
@@ -33,6 +42,7 @@ func validateAgent(a AgentEntry) (AgentEntry, error) {
 	default:
 		return AgentEntry{}, fmt.Errorf("неизвестный тип агента %q (допустимо: %s, %s, %s, %s)", a.Kind, AgentKindClaude, AgentKindCodex, AgentKindAntigravity, AgentKindACP)
 	}
+	a.ProxyName = strings.TrimSpace(a.ProxyName)
 	return a, nil
 }
 
@@ -49,6 +59,9 @@ func (m *Manager) AddAgent(a AgentEntry) (AgentEntry, error) {
 			return AgentEntry{}, fmt.Errorf("агент с именем %q уже существует", e.Name)
 		}
 	}
+	if _, err := resolveNetworkIn(m.cfg.Proxies, a); err != nil {
+		return AgentEntry{}, err
+	}
 	m.cfg.Agents = append(m.cfg.Agents, a)
 	return a, m.persistConfigLocked()
 }
@@ -63,6 +76,9 @@ func (m *Manager) UpdateAgent(a AgentEntry) (AgentEntry, error) {
 	defer m.cfgMu.Unlock()
 	for i, e := range m.cfg.Agents {
 		if strings.EqualFold(e.Name, a.Name) {
+			if _, err := resolveNetworkIn(m.cfg.Proxies, a); err != nil {
+				return AgentEntry{}, err
+			}
 			m.cfg.Agents[i] = a
 			return a, m.persistConfigLocked()
 		}

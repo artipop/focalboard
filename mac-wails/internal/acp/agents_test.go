@@ -109,6 +109,102 @@ func TestExternalACPCommand(t *testing.T) {
 	}
 }
 
+func TestAgentLaunchArgvCustomCommand(t *testing.T) {
+	m := agentManager(t, "")
+	bin := writeFakeClaude(t, "#!/bin/sh\n")
+
+	// No command: the resolved binary, as before.
+	argv, err := agentLaunchArgv(AgentEntry{Name: "c", Kind: "claude", BinPath: bin}, m.resolveClaudeBin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(argv, " "); got != bin {
+		t.Errorf("launch argv = %q, want %q", got, bin)
+	}
+
+	// A wrapper command replaces the binary and keeps its own args; the bridge
+	// appends its protocol flags after it.
+	wrapper := []string{"/bin/sh", "-c", "exec " + bin}
+	argv, err = agentLaunchArgv(AgentEntry{Name: "c", Kind: "claude", BinPath: bin, Command: wrapper}, m.resolveClaudeBin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Join(argv, " "); got != strings.Join(wrapper, " ") {
+		t.Errorf("wrapped launch argv = %q", got)
+	}
+
+	// A missing binary still errors clearly when no command is set.
+	if _, err := agentLaunchArgv(AgentEntry{Name: "c", Kind: "codex", BinPath: "/no/such/codex"}, m.resolveCodexBin); err == nil {
+		t.Error("missing codex binary should error")
+	}
+}
+
+func TestAgentSpawnEnvProxy(t *testing.T) {
+	envOf := func(a AgentEntry, net NetworkSettings) (map[string]string, map[string]bool) {
+		env, drop := spawnEnv(a, net)
+		vals := map[string]string{}
+		for _, kv := range env {
+			eq := strings.Index(kv, "=")
+			vals[kv[:eq]] = kv[eq+1:] // later entries win, as they do in the child env
+		}
+		dropped := map[string]bool{}
+		for _, k := range drop {
+			dropped[k] = true
+		}
+		return vals, dropped
+	}
+
+	// A proxy expands to both cases and manages NO_PROXY as its pair.
+	vals, dropped := envOf(AgentEntry{}, NetworkSettings{Proxy: "http://proxy.example.com:8080", NoProxy: "git.internal,localhost"})
+	for _, k := range proxyEnvNames {
+		if vals[k] != "http://proxy.example.com:8080" {
+			t.Errorf("%s = %q, want the proxy URL", k, vals[k])
+		}
+		if !dropped[k] {
+			t.Errorf("%s should be dropped from the inherited env", k)
+		}
+	}
+	if vals["NO_PROXY"] != "git.internal,localhost" || vals["no_proxy"] != "git.internal,localhost" {
+		t.Errorf("NO_PROXY = %q/%q", vals["NO_PROXY"], vals["no_proxy"])
+	}
+
+	// A CA bundle reaches every runtime's variable.
+	vals, _ = envOf(AgentEntry{}, NetworkSettings{CACert: "/etc/my-ca.pem"})
+	for _, k := range caCertEnvNames {
+		if vals[k] != "/etc/my-ca.pem" {
+			t.Errorf("%s = %q, want the CA path", k, vals[k])
+		}
+	}
+	if _, ok := vals["HTTPS_PROXY"]; ok {
+		t.Error("no proxy configured, HTTPS_PROXY should be left alone")
+	}
+
+	// The explicit env map wins over the expanded settings, including blanking
+	// a proxy out; unrelated inherited proxy vars are still overridden.
+	vals, dropped = envOf(
+		AgentEntry{Env: map[string]string{"HTTPS_PROXY": "", "CODEX_HOME": "/tmp/a"}},
+		NetworkSettings{Proxy: "http://proxy.example.com:8080"},
+	)
+	if vals["HTTPS_PROXY"] != "" {
+		t.Errorf("Env should override the expanded proxy, got %q", vals["HTTPS_PROXY"])
+	}
+	if vals["HTTP_PROXY"] != "http://proxy.example.com:8080" || vals["CODEX_HOME"] != "/tmp/a" {
+		t.Errorf("unexpected env: %v", vals)
+	}
+	if !dropped["CODEX_HOME"] || !dropped["HTTPS_PROXY"] {
+		t.Error("agent env keys must be dropped from the inherited env")
+	}
+
+	// NoProxy alone does not invent a proxy.
+	vals, _ = envOf(AgentEntry{}, NetworkSettings{NoProxy: "*.internal"})
+	if vals["NO_PROXY"] != "*.internal" {
+		t.Errorf("NO_PROXY = %q", vals["NO_PROXY"])
+	}
+	if _, ok := vals["ALL_PROXY"]; ok {
+		t.Error("ALL_PROXY set without a proxy")
+	}
+}
+
 func TestResolveAgentByOption(t *testing.T) {
 	m := agentManager(t, "",
 		AgentEntry{Name: "claude", Kind: "claude"},
