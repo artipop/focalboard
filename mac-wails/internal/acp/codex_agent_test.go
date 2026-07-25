@@ -58,17 +58,23 @@ printf '%s\n' '{"type":"turn.completed"}'
 func TestCodexAgentWrapperCommandAndProxy(t *testing.T) {
 	script := writeFakeClaude(t, fakeCodexProxy)
 	m, writer, events, repo := testManager(t, fakeClaudeHappy, func(c *Config) {
+		c.Proxies = []ProxyEntry{{
+			Name: "office",
+			NetworkSettings: NetworkSettings{
+				Proxy:  "http://proxy.example.com:8080",
+				CACert: "/etc/my-ca.pem",
+			},
+		}}
 		c.Agents = []AgentEntry{{
-			Name:    "corpcodex",
-			Kind:    "codex",
-			Command: []string{"/bin/sh", script}, // stands in for `proxychains4 -f … codex`
-			Proxy:   "http://proxy.corp:3128",
-			CACert:  "/etc/corp-ca.pem",
+			Name:      "proxiedcodex",
+			Kind:      "codex",
+			Command:   []string{"/bin/sh", script}, // stands in for `proxychains4 -f … codex`
+			ProxyName: "office",
 		}}
 	})
 
 	ev := moveEvent("cardProxy", repo, "opt-backlog", "opt-agent")
-	ev.OptionNames = []string{"corpcodex"}
+	ev.OptionNames = []string{"proxiedcodex"}
 	events.ch <- ev
 
 	waitFor(t, 15*time.Second, "wrapped codex session done", func() bool {
@@ -78,10 +84,10 @@ func TestCodexAgentWrapperCommandAndProxy(t *testing.T) {
 
 	comments := writer.cardComments("cardProxy")
 	last := comments[len(comments)-1]
-	if !strings.Contains(last, "proxy=http://proxy.corp:3128") {
+	if !strings.Contains(last, "proxy=http://proxy.example.com:8080") {
 		t.Errorf("per-agent proxy did not reach the process; final comment: %q", last)
 	}
-	if !strings.Contains(last, "ca=/etc/corp-ca.pem") {
+	if !strings.Contains(last, "ca=/etc/my-ca.pem") {
 		t.Errorf("per-agent CA bundle did not reach the process; final comment: %q", last)
 	}
 }

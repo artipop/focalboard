@@ -14,6 +14,7 @@ import Dialog from '../dialog'
 import {sendFlashMessage} from '../flashMessages'
 
 import {agentBindings} from './agentReposDialog'
+import {ProxyEntry} from './proxiesDialog'
 
 import './agentsDialog.scss'
 
@@ -30,16 +31,14 @@ type AgentEntry = {
     env?: {[key: string]: string}
     args?: string[]
     command?: string[]
-    proxy?: string
-    noProxy?: string
-    caCert?: string
+    proxyName?: string
 }
 
 // Launch command placeholders per kind: for claude/codex the command wraps the
 // CLI (a proxy launcher, a per-account shim); the ACP kinds spawn it directly.
 const commandPlaceholders: {[kind: string]: string} = {
-    claude: 'proxychains4 -q -f /etc/corp.conf claude',
-    codex: 'proxychains4 -q -f /etc/corp.conf codex',
+    claude: 'proxychains4 -q -f /etc/myproxy.conf claude',
+    codex: 'proxychains4 -q -f /etc/myproxy.conf codex',
     antigravity: 'antigravity --acp',
     acp: 'gemini --acp',
 }
@@ -106,6 +105,7 @@ const AgentsDialog = (props: Props) => {
     const bindings = agentBindings()
 
     const [agents, setAgents] = useState<AgentEntry[]>([])
+    const [proxies, setProxies] = useState<ProxyEntry[]>([])
     const [systemPrompt, setSystemPrompt] = useState('')
     const [form, setForm] = useState<AgentEntry | null>(null)
     const [envText, setEnvText] = useState('')
@@ -120,6 +120,9 @@ const AgentsDialog = (props: Props) => {
         }
         try {
             setAgents(JSON.parse(await bindings.ListAgents()) || [])
+            if (bindings.ListProxies) {
+                setProxies(JSON.parse(await bindings.ListProxies()) || [])
+            }
             if (bindings.GetAgentSystemPrompt) {
                 setSystemPrompt(await bindings.GetAgentSystemPrompt())
             }
@@ -332,29 +335,28 @@ const AgentsDialog = (props: Props) => {
                             />
                         </label>
                         <label>
-                            {intl.formatMessage({id: 'Agents.proxy', defaultMessage: 'Proxy (optional) — HTTP(S)_PROXY / ALL_PROXY for this agent only'})}
-                            <input
-                                value={form.proxy || ''}
-                                placeholder={'http://proxy.corp:3128'}
-                                onChange={(e) => updateForm({proxy: e.target.value})}
-                            />
+                            {intl.formatMessage({id: 'Agents.proxyName', defaultMessage: 'Proxy configuration'})}
+                            <select
+                                value={form.proxyName || ''}
+                                onChange={(e) => updateForm({proxyName: e.target.value})}
+                            >
+                                <option value=''>
+                                    {intl.formatMessage({id: 'Agents.proxy-none', defaultMessage: 'No proxy (inherit the app environment)'})}
+                                </option>
+                                {proxies.map((p) => (
+                                    <option
+                                        key={p.name}
+                                        value={p.name}
+                                    >
+                                        {p.proxy ? `${p.name} — ${p.proxy}` : p.name}
+                                    </option>
+                                ))}
+                            </select>
                         </label>
-                        <label>
-                            {intl.formatMessage({id: 'Agents.noProxy', defaultMessage: 'Bypass proxy for (optional, comma-separated)'})}
-                            <input
-                                value={form.noProxy || ''}
-                                placeholder={'localhost,127.0.0.1,.corp'}
-                                onChange={(e) => updateForm({noProxy: e.target.value})}
-                            />
-                        </label>
-                        <label>
-                            {intl.formatMessage({id: 'Agents.caCert', defaultMessage: 'CA bundle (optional) — PEM for a TLS-inspecting proxy'})}
-                            <input
-                                value={form.caCert || ''}
-                                placeholder={'/etc/ssl/corp-ca.pem'}
-                                onChange={(e) => updateForm({caCert: e.target.value})}
-                            />
-                        </label>
+                        {proxies.length === 0 &&
+                            <div className='AgentsDialog__hint'>
+                                {intl.formatMessage({id: 'Agents.proxy-hint', defaultMessage: 'Configurations are managed in the board menu → Proxy configurations…'})}
+                            </div>}
                         <label>
                             {intl.formatMessage({id: 'Agents.env', defaultMessage: 'Environment (KEY=VALUE per line — e.g. CODEX_HOME, OPENAI_API_KEY)'})}
                             <textarea

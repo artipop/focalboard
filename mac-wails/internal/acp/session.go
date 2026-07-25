@@ -25,7 +25,8 @@ type Session struct {
 	RepoPath   string
 	BaseBranch string
 	PromptText string
-	Agent      AgentEntry // resolved agent (kind/bin/model/env/prompt)
+	Agent      AgentEntry      // resolved agent (kind/bin/model/env/prompt)
+	Net        NetworkSettings // resolved proxy configuration (Agent.ProxyName)
 
 	Worktree     WorktreeInfo
 	usedWorktree bool // a dedicated worktree was actually created
@@ -261,7 +262,7 @@ func (m *Manager) connectClaude(ctx context.Context, s *Session) (*acpsdk.Client
 		extraArgs = append(extraArgs, "--model", s.Agent.Model)
 	}
 	extraArgs = append(extraArgs, s.Agent.Args...)
-	env, drop := s.Agent.spawnEnv()
+	env, drop := spawnEnv(s.Agent, s.Net)
 	bridge := claudebridge.New(claudebridge.Options{
 		Launch:    launch,
 		ExtraArgs: extraArgs,
@@ -295,7 +296,7 @@ func (m *Manager) connectCodex(ctx context.Context, s *Session) (*acpsdk.ClientS
 	if err != nil {
 		return nil, nil, err
 	}
-	env, drop := s.Agent.spawnEnv()
+	env, drop := spawnEnv(s.Agent, s.Net)
 	bridge := codexbridge.New(codexbridge.Options{
 		Launch:    launch,
 		Model:     s.Agent.Model,
@@ -360,7 +361,7 @@ func (m *Manager) connectACPAgent(ctx context.Context, s *Session, argv []string
 	if len(argv) == 0 {
 		return nil, nil, fmt.Errorf("empty agent command")
 	}
-	env, drop := s.Agent.spawnEnv()
+	env, drop := spawnEnv(s.Agent, s.Net)
 	argv = resolveArgv0(argv)
 	proc, err := procgroup.Spawn(m.rootCtx, argv, s.Worktree.Path, env, drop...)
 	if err != nil {

@@ -38,7 +38,7 @@ import (
 // Options configures the bridge.
 type Options struct {
 	// Launch is the base argv of the codex CLI: the resolved binary, or a
-	// wrapper command ending in it (e.g. `proxychains4 -f corp.conf codex`).
+	// wrapper command ending in it (e.g. `proxychains4 -f myproxy.conf codex`).
 	// The bridge appends `exec --json …` after it.
 	Launch []string
 	// Model is passed as -m when non-empty.

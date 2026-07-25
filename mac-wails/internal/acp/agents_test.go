@@ -140,8 +140,8 @@ func TestAgentLaunchArgvCustomCommand(t *testing.T) {
 }
 
 func TestAgentSpawnEnvProxy(t *testing.T) {
-	envOf := func(a AgentEntry) (map[string]string, map[string]bool) {
-		env, drop := a.spawnEnv()
+	envOf := func(a AgentEntry, net NetworkSettings) (map[string]string, map[string]bool) {
+		env, drop := spawnEnv(a, net)
 		vals := map[string]string{}
 		for _, kv := range env {
 			eq := strings.Index(kv, "=")
@@ -155,23 +155,23 @@ func TestAgentSpawnEnvProxy(t *testing.T) {
 	}
 
 	// A proxy expands to both cases and manages NO_PROXY as its pair.
-	vals, dropped := envOf(AgentEntry{Proxy: "http://proxy.corp:3128", NoProxy: "git.corp,localhost"})
+	vals, dropped := envOf(AgentEntry{}, NetworkSettings{Proxy: "http://proxy.example.com:8080", NoProxy: "git.internal,localhost"})
 	for _, k := range proxyEnvNames {
-		if vals[k] != "http://proxy.corp:3128" {
+		if vals[k] != "http://proxy.example.com:8080" {
 			t.Errorf("%s = %q, want the proxy URL", k, vals[k])
 		}
 		if !dropped[k] {
 			t.Errorf("%s should be dropped from the inherited env", k)
 		}
 	}
-	if vals["NO_PROXY"] != "git.corp,localhost" || vals["no_proxy"] != "git.corp,localhost" {
+	if vals["NO_PROXY"] != "git.internal,localhost" || vals["no_proxy"] != "git.internal,localhost" {
 		t.Errorf("NO_PROXY = %q/%q", vals["NO_PROXY"], vals["no_proxy"])
 	}
 
 	// A CA bundle reaches every runtime's variable.
-	vals, _ = envOf(AgentEntry{CACert: "/etc/corp-ca.pem"})
+	vals, _ = envOf(AgentEntry{}, NetworkSettings{CACert: "/etc/my-ca.pem"})
 	for _, k := range caCertEnvNames {
-		if vals[k] != "/etc/corp-ca.pem" {
+		if vals[k] != "/etc/my-ca.pem" {
 			t.Errorf("%s = %q, want the CA path", k, vals[k])
 		}
 	}
@@ -181,14 +181,14 @@ func TestAgentSpawnEnvProxy(t *testing.T) {
 
 	// The explicit env map wins over the expanded settings, including blanking
 	// a proxy out; unrelated inherited proxy vars are still overridden.
-	vals, dropped = envOf(AgentEntry{
-		Proxy: "http://proxy.corp:3128",
-		Env:   map[string]string{"HTTPS_PROXY": "", "CODEX_HOME": "/tmp/a"},
-	})
+	vals, dropped = envOf(
+		AgentEntry{Env: map[string]string{"HTTPS_PROXY": "", "CODEX_HOME": "/tmp/a"}},
+		NetworkSettings{Proxy: "http://proxy.example.com:8080"},
+	)
 	if vals["HTTPS_PROXY"] != "" {
 		t.Errorf("Env should override the expanded proxy, got %q", vals["HTTPS_PROXY"])
 	}
-	if vals["HTTP_PROXY"] != "http://proxy.corp:3128" || vals["CODEX_HOME"] != "/tmp/a" {
+	if vals["HTTP_PROXY"] != "http://proxy.example.com:8080" || vals["CODEX_HOME"] != "/tmp/a" {
 		t.Errorf("unexpected env: %v", vals)
 	}
 	if !dropped["CODEX_HOME"] || !dropped["HTTPS_PROXY"] {
@@ -196,8 +196,8 @@ func TestAgentSpawnEnvProxy(t *testing.T) {
 	}
 
 	// NoProxy alone does not invent a proxy.
-	vals, _ = envOf(AgentEntry{NoProxy: "*.corp"})
-	if vals["NO_PROXY"] != "*.corp" {
+	vals, _ = envOf(AgentEntry{}, NetworkSettings{NoProxy: "*.internal"})
+	if vals["NO_PROXY"] != "*.internal" {
 		t.Errorf("NO_PROXY = %q", vals["NO_PROXY"])
 	}
 	if _, ok := vals["ALL_PROXY"]; ok {

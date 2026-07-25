@@ -116,17 +116,26 @@ for later.
     `ANTHROPIC_API_KEY` or `CODEX_HOME` / `OPENAI_API_KEY` for a second account.
     It is injected at spawn (`procgroup.Spawn`), no terminal isolation needed.
   - `command` — the launch argv. For `claude`/`codex` it replaces the binary the
-    bridge invokes, so the CLI can be wrapped: `proxychains4 -q -f corp.conf
-    claude` routes one agent through the corporate segment, a shim script can do
+    bridge invokes, so the CLI can be wrapped: `proxychains4 -q -f myproxy.conf
+    claude` routes one agent through its own network path, a shim script can do
     anything else (`tsh`, `nsenter`, a VPN namespace). The bridge still appends
     its own protocol flags, and `args` still appends CLI flags. For the
     ACP-native kinds it is the whole command, as before.
-  - `proxy` / `noProxy` / `caCert` — expanded into `HTTP(S)_PROXY`, `ALL_PROXY`,
-    `NO_PROXY` and the per-runtime CA variables (`NODE_EXTRA_CA_CERTS`,
-    `SSL_CERT_FILE`, …). This covers a plain corporate proxy without a wrapper;
-    `env` overrides them (an empty value opts an agent out of an inherited
-    proxy). A per-agent *VPN* needs the `command` wrapper — env alone cannot
-    change routing.
+  - `proxyName` — the network configuration the agent runs with, picked from
+    the proxy registry (below).
+- **Proxy configurations**: a separate registry (board menu → *Proxy
+  configurations…*), each entry a name plus `proxy` / `noProxy` / `caCert`.
+  Agents reference one by name, so a proxy is described once and shared by
+  several agents. At spawn the entry expands into `HTTP(S)_PROXY`, `ALL_PROXY`,
+  `NO_PROXY` and the per-runtime CA variables (`NODE_EXTRA_CA_CERTS`,
+  `SSL_CERT_FILE`, …), covering a plain HTTP proxy without any wrapper; an
+  agent's own `env` still overrides them (an empty value opts it out of an
+  inherited proxy). Guardrails: a proxy URL without a scheme is rejected, and
+  since Claude Code documents no SOCKS support a `socks…://` configuration
+  cannot be paired with a `claude` agent — neither when saving the agent nor by
+  editing the configuration afterwards. Removing an entry still referenced by
+  an agent is refused. A per-agent *VPN* needs the `command` wrapper — env
+  alone cannot change routing.
 - Config: `~/Library/Application Support/Focalboard/acp/config.json` (created
   with defaults on first run; the repo registry is stored there too). If the
   app can't find `claude` (GUI apps get a minimal `PATH`), set `claudePath`

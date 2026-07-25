@@ -32,18 +32,60 @@ type AgentEntry struct {
 	// Command is the launch argv. For the ACP-native kinds it is the whole
 	// agent command (required for "acp"). For claude/codex it replaces the
 	// binary the bridge builds its invocation on: the last element is the CLI
-	// and anything before it is a wrapper — `proxychains4 -f corp.conf claude`,
+	// and anything before it is a wrapper — `proxychains4 -f myproxy.conf claude`,
 	// a per-account shim script — while the bridge still appends its own
 	// protocol flags. Takes precedence over BinPath.
 	Command []string `json:"command,omitempty"`
 
-	// Proxy/NoProxy/CACert are per-agent network settings, expanded into the
-	// standard proxy environment variables at spawn time (see spawnEnv). They
-	// let one agent reach the internet through a corporate proxy while another
-	// goes direct; Env wins over them on conflicts.
+	// ProxyName selects a named entry from the proxy registry (Config.Proxies).
+	// Network settings live there rather than on the agent, so several agents
+	// share one configuration and it is edited in a single place. Empty means
+	// the agent inherits the app's own environment.
+	ProxyName string `json:"proxyName,omitempty"`
+}
+
+// NetworkSettings is one network path: the proxy an agent's traffic takes and
+// the trust material that goes with it. Expanded into the standard proxy
+// environment variables at spawn time (see spawnEnv).
+type NetworkSettings struct {
 	Proxy   string `json:"proxy,omitempty"`   // http(s)/socks5 URL → HTTP(S)_PROXY, ALL_PROXY
 	NoProxy string `json:"noProxy,omitempty"` // comma-separated hosts/suffixes → NO_PROXY
 	CACert  string `json:"caCert,omitempty"`  // PEM bundle for a TLS-inspecting proxy
+}
+
+// ProxyEntry is one named network configuration in the registry, referenced by
+// agents through AgentEntry.ProxyName.
+type ProxyEntry struct {
+	Name string `json:"name"` // registry key; matches AgentEntry.ProxyName
+	NetworkSettings
+}
+
+// IsZero reports whether nothing is configured.
+func (n NetworkSettings) IsZero() bool {
+	return strings.TrimSpace(n.Proxy) == "" &&
+		strings.TrimSpace(n.NoProxy) == "" &&
+		strings.TrimSpace(n.CACert) == ""
+}
+
+// Validate normalizes and checks the settings. kind is the agent kind they will
+// be used with, or "" to skip the kind-specific checks.
+func (n NetworkSettings) Validate(kind string) (NetworkSettings, error) {
+	n.Proxy = strings.TrimSpace(n.Proxy)
+	n.NoProxy = strings.TrimSpace(n.NoProxy)
+	n.CACert = strings.TrimSpace(n.CACert)
+	if n.Proxy != "" {
+		// The CLIs read the proxy variables as URLs; a bare host:port is
+		// silently ignored, which looks like "the proxy setting does nothing".
+		if !strings.Contains(n.Proxy, "://") {
+			return n, fmt.Errorf("в адресе прокси %q не хватает схемы, например http://%s", n.Proxy, n.Proxy)
+		}
+		// Claude Code documents no SOCKS support (code.claude.com/docs/en/network-config),
+		// so a socks:// value would be accepted here and then quietly ignored.
+		if kind == AgentKindClaude && strings.HasPrefix(strings.ToLower(n.Proxy), "socks") {
+			return n, fmt.Errorf("Claude Code не поддерживает SOCKS-прокси: укажи http(s):// или заверни CLI в команду запуска (command)")
+		}
+	}
+	return n, nil
 }
 
 // proxyEnvNames are the variables spawnEnv manages when Proxy is set. Both
@@ -62,28 +104,28 @@ var caCertEnvNames = []string{
 
 // spawnEnv returns the "KEY=value" pairs injected into the agent process and
 // the names dropped from the inherited environment first, so the agent's own
-// values win over whatever the desktop app itself was launched with. Network
-// settings are expanded first and the explicit Env map last, so Env can
-// override or blank out any of them (an empty value means "present but empty",
-// which is how an agent opts out of an inherited corporate proxy).
-func (a AgentEntry) spawnEnv() (env []string, drop []string) {
+// values win over whatever the desktop app itself was launched with. net is the
+// resolved network configuration; it is expanded first and the agent's Env map
+// last, so Env can override or blank out any of it (an empty value means
+// "present but empty", which is how an agent opts out of an inherited proxy).
+func spawnEnv(a AgentEntry, net NetworkSettings) (env []string, drop []string) {
 	add := func(k, v string) {
 		env = append(env, k+"="+v)
 		drop = append(drop, k)
 	}
-	if p := strings.TrimSpace(a.Proxy); p != "" {
+	if p := strings.TrimSpace(net.Proxy); p != "" {
 		for _, k := range proxyEnvNames {
 			add(k, p)
 		}
 		// Managed as a pair: an inherited NO_PROXY must not leak into an agent
-		// that declares its own proxy.
-		add("NO_PROXY", a.NoProxy)
-		add("no_proxy", a.NoProxy)
-	} else if n := strings.TrimSpace(a.NoProxy); n != "" {
+		// that goes through its own proxy.
+		add("NO_PROXY", net.NoProxy)
+		add("no_proxy", net.NoProxy)
+	} else if n := strings.TrimSpace(net.NoProxy); n != "" {
 		add("NO_PROXY", n)
 		add("no_proxy", n)
 	}
-	if c := strings.TrimSpace(a.CACert); c != "" {
+	if c := strings.TrimSpace(net.CACert); c != "" {
 		for _, k := range caCertEnvNames {
 			add(k, c)
 		}
@@ -141,6 +183,10 @@ type Config struct {
 	// AgentMode below drives the (single) built-in agent for backward compat.
 	Agents []AgentEntry `json:"agents"`
 
+	// Proxies is the registry of named network configurations. Agents pick one
+	// by name (AgentEntry.ProxyName), so a proxy is described once and shared.
+	Proxies []ProxyEntry `json:"proxies"`
+
 	// SystemPrompt is the board/column-level instruction prepended to every
 	// triggered session's prompt (before the agent's own system prompt and the
 	// card task). One trigger column today; may become a per-column map later.
@@ -173,6 +219,7 @@ func DefaultConfig(dataDir string) Config {
 		RepoWhitelist:            []string{},
 		Repos:                    []RepoEntry{},
 		Agents:                   []AgentEntry{},
+		Proxies:                  []ProxyEntry{},
 		WorktreeMode:             "never",
 		MaxConcurrent:            3,
 		SessionTimeoutMinutes:    15,

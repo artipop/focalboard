@@ -31,6 +31,10 @@ export interface IAppWindow extends Window {
                 AddAgent(entryJSON: string): Promise<string>
                 UpdateAgent(entryJSON: string): Promise<string>
                 RemoveAgent(name: string): Promise<void>
+                ListProxies(): Promise<string>
+                AddProxy(entryJSON: string): Promise<string>
+                UpdateProxy(entryJSON: string): Promise<string>
+                RemoveProxy(name: string): Promise<void>
                 GetAgentSystemPrompt(): Promise<string>
                 SetAgentSystemPrompt(text: string): Promise<void>
                 GetCardSessions(cardId: string): Promise<string>

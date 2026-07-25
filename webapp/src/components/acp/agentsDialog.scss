@@ -64,6 +64,11 @@
         }
     }
 
+    .AgentsDialog__hint {
+        color: rgba(var(--center-channel-color-rgb), 0.64);
+        font-size: 12px;
+    }
+
     .AgentsDialog__formActions,
     .AgentsDialog__actions {
         display: flex;

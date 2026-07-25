@@ -32,7 +32,7 @@ import (
 // Options configures the bridge.
 type Options struct {
 	// Launch is the base argv of the claude CLI: the resolved binary, or a
-	// wrapper command ending in it (e.g. `proxychains4 -f corp.conf claude`).
+	// wrapper command ending in it (e.g. `proxychains4 -f myproxy.conf claude`).
 	// The bridge appends its own stream-json flags after it.
 	Launch []string
 	// ExtraArgs are appended to the claude invocation (e.g. --model).

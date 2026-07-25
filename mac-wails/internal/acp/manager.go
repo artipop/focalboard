@@ -109,6 +109,10 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
+	net, err := m.resolveNetwork(agent)
+	if err != nil {
+		return nil, err
+	}
 	// Without worktrees, two agents must never share one working tree
 	// (spec §7): reject while another live session uses the same repo.
 	if !m.cfg.UseWorktrees() {
@@ -136,6 +140,7 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 		RepoPath:   repoPath,
 		BaseBranch: ev.Props["branch"],
 		Agent:      agent,
+		Net:        net,
 		PromptText: composePrompt(ev, agent, systemPrompt, m.cfg.UseWorktrees()),
 		status:     StatusQueued,
 		allowTools: make(map[string]bool),
@@ -333,9 +338,9 @@ func lookupBin(name, notFoundMsg string) (string, error) {
 }
 
 // agentLaunchArgv returns the base argv a bridge builds its invocation on: the
-// agent's explicit Command when set — which is how a wrapper (proxychains for a
-// corporate segment, a per-account shim) gets in front of the CLI — otherwise
-// the resolved binary. The bridge appends its own protocol flags after it.
+// agent's explicit Command when set — which is how a wrapper (a proxy launcher,
+// a per-account shim) gets in front of the CLI — otherwise the resolved binary.
+// The bridge appends its own protocol flags after it.
 func agentLaunchArgv(a AgentEntry, resolveBin func(override string) (string, error)) ([]string, error) {
 	if len(a.Command) == 0 {
 		bin, err := resolveBin(a.BinPath)
