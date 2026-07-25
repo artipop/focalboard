@@ -8,13 +8,12 @@ const createInlineCodeStyleStrategy = (): InlineStrategy => {
 
     return {
         style: 'INLINE-CODE',
-        findStyleRanges: (block) => {
+        findStyleRanges: (text, blockType) => {
             // Don't allow inline code inside of code blocks
-            if (block.getType() === 'code-block') {
+            if (blockType === 'code-block') {
                 return []
             }
 
-            const text = block.getText()
             const codeRanges = findRangesWithRegex(text, codeRegex)
             return codeRanges
         },

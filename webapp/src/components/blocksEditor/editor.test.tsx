@@ -10,8 +10,6 @@ import {TestBlockFactory} from '../../test/testBlockFactory'
 
 import Editor from './editor'
 
-jest.mock('draft-js/lib/generateRandomKey', () => () => '123')
-
 describe('components/blocksEditor/editor', () => {
     beforeEach(mockDOM)
 

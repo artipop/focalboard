@@ -1,52 +1,34 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import Editor from '@draft-js-plugins/editor'
-import createEmojiPlugin from '@draft-js-plugins/emoji'
-import '@draft-js-plugins/emoji/lib/plugin.css'
-import createMentionPlugin from '@draft-js-plugins/mention'
-import '@draft-js-plugins/mention/lib/plugin.css'
-import {ContentState, DraftHandleValue, EditorState, getDefaultKeyBinding} from 'draft-js'
-import React, {
-    ReactElement, useCallback, useEffect,
-    useMemo, useRef,
-    useState,
-} from 'react'
+import React, {MutableRefObject, ReactElement, useEffect, useRef} from 'react'
 
-import {debounce} from 'lodash'
-
-import {useAppSelector} from '../../store/hooks'
-import {IUser} from '../../user'
-import {getBoardUsersList, getMe} from '../../store/users'
-import createLiveMarkdownPlugin from '../live-markdown-plugin/liveMarkdownPlugin'
-import {useHasPermissions} from '../../hooks/permissions'
-import {Permission} from '../../constants'
-import {BoardMember, BoardTypeOpen, MemberRole} from '../../blocks/board'
-import mutator from '../../mutator'
-import ConfirmAddUserForNotifications from '../confirmAddUserForNotifications'
-import RootPortal from '../rootPortal'
-
-import './markdownEditorInput.scss'
-
-import {getCurrentBoard} from '../../store/boards'
-import octoClient from '../../octoClient'
+import {LexicalComposer} from '@lexical/react/LexicalComposer'
+import {ContentEditable} from '@lexical/react/LexicalContentEditable'
+import {PlainTextPlugin} from '@lexical/react/LexicalPlainTextPlugin'
+import {HistoryPlugin} from '@lexical/react/LexicalHistoryPlugin'
+import {OnChangePlugin} from '@lexical/react/LexicalOnChangePlugin'
+import {LexicalErrorBoundary} from '@lexical/react/LexicalErrorBoundary'
+import {useLexicalComposerContext} from '@lexical/react/LexicalComposerContext'
+import {mergeRegister} from '@lexical/utils'
+import {
+    $getRoot,
+    BLUR_COMMAND,
+    COMMAND_PRIORITY_LOW,
+    EditorState,
+    FOCUS_COMMAND,
+    KEY_BACKSPACE_COMMAND,
+    KEY_ENTER_COMMAND,
+    KEY_ESCAPE_COMMAND,
+} from 'lexical'
 
 import {Utils} from '../../utils'
-import {ClientConfig} from '../../config/clientConfig'
-import {getClientConfig} from '../../store/clientConfig'
 
-import Entry from './entryComponent/entryComponent'
+import {$rebuildStyledContent, $setEditorMarkdown, registerLiveMarkdown} from '../live-markdown-plugin/liveMarkdown'
 
-const imageURLForUser = (window as any).Components?.imageURLForUser
+import MentionsPlugin from './plugins/mentionsPlugin'
+import EmojiPlugin from './plugins/emojiPlugin'
 
-type MentionUser = {
-    user: IUser
-    name: string
-    avatar: string
-    is_bot: boolean
-    is_guest: boolean
-    displayName: string
-    isBoardMember: boolean
-}
+import './markdownEditorInput.scss'
 
 type Props = {
     onChange?: (text: string) => void
@@ -59,279 +41,144 @@ type Props = {
     saveOnEnter?: boolean
 }
 
-const MarkdownEditorInput = (props: Props): ReactElement => {
-    const {onChange, onFocus, onBlur, initialText, id} = props
-    const boardUsers = useAppSelector<IUser[]>(getBoardUsersList)
-    const board = useAppSelector(getCurrentBoard)
-    const clientConfig = useAppSelector<ClientConfig>(getClientConfig)
-    const ref = useRef<Editor>(null)
-    const allowManageBoardRoles = useHasPermissions(board.teamId, board.id, [Permission.ManageBoardRoles])
-    const [confirmAddUser, setConfirmAddUser] = useState<IUser|null>(null)
-    const me = useAppSelector<IUser|null>(getMe)
+// Registers live-markdown styling on the editor and styles the initial content.
+const LiveMarkdownPlugin = (): null => {
+    const [editor] = useLexicalComposerContext()
+    useEffect(() => {
+        const unregister = registerLiveMarkdown(editor)
+        editor.update(() => $rebuildStyledContent(), {tag: 'live-markdown'})
+        return unregister
+    }, [editor])
+    return null
+}
 
-    const [suggestions, setSuggestions] = useState<MentionUser[]>([])
+type EventsProps = {
+    onFocus?: () => void
+    onBlur?: (text: string) => void
+    onEditorCancel?: () => void
+    saveOnEnter?: boolean
+    suppressBlurRef: MutableRefObject<boolean>
+}
 
-    const loadSuggestions = async (term: string) => {
-        let users: IUser[]
+// Focus on mount and translate editor keyboard/focus events into the callbacks
+// the surrounding board UI expects (Esc → blur, Enter → save, Backspace on empty
+// → cancel).
+const EditorEventsPlugin = (props: EventsProps): null => {
+    const {onFocus, onBlur, onEditorCancel, saveOnEnter, suppressBlurRef} = props
+    const [editor] = useLexicalComposerContext()
 
-        if (!me?.is_guest && (allowManageBoardRoles || (board && board.type === BoardTypeOpen))) {
-            const excludeBots = true
-            users = await octoClient.searchTeamUsers(term, excludeBots)
-        } else {
-            users = boardUsers.
-                filter((user) => {
-                    // no search term
-                    if (!term) {
+    useEffect(() => {
+        editor.focus()
+    }, [editor])
+
+    useEffect(() => {
+        const readText = () => editor.getEditorState().read(() => $getRoot().getTextContent())
+
+        return mergeRegister(
+            editor.registerCommand(
+                KEY_ESCAPE_COMMAND,
+                () => {
+                    editor.blur()
+                    return true
+                },
+                COMMAND_PRIORITY_LOW,
+            ),
+            editor.registerCommand<KeyboardEvent | null>(
+                KEY_ENTER_COMMAND,
+                (event) => {
+                    if (saveOnEnter && event && !event.shiftKey) {
+                        event.preventDefault()
+                        onBlur?.(readText())
                         return true
                     }
+                    return false
+                },
+                COMMAND_PRIORITY_LOW,
+            ),
+            editor.registerCommand<KeyboardEvent>(
+                KEY_BACKSPACE_COMMAND,
+                () => {
+                    if (onEditorCancel && $getRoot().getTextContent().length === 0) {
+                        onEditorCancel()
+                        return true
+                    }
+                    return false
+                },
+                COMMAND_PRIORITY_LOW,
+            ),
+            editor.registerCommand(
+                FOCUS_COMMAND,
+                () => {
+                    onFocus?.()
+                    return false
+                },
+                COMMAND_PRIORITY_LOW,
+            ),
+            editor.registerCommand(
+                BLUR_COMMAND,
+                () => {
+                    if (!suppressBlurRef.current) {
+                        onBlur?.(readText())
+                    }
+                    return false
+                },
+                COMMAND_PRIORITY_LOW,
+            ),
+        )
+    }, [editor, onBlur, onFocus, onEditorCancel, saveOnEnter, suppressBlurRef])
 
-                    // does the search term occur anywhere in the display name?
-                    return Utils.getUserDisplayName(user, clientConfig.teammateNameDisplay).includes(term)
-                }).
+    return null
+}
 
-                // first 10 results
-                slice(0, 10)
-        }
+const MarkdownEditorInput = (props: Props): ReactElement => {
+    const {onChange, onFocus, onBlur, onEditorCancel, initialText, id, saveOnEnter} = props
 
-        const mentions: MentionUser[] = users.map(
-            (user: IUser): MentionUser => ({
-                name: user.username,
-                avatar: `${imageURLForUser ? imageURLForUser(user.id) : ''}`,
-                is_bot: user.is_bot,
-                is_guest: user.is_guest,
-                displayName: Utils.getUserDisplayName(user, clientConfig.teammateNameDisplay),
-                isBoardMember: Boolean(boardUsers.find((u) => u.id === user.id)),
-                user,
-            }))
-        setSuggestions(mentions)
+    // Guards the blur-save while the "add user to board" confirm dialog (opened
+    // from the mentions plugin) steals focus.
+    const suppressBlurRef = useRef(false)
+    const lastTextRef = useRef<string>(initialText || '')
+
+    const initialConfig = {
+        namespace: id || 'MarkdownEditorInput',
+        onError: (error: Error) => {
+            Utils.logError(`Lexical editor error: ${error.message}`)
+        },
+        editable: true,
+        editorState: () => $setEditorMarkdown(initialText || ''),
     }
 
-    const debouncedLoadSuggestion = useMemo(() => debounce(loadSuggestions, 200), [])
-
-    useEffect(() => {
-        // Get the ball rolling. Searching for empty string
-        // returns first 10 users in alphabetical order.
-        loadSuggestions('')
-    }, [])
-
-    const generateEditorState = (text?: string) => {
-        const state = EditorState.createWithContent(ContentState.createFromText(text || ''))
-        return EditorState.moveSelectionToEnd(state)
-    }
-
-    const [editorState, setEditorState] = useState(() => generateEditorState(initialText))
-
-    const addUser = useCallback(async (userId: string, role: string) => {
-        const newRole = role || MemberRole.Viewer
-        const newMember = {
-            boardId: board.id,
-            userId,
-            roles: role,
-            schemeAdmin: newRole === MemberRole.Admin,
-            schemeEditor: newRole === MemberRole.Admin || newRole === MemberRole.Editor,
-            schemeCommenter: newRole === MemberRole.Admin || newRole === MemberRole.Editor || newRole === MemberRole.Commenter,
-            schemeViewer: newRole === MemberRole.Admin || newRole === MemberRole.Editor || newRole === MemberRole.Commenter || newRole === MemberRole.Viewer,
-        } as BoardMember
-
-        setConfirmAddUser(null)
-        setEditorState(EditorState.moveSelectionToEnd(editorState))
-        ref.current?.focus()
-        await mutator.createBoardMember(newMember)
-    }, [board, editorState])
-
-    const [initialTextCache, setInitialTextCache] = useState<string | undefined>(initialText)
-    const [initialTextUsed, setInitialTextUsed] = useState<boolean>(false)
-
-    // avoiding stale closure
-    useEffect(() => {
-        // only change editor state when initialText actually changes from one defined value to another.
-        // This is needed to make the mentions plugin work. For some reason, if we don't check
-        // for this if condition here, mentions don't work. I suspect it's because without
-        // the in condition, we're changing editor state twice during component initialization
-        // and for some reason it causes mentions to not show up.
-
-        // initial text should only be used once, i'e', initially
-        // `initialTextUsed` flag records if the initialText prop has been used
-        // to se the editor state once as a truthy value.
-        // Once used, we don't react to its changing value
-
-        if (!initialTextUsed && initialText && initialText !== initialTextCache) {
-            setEditorState(generateEditorState(initialText || ''))
-            setInitialTextCache(initialText)
-            setInitialTextUsed(true)
+    const handleChange = (editorState: EditorState) => {
+        const text = editorState.read(() => $getRoot().getTextContent())
+        if (text !== lastTextRef.current) {
+            lastTextRef.current = text
+            onChange?.(text)
         }
-    }, [initialText])
-
-    const [isMentionPopoverOpen, setIsMentionPopoverOpen] = useState(false)
-    const [isEmojiPopoverOpen, setIsEmojiPopoverOpen] = useState(false)
-
-    const {MentionSuggestions, plugins, EmojiSuggestions} = useMemo(() => {
-        const mentionPlugin = createMentionPlugin({mentionPrefix: '@'})
-        const emojiPlugin = createEmojiPlugin()
-        const markdownPlugin = createLiveMarkdownPlugin()
-
-        // eslint-disable-next-line @typescript-eslint/no-shadow
-        const {EmojiSuggestions} = emojiPlugin
-        // eslint-disable-next-line @typescript-eslint/no-shadow
-        const {MentionSuggestions} = mentionPlugin
-        // eslint-disable-next-line @typescript-eslint/no-shadow
-        const plugins = [
-            mentionPlugin,
-            emojiPlugin,
-            markdownPlugin,
-        ]
-        return {plugins, MentionSuggestions, EmojiSuggestions}
-    }, [])
-
-    const onEditorStateChange = useCallback((newEditorState: EditorState) => {
-        // newEditorState.
-        const newText = newEditorState.getCurrentContent().getPlainText()
-
-        onChange && onChange(newText)
-        setEditorState(newEditorState)
-    }, [onChange])
-
-    const customKeyBindingFn = useCallback((e: React.KeyboardEvent) => {
-        if (isMentionPopoverOpen || isEmojiPopoverOpen) {
-            return undefined
-        }
-
-        if (e.key === 'Escape') {
-            return 'editor-blur'
-        }
-
-        if (e.key === 'Backspace') {
-            return 'backspace'
-        }
-
-        if (getDefaultKeyBinding(e) === 'undo') {
-            return 'editor-undo'
-        }
-
-        if (getDefaultKeyBinding(e) === 'redo') {
-            return 'editor-redo'
-        }
-
-        return getDefaultKeyBinding(e as any)
-    }, [isEmojiPopoverOpen, isMentionPopoverOpen])
-
-    const handleKeyCommand = useCallback((command: string, currentState: EditorState): DraftHandleValue => {
-        if (command === 'editor-blur') {
-            ref.current?.blur()
-            return 'handled'
-        }
-
-        if (command === 'editor-redo') {
-            const selectionRemovedState = EditorState.redo(currentState)
-            onEditorStateChange(EditorState.redo(selectionRemovedState))
-
-            return 'handled'
-        }
-
-        if (command === 'editor-undo') {
-            const selectionRemovedState = EditorState.undo(currentState)
-            onEditorStateChange(EditorState.undo(selectionRemovedState))
-
-            return 'handled'
-        }
-
-        if (command === 'backspace') {
-            if (props.onEditorCancel && editorState.getCurrentContent().getPlainText().length === 0) {
-                props.onEditorCancel()
-                return 'handled'
-            }
-        }
-
-        return 'not-handled'
-    }, [props.onEditorCancel, editorState])
-
-    const onEditorStateBlur = useCallback(() => {
-        if (confirmAddUser) {
-            return
-        }
-        const text = editorState.getCurrentContent().getPlainText()
-        onBlur && onBlur(text)
-    }, [editorState.getCurrentContent().getPlainText(), onBlur, confirmAddUser])
-
-    const onMentionPopoverOpenChange = useCallback((open: boolean) => {
-        setIsMentionPopoverOpen(open)
-    }, [])
-
-    const onEmojiPopoverOpen = useCallback(() => {
-        setIsEmojiPopoverOpen(true)
-    }, [])
-
-    const onEmojiPopoverClose = useCallback(() => {
-        setIsEmojiPopoverOpen(false)
-    }, [])
-
-    const onSearchChange = useCallback(({value}: { value: string }) => {
-        debouncedLoadSuggestion(value)
-    }, [suggestions])
-
-    const className = 'MarkdownEditorInput'
-
-    const handleReturn = (e: any, state: EditorState): DraftHandleValue => {
-        if (!e.shiftKey) {
-            const text = state.getCurrentContent().getPlainText()
-            onBlur && onBlur(text)
-            return 'handled'
-        }
-        return 'not-handled'
     }
 
     return (
-        <div
-            className={className}
-            onKeyDown={(e: React.KeyboardEvent) => {
-                if (isMentionPopoverOpen || isEmojiPopoverOpen) {
-                    e.stopPropagation()
-                }
-            }}
-        >
-            <Editor
-                editorKey={id}
-                editorState={editorState}
-                onChange={onEditorStateChange}
-                plugins={plugins}
-                ref={ref}
-                onBlur={onEditorStateBlur}
-                onFocus={onFocus}
-                keyBindingFn={customKeyBindingFn}
-                handleKeyCommand={handleKeyCommand}
-                handleReturn={props.saveOnEnter ? handleReturn : undefined}
-            />
-            <MentionSuggestions
-                open={isMentionPopoverOpen}
-                onOpenChange={onMentionPopoverOpenChange}
-                suggestions={suggestions}
-                onSearchChange={onSearchChange}
-                entryComponent={Entry}
-                onAddMention={(mention) => {
-                    if (mention.isBoardMember) {
-                        return
-                    }
-                    setConfirmAddUser(mention.user)
-                }}
-            />
-            <EmojiSuggestions
-                onOpen={onEmojiPopoverOpen}
-                onClose={onEmojiPopoverClose}
-            />
-            {confirmAddUser &&
-                <RootPortal>
-                    <ConfirmAddUserForNotifications
-                        allowManageBoardRoles={allowManageBoardRoles}
-                        minimumRole={board.minimumRole}
-                        user={confirmAddUser}
-                        onConfirm={addUser}
-                        onClose={() => {
-                            setConfirmAddUser(null)
-                            setEditorState(EditorState.moveSelectionToEnd(editorState))
-                            ref.current?.focus()
-                        }}
-                    />
-                </RootPortal>}
+        <div className='MarkdownEditorInput'>
+            <LexicalComposer initialConfig={initialConfig}>
+                <PlainTextPlugin
+                    contentEditable={<ContentEditable className='MarkdownEditorInput__content'/>}
+                    placeholder={null}
+                    ErrorBoundary={LexicalErrorBoundary}
+                />
+                <HistoryPlugin/>
+                <OnChangePlugin
+                    onChange={handleChange}
+                    ignoreSelectionChange={true}
+                />
+                <LiveMarkdownPlugin/>
+                <EditorEventsPlugin
+                    onFocus={onFocus}
+                    onBlur={onBlur}
+                    onEditorCancel={onEditorCancel}
+                    saveOnEnter={saveOnEnter}
+                    suppressBlurRef={suppressBlurRef}
+                />
+                <MentionsPlugin suppressBlurRef={suppressBlurRef}/>
+                <EmojiPlugin/>
+            </LexicalComposer>
         </div>
     )
 }

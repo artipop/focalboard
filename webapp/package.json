@@ -25,22 +25,25 @@
 		"cypress:open": "cypress open"
 	},
 	"dependencies": {
-		"@draft-js-plugins/editor": "^4.1.2",
-		"@draft-js-plugins/emoji": "^4.6.0",
-		"@draft-js-plugins/mention": "^5.1.2",
 		"@fullcalendar/core": "^5.10.1",
 		"@fullcalendar/daygrid": "^5.10.1",
 		"@fullcalendar/interaction": "^5.10.1",
 		"@fullcalendar/react": "^5.10.1",
+		"@lexical/history": "0.45.0",
+		"@lexical/plain-text": "0.45.0",
+		"@lexical/react": "0.45.0",
+		"@lexical/selection": "0.45.0",
+		"@lexical/text": "0.45.0",
+		"@lexical/utils": "0.45.0",
 		"@mattermost/compass-icons": "^0.1.39",
 		"@reduxjs/toolkit": "^1.8.0",
 		"@tippyjs/react": "4.2.6",
 		"classnames": "^2.5.1",
 		"color": "^4.2.1",
-		"draft-js": "^0.11.7",
 		"emoji-mart": "^3.0.1",
 		"fstream": "^1.0.12",
 		"fullcalendar": "^5.10.2",
+		"lexical": "0.45.0",
 		"lodash": "^4.17.21",
 		"marked": "^4.0.12",
 		"mini-create-react-context": "^0.4.1",
@@ -63,6 +66,7 @@
 		"trim-newlines": "^4.0.2"
 	},
 	"jest": {
+		"resolver": "<rootDir>/jest.resolver.js",
 		"moduleNameMapper": {
 			"\\.(jpg|jpeg|png|gif|eot|otf|webp|svg|ttf|woff|woff2|mp4|webm|wav|mp3|m4a|aac|oga)$": "<rootDir>/__mocks__/fileMock.js",
 			"\\.(scss|css)$": "<rootDir>/__mocks__/styleMock.js"
@@ -89,6 +93,7 @@
 	"devDependencies": {
 		"@formatjs/cli": "^4.8.2",
 		"@formatjs/ts-transformer": "^3.9.2",
+		"@swc/core": "^1.2.210",
 		"@swc/jest": "^0.2.20",
 		"@testing-library/cypress": "^8.0.2",
 		"@testing-library/dom": "^8.11.4",
@@ -96,9 +101,9 @@
 		"@testing-library/react": "^11.2.5",
 		"@testing-library/user-event": "^13.5.0",
 		"@types/color": "^3.0.3",
-		"@types/draft-js": "^0.11.9",
 		"@types/emoji-mart": "^3.0.9",
 		"@types/jest": "^27.4.1",
+		"@types/lodash": "4.14.182",
 		"@types/marked": "^4.0.3",
 		"@types/nanoevents": "^1.0.0",
 		"@types/react": "^17.0.43",

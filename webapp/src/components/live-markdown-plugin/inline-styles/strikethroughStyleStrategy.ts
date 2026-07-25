@@ -10,18 +10,16 @@ const createStrikethroughStyleStrategy = (): InlineStrategy => {
     return {
         style: 'STRIKETHROUGH',
         delimiterStyle: 'STRIKETHROUGH-DELIMITER',
-        findStyleRanges: (block) => {
+        findStyleRanges: (text) => {
             // Return an array of arrays containing start and end indices for ranges of
             // text that should be crossed out
             // e.g. [[0,6], [10,20]]
-            const text = block.getText()
             const strikethroughRanges = findRangesWithRegex(text, strikethroughRegex)
             return strikethroughRanges
         },
-        findDelimiterRanges: (block, styleRanges) => {
+        findDelimiterRanges: (text, styleRanges) => {
             // Find ranges for delimiters at the beginning/end of styled text ranges
             // Returns an array of arrays containing start and end indices for delimiters
-            const text = block.getText()
             let strikethroughDelimiterRanges: number[][] = []
             styleRanges.forEach((styleRange) => {
                 const delimiterRange = findRangesWithRegex(
