@@ -8,13 +8,12 @@ const createHeadingDelimiterStyleStrategy = (): InlineStrategy => {
 
     return {
         style: 'HEADING-DELIMITER',
-        findStyleRanges: (block) => {
+        findStyleRanges: (text, blockType) => {
             // Skip the text search if the block isn't a header block
-            if (block.getType().indexOf('header') < 0) {
+            if (blockType.indexOf('header') < 0) {
                 return []
             }
 
-            const text = block.getText()
             const headingDelimiterRanges = findRangesWithRegex(
                 text,
                 headingDelimiterRegex,

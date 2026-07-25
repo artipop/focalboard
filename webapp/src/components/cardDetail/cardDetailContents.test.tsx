@@ -15,7 +15,6 @@ import CardDetailContents from './cardDetailContents'
 import {CardDetailProvider} from './cardDetailContext'
 
 global.fetch = jest.fn()
-jest.mock('draft-js/lib/generateRandomKey', () => () => '123')
 
 beforeAll(() => {
     mockDOM()

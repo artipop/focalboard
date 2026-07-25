@@ -12,9 +12,13 @@
         "allowJs": true,
         "resolveJsonModule": true,
         "incremental": false,
+        "skipLibCheck": true,
         "baseUrl": "src",
         "outDir": "./dist",
-        "moduleResolution": "node"
+        "moduleResolution": "node",
+        "paths": {
+            "@lexical/react/*": ["../node_modules/@lexical/react/dist/*"]
+        }
     },
     "include": [
         "."

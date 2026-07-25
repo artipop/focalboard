@@ -8,8 +8,7 @@ const createOLDelimiterStyleStrategy = (): InlineStrategy => {
 
     return {
         style: 'OL-DELIMITER',
-        findStyleRanges: (block) => {
-            const text = block.getText()
+        findStyleRanges: (text) => {
             const olDelimiterRanges = findRangesWithRegex(text, olDelimiterRegex)
             return olDelimiterRanges
         },

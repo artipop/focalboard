@@ -33,18 +33,16 @@ const createItalicStyleStrategy = (): InlineStrategy => {
     return {
         style: 'ITALIC',
         delimiterStyle: 'ITALIC-DELIMITER',
-        findStyleRanges: (block) => {
+        findStyleRanges: (text) => {
             // Return an array of arrays containing start and end indices for ranges of
             // text that should be italicized
             // e.g. [[0,6], [10,20]]
-            const text = block.getText()
             const italicRanges = findRangesWithRegex(text, italicRegex)
             return italicRanges
         },
-        findDelimiterRanges: (block, styleRanges) => {
+        findDelimiterRanges: (text, styleRanges) => {
             // Find ranges for delimiters at the beginning/end of styled text ranges
             // Returns an array of arrays containing start and end indices for delimiters
-            const text = block.getText()
             let italicDelimiterRanges: number[][] = []
             styleRanges.forEach((styleRange) => {
                 const delimiterRange = findRangesWithRegex(
@@ -54,6 +52,9 @@ const createItalicStyleStrategy = (): InlineStrategy => {
                 italicDelimiterRanges = italicDelimiterRanges.concat(delimiterRange)
             })
             return italicDelimiterRanges
+        },
+        styles: {
+            fontStyle: 'italic',
         },
         delimiterStyles: {
             opacity: 0.4,

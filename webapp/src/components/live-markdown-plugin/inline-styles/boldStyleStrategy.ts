@@ -17,18 +17,16 @@ const createBoldStyleStrategy = (): InlineStrategy => {
     return {
         style: 'BOLD',
         delimiterStyle: 'BOLD-DELIMITER',
-        findStyleRanges: (block) => {
+        findStyleRanges: (text) => {
             // Return an array of arrays containing start and end indices for ranges of
             // text that should be bolded
             // e.g. [[0,6], [10,20]]
-            const text = block.getText()
             const boldRanges = findRangesWithRegex(text, boldRegex)
             return boldRanges
         },
-        findDelimiterRanges: (block, styleRanges) => {
+        findDelimiterRanges: (text, styleRanges) => {
             // Find ranges for delimiters at the beginning/end of styled text ranges
             // Returns an array of arrays containing start and end indices for delimiters
-            const text = block.getText()
             let boldDelimiterRanges: number[][] = []
             styleRanges.forEach((styleRange) => {
                 const delimiterRange = findRangesWithRegex(
@@ -38,6 +36,9 @@ const createBoldStyleStrategy = (): InlineStrategy => {
                 boldDelimiterRanges = boldDelimiterRanges.concat(delimiterRange)
             })
             return boldDelimiterRanges
+        },
+        styles: {
+            fontWeight: 'bold',
         },
         delimiterStyles: {
             opacity: 0.4,

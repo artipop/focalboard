@@ -8,8 +8,7 @@ const createULDelimiterStyleStrategy = (): InlineStrategy => {
 
     return {
         style: 'UL-DELIMITER',
-        findStyleRanges: (block) => {
-            const text = block.getText()
+        findStyleRanges: (text) => {
             const ulDelimiterRanges = findRangesWithRegex(text, ulDelimiterRegex)
             return ulDelimiterRanges
         },

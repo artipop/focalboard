@@ -43,47 +43,23 @@ exports[`components/markdownEditor should match snapshot with on click on previe
       class="MarkdownEditorInput"
     >
       <div
-        class="DraftEditor-root"
+        autocapitalize="off"
+        class="MarkdownEditorInput__content"
+        contenteditable="true"
+        data-lexical-editor="true"
+        role="textbox"
+        spellcheck="true"
+        style="user-select: text; white-space: pre-wrap; word-break: break-word;"
       >
-        <div
-          class="DraftEditor-editorContainer"
+        <p
+          dir="auto"
         >
-          <div
-            aria-autocomplete="list"
-            aria-expanded="false"
-            class="notranslate public-DraftEditor-content"
-            contenteditable="true"
-            role="combobox"
-            spellcheck="false"
-            style="outline: none; user-select: text; white-space: pre-wrap; word-wrap: break-word;"
+          <span
+            data-lexical-text="true"
           >
-            <div
-              data-contents="true"
-            >
-              <div
-                class=""
-                data-block="true"
-                data-editor="test-id"
-                data-offset-key="123-0-0"
-              >
-                <div
-                  class="public-DraftStyleDefault-block public-DraftStyleDefault-ltr"
-                  data-offset-key="123-0-0"
-                >
-                  <span
-                    data-offset-key="123-0-0"
-                  >
-                    <span
-                      data-text="true"
-                    >
-                      some initial text already set
-                    </span>
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+            some initial text already set
+          </span>
+        </p>
       </div>
     </div>
   </div>

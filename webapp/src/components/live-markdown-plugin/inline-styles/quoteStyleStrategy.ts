@@ -10,13 +10,11 @@ const createQuoteStyleStrategy = (): InlineStrategy => {
     return {
         style: 'QUOTE',
         delimiterStyle: 'QUOTE-DELIMITER',
-        findStyleRanges: (block) => {
-            const text = block.getText()
+        findStyleRanges: (text) => {
             const quoteRanges = findRangesWithRegex(text, quoteRegex)
             return quoteRanges
         },
-        findDelimiterRanges: (block, styleRanges) => {
-            const text = block.getText()
+        findDelimiterRanges: (text, styleRanges) => {
             let quoteDelimiterRanges: number[][] = []
             styleRanges.forEach((styleRange) => {
                 const delimiterRange = findRangesWithRegex(

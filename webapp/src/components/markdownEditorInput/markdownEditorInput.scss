@@ -1,47 +1,60 @@
 .MarkdownEditorInput {
-    div[role=option] {
-        display: flex;
-        align-items: center;
-    }
+    width: 100%;
 
-    span[data-testid='mentionText'] {
-        background: rgba(var(--button-bg-rgb), 0.16);
-        border-radius: 4px;
-        color: inherit;
-    }
-}
-
-.DraftEditor-root + div {
-    background: rgba(var(--center-channel-bg-rgb), 1);
-    box-shadow: var(--elevation-1);
-    border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
-    border-radius: 4px;
-
-    > div {
-        > div {
-            height: 40px;
-            padding: 0 20px;
-
-            &[aria-selected='true'] {
-                background: rgba(var(--center-channel-color-rgb), 0.08);
-            }
-
-            &:hover {
-                background: rgba(var(--center-channel-color-rgb), 0.08);
-            }
-
-            &:active {
-                background: rgba(var(--button-bg-rgb), 0.08);
-            }
-
-            .Badge {
-                margin-left: 12px;
-            }
-        }
+    .MarkdownEditorInput__content {
+        outline: none;
+        white-space: pre-wrap;
+        word-break: break-word;
     }
 
     .code-block {
         background-color: unset;
         border: 0;
+    }
+}
+
+// Floating typeahead popovers (mentions and emoji) are portalled into an anchor
+// element the Lexical typeahead plugin positions at the caret.
+.MarkdownEditorInput--mentions,
+.MarkdownEditorInput--emojis {
+    background: rgba(var(--center-channel-bg-rgb), 1);
+    box-shadow: var(--elevation-1);
+    border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+    border-radius: 4px;
+    overflow: hidden;
+
+    [role='option'] {
+        display: flex;
+        align-items: center;
+        min-height: 40px;
+        padding: 0 20px;
+        cursor: pointer;
+
+        &[aria-selected='true'],
+        &:hover {
+            background: rgba(var(--center-channel-color-rgb), 0.08);
+        }
+
+        &:active {
+            background: rgba(var(--button-bg-rgb), 0.08);
+        }
+
+        .Badge {
+            margin-left: 12px;
+        }
+    }
+}
+
+.MarkdownEditorInput--emojis {
+    .EmojiEntry {
+        gap: 8px;
+
+        .EmojiEntry__native {
+            font-size: 18px;
+        }
+
+        .EmojiEntry__colons {
+            opacity: 0.72;
+        }
     }
 }
