@@ -1,0 +1,105 @@
+.AgentsDialog {
+    .AgentsDialog__content {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 0 24px 24px;
+        min-width: 520px;
+    }
+
+    .AgentsDialog__empty {
+        color: rgba(var(--center-channel-color-rgb), 0.64);
+        padding: 8px 0;
+    }
+
+    .AgentsDialog__row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+
+        .AgentsDialog__name {
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .AgentsDialog__kind {
+            flex: 1;
+            color: rgba(var(--center-channel-color-rgb), 0.64);
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.04em;
+        }
+    }
+
+    .AgentsDialog__form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin: 8px 0;
+        padding: 12px;
+        border: 1px solid rgba(var(--center-channel-color-rgb), 0.12);
+        border-radius: 6px;
+
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-weight: 600;
+        }
+
+        input,
+        select,
+        textarea {
+            border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+            border-radius: 4px;
+            padding: 6px 8px;
+            background: rgb(var(--center-channel-bg-rgb));
+            color: rgb(var(--center-channel-color-rgb));
+            font-weight: 400;
+            font-family: inherit;
+        }
+
+        textarea {
+            resize: vertical;
+        }
+    }
+
+    .AgentsDialog__formActions,
+    .AgentsDialog__actions {
+        display: flex;
+        gap: 8px;
+        padding-top: 4px;
+    }
+
+    .AgentsDialog__systemPrompt {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(var(--center-channel-color-rgb), 0.08);
+
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-weight: 600;
+        }
+
+        textarea {
+            border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+            border-radius: 4px;
+            padding: 6px 8px;
+            background: rgb(var(--center-channel-bg-rgb));
+            color: rgb(var(--center-channel-color-rgb));
+            font-weight: 400;
+            font-family: inherit;
+            resize: vertical;
+        }
+    }
+
+    .AgentsDialog__error {
+        color: rgb(var(--error-text-color-rgb, 210, 75, 78));
+        padding-top: 8px;
+    }
+}

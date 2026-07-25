@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -17,7 +18,7 @@ import (
 // and policies, and reports results back to the board and the UI.
 type Manager struct {
 	cfg     Config
-	cfgMu   sync.RWMutex // guards cfg.Repos (the only mutable part of cfg)
+	cfgMu   sync.RWMutex // guards the UI-mutable parts of cfg (Repos, Agents, SystemPrompt)
 	cfgPath string       // where registry edits are persisted; empty in tests
 	store   *Store
 	writer  BoardWriter
@@ -61,8 +62,12 @@ func NewManager(cfg Config, cfgPath string, st *Store, w BoardWriter, ui UIEmitt
 func (m *Manager) Start(ctx context.Context, events BoardEvents) error {
 	m.rootCtx, m.stop = context.WithCancel(ctx)
 
-	if _, err := m.findClaude(); m.cfg.AgentMode != "acp-command" && err != nil {
-		m.log.Warn("acp: claude binary not found; sessions will fail until claudePath is configured", "err", err)
+	// Probe the built-in claude binary only when the empty-registry fallback
+	// would use it; registered agents resolve their own binaries at run time.
+	if len(m.cfg.Agents) == 0 && m.cfg.AgentMode != "acp-command" {
+		if _, err := m.findClaude(); err != nil {
+			m.log.Warn("acp: claude binary not found; sessions will fail until claudePath is configured", "err", err)
+		}
 	}
 
 	m.recover()
@@ -100,6 +105,10 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
+	agent, err := m.resolveAgent(ev)
+	if err != nil {
+		return nil, err
+	}
 	// Without worktrees, two agents must never share one working tree
 	// (spec §7): reject while another live session uses the same repo.
 	if !m.cfg.UseWorktrees() {
@@ -117,13 +126,17 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 		}
 	}
 
+	m.cfgMu.RLock()
+	systemPrompt := m.cfg.SystemPrompt
+	m.cfgMu.RUnlock()
 	s := &Session{
 		ID:         uuid.NewString(),
 		CardID:     ev.CardID,
 		BoardID:    ev.BoardID,
 		RepoPath:   repoPath,
 		BaseBranch: ev.Props["branch"],
-		PromptText: composePrompt(ev, m.cfg.UseWorktrees()),
+		Agent:      agent,
+		PromptText: composePrompt(ev, agent, systemPrompt, m.cfg.UseWorktrees()),
 		status:     StatusQueued,
 		allowTools: make(map[string]bool),
 	}
@@ -131,7 +144,7 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 		ID:        s.ID,
 		CardID:    s.CardID,
 		BoardID:   s.BoardID,
-		AgentKind: m.cfg.AgentMode,
+		AgentKind: agent.Kind,
 		Status:    StatusQueued,
 		StartedAt: time.Now(),
 	}
@@ -248,34 +261,99 @@ func (m *Manager) commentCard(cardID, text string) {
 	}
 }
 
-// findClaude resolves the claude binary: explicit config, PATH, then common
-// install locations (GUI apps get launchd's minimal PATH).
+// findClaude resolves the claude binary from the global config (no per-agent
+// override); used by the empty-registry fallback path and the startup probe.
 func (m *Manager) findClaude() (string, error) {
-	if m.cfg.ClaudePath != "" {
-		if _, err := os.Stat(m.cfg.ClaudePath); err != nil {
-			return "", fmt.Errorf("claudePath %s: %w", m.cfg.ClaudePath, err)
-		}
-		return m.cfg.ClaudePath, nil
+	return m.resolveClaudeBin("")
+}
+
+// resolveClaudeBin resolves the claude binary: per-agent override, global
+// config, PATH, then common install locations (GUI apps get launchd's minimal
+// PATH).
+func (m *Manager) resolveClaudeBin(override string) (string, error) {
+	label := "agent binPath"
+	if override == "" {
+		override = m.cfg.ClaudePath
+		label = "claudePath"
 	}
-	if p, err := exec.LookPath("claude"); err == nil {
+	if override != "" {
+		if _, err := os.Stat(override); err != nil {
+			return "", fmt.Errorf("%s %s: %w", label, override, err)
+		}
+		return override, nil
+	}
+	return lookupBin("claude", "claude binary not found (set binPath on the agent or claudePath in the acp config)")
+}
+
+// resolveCodexBin resolves the codex binary: per-agent override, PATH, then
+// common install locations.
+func (m *Manager) resolveCodexBin(override string) (string, error) {
+	if override != "" {
+		if _, err := os.Stat(override); err != nil {
+			return "", fmt.Errorf("codex binPath %s: %w", override, err)
+		}
+		return override, nil
+	}
+	return lookupBin("codex", "codex binary not found (set binPath on the agent)")
+}
+
+// firstNonEmpty returns the first non-empty string.
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// lookupBin finds name on PATH or in common install locations. When name is an
+// absolute/explicit path (contains a separator) it is stat-checked directly.
+func lookupBin(name, notFoundMsg string) (string, error) {
+	if strings.ContainsRune(name, filepath.Separator) {
+		if _, err := os.Stat(name); err != nil {
+			return "", fmt.Errorf("%s: %w", name, err)
+		}
+		return name, nil
+	}
+	if p, err := exec.LookPath(name); err == nil {
 		return p, nil
 	}
 	home, _ := os.UserHomeDir()
 	for _, p := range []string{
-		filepath.Join(home, ".local", "bin", "claude"),
-		"/opt/homebrew/bin/claude",
-		"/usr/local/bin/claude",
+		filepath.Join(home, ".local", "bin", name),
+		"/opt/homebrew/bin/" + name,
+		"/usr/local/bin/" + name,
 	} {
 		if _, err := os.Stat(p); err == nil {
 			return p, nil
 		}
 	}
-	return "", fmt.Errorf("claude binary not found (set claudePath in the acp config)")
+	return "", fmt.Errorf("%s", notFoundMsg)
 }
 
-// composePrompt builds the agent task text from the card.
-func composePrompt(ev CardMoved, useWorktree bool) string {
+// agentSpawnEnv turns an agent's Env map into the "KEY=value" slice and the
+// list of names to drop from the inherited environment, so per-agent values
+// (CODEX_HOME, OPENAI_API_KEY, CLAUDE_CONFIG_DIR, …) override the parent's.
+func agentSpawnEnv(a AgentEntry) (env []string, drop []string) {
+	for k, v := range a.Env {
+		env = append(env, k+"="+v)
+		drop = append(drop, k)
+	}
+	return env, drop
+}
+
+// composePrompt builds the agent task text from the card. The final prompt is
+// the board/column system prompt, then the agent's own system prompt, then the
+// card task.
+func composePrompt(ev CardMoved, agent AgentEntry, systemPrompt string, useWorktree bool) string {
 	var b []byte
+	if p := strings.TrimSpace(systemPrompt); p != "" {
+		b = fmt.Appendf(b, "%s\n\n", p)
+	}
+	if p := strings.TrimSpace(agent.Prompt); p != "" {
+		b = fmt.Appendf(b, "%s\n\n", p)
+	}
 	b = fmt.Appendf(b, "Задача: %s\n", ev.Title)
 	if ev.Body != "" {
 		b = fmt.Appendf(b, "\n%s\n", ev.Body)

@@ -27,6 +27,12 @@ export interface IAppWindow extends Window {
                 PickDirectory(title: string): Promise<string>
                 AddAgentRepo(name: string, path: string): Promise<string>
                 RemoveAgentRepo(name: string): Promise<void>
+                ListAgents(): Promise<string>
+                AddAgent(entryJSON: string): Promise<string>
+                UpdateAgent(entryJSON: string): Promise<string>
+                RemoveAgent(name: string): Promise<void>
+                GetAgentSystemPrompt(): Promise<string>
+                SetAgentSystemPrompt(text: string): Promise<void>
                 GetCardSessions(cardId: string): Promise<string>
                 CancelSession(cardId: string): Promise<boolean>
             }

@@ -34,7 +34,12 @@ type Options struct {
 	ClaudeBin string
 	// ExtraArgs are appended to the claude invocation (e.g. --model).
 	ExtraArgs []string
-	Logger    *slog.Logger
+	// Env are "KEY=value" pairs injected into each claude process; DropEnv names
+	// are removed from the inherited environment first so Env overrides them
+	// (per-agent CLAUDE_CONFIG_DIR/ANTHROPIC_API_KEY isolate accounts).
+	Env     []string
+	DropEnv []string
+	Logger  *slog.Logger
 }
 
 // Bridge implements acp.Agent by driving one claude subprocess per session.
@@ -176,7 +181,8 @@ func (b *Bridge) runTurn(ctx context.Context, s *session, prompt string) (acp.Pr
 	}, b.opts.ExtraArgs...)
 
 	// CLAUDECODE in the environment triggers the CLI's nested-session guard.
-	proc, err := procgroup.Spawn(ctx, argv, s.cwd, nil, "CLAUDECODE")
+	dropEnv := append([]string{"CLAUDECODE"}, b.opts.DropEnv...)
+	proc, err := procgroup.Spawn(ctx, argv, s.cwd, b.opts.Env, dropEnv...)
 	if err != nil {
 		return acp.PromptResponse{}, fmt.Errorf("spawn claude: %w", err)
 	}

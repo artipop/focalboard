@@ -15,6 +15,37 @@ type RepoEntry struct {
 	Path string `json:"path"`
 }
 
+// AgentEntry is one named coding agent in the registry. A card is mapped to an
+// agent when one of its select option names (e.g. an "Agent" field option)
+// matches the entry name. Its Env is injected per-process at spawn time, which
+// is how several agents (e.g. two Codex accounts) coexist on one machine: give
+// each its own CODEX_HOME/OPENAI_API_KEY (or CLAUDE_CONFIG_DIR/ANTHROPIC_API_KEY).
+type AgentEntry struct {
+	Name    string            `json:"name"`              // registry key; matches the card "Agent" option
+	Kind    string            `json:"kind"`              // "claude" | "codex" | "antigravity" | "acp"
+	BinPath string            `json:"binPath,omitempty"` // overrides binary discovery
+	Model   string            `json:"model,omitempty"`   // --model passed to the CLI
+	Prompt  string            `json:"prompt,omitempty"`  // per-agent system prompt prepended to the task
+	Env     map[string]string `json:"env,omitempty"`     // per-process env (CODEX_HOME, OPENAI_API_KEY, …)
+	Args    []string          `json:"args,omitempty"`    // extra CLI args (sandbox/approval, etc.)
+	Command []string          `json:"command,omitempty"` // full argv override for ACP-native agents (kind "acp"/"antigravity")
+}
+
+// Agent kinds. claude/codex run through in-process bridges; antigravity and the
+// generic acp kind are ACP-native CLIs spawned over stdio (no bridge).
+const (
+	AgentKindClaude      = "claude"
+	AgentKindCodex       = "codex"
+	AgentKindAntigravity = "antigravity"
+	AgentKindACP         = "acp"
+)
+
+// IsExternalACP reports whether the kind is an ACP-native external agent
+// (spawned over stdio and talked to in pure ACP, no bridge translation).
+func IsExternalACP(kind string) bool {
+	return kind == AgentKindAntigravity || kind == AgentKindACP
+}
+
 // Config controls the agent integration. It is stored as JSON in the app data
 // directory; the repo registry is edited through the desktop UI, the rest by
 // hand for now.
@@ -40,6 +71,17 @@ type Config struct {
 	// a repo when one of its select/multiSelect option names (e.g. a tag)
 	// matches a registry entry name. Registered paths are implicitly allowed.
 	Repos []RepoEntry `json:"repos"`
+
+	// Agents is the registry of named coding agents (claude/codex, with their
+	// own prompt, model and env). A card is mapped to an agent when one of its
+	// select option names (the "Agent" field) matches an entry name. When empty,
+	// AgentMode below drives the (single) built-in agent for backward compat.
+	Agents []AgentEntry `json:"agents"`
+
+	// SystemPrompt is the board/column-level instruction prepended to every
+	// triggered session's prompt (before the agent's own system prompt and the
+	// card task). One trigger column today; may become a per-column map later.
+	SystemPrompt string `json:"systemPrompt"`
 
 	// WorktreeMode controls where sessions run: "never" (default) — directly
 	// in the repository working tree, with concurrent sessions per repo
@@ -67,6 +109,7 @@ func DefaultConfig(dataDir string) Config {
 		TriggerColumn:            "To Agent",
 		RepoWhitelist:            []string{},
 		Repos:                    []RepoEntry{},
+		Agents:                   []AgentEntry{},
 		WorktreeMode:             "never",
 		MaxConcurrent:            3,
 		SessionTimeoutMinutes:    15,
