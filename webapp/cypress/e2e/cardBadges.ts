@@ -26,7 +26,11 @@ describe('Card badges', () => {
         // Add card description
         cy.log('**Add card description**')
         cy.findByText('Add a description...').click()
-        cy.findByRole('combobox').type('## Header\n- [ ] one\n- [x] two{esc}')
+
+        // Scope to the description block: with comments already added, the comment
+        // editor is a role=textbox too. (The editor is Lexical's contenteditable,
+        // role=textbox -- it was role=combobox before the draft-js -> Lexical move.)
+        cy.get('.CardDetailContents').findByRole('textbox').type('## Header\n- [ ] one\n- [x] two{esc}')
 
         // Add checkboxes
         cy.log('**Add checkboxes**')
@@ -61,7 +65,10 @@ describe('Card badges', () => {
 
     const addComment = (text: string) => {
         cy.findByText('Add a comment...').click()
-        cy.findByRole('combobox').type(text).blur()
+
+        // No .blur() here: blurring drops the editor out of edit mode and unmounts it,
+        // so Cypress cannot requery the detached subject. Send commits the comment.
+        cy.get('.CommentsList').findByRole('textbox').type(text)
         cy.findByRole('button', {name: 'Send'}).click()
     }
 })
