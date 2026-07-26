@@ -1,4 +1,4 @@
-.PHONY: prebuild clean cleanall ci server server-mac server-linux server-win server-linux-package generate watch-server webapp desktop-pack mac-app-wails mac-dmg-wails win-app-wails linux-app-wails linux-installers-wails wails-precheck modd-precheck templates-archive
+.PHONY: prebuild clean cleanall ci server server-mac server-linux server-win server-linux-package generate watch-server webapp desktop-pack dev-wails mac-app-wails mac-dmg-wails win-app-wails linux-app-wails linux-installers-wails wails-precheck modd-precheck templates-archive
 
 PACKAGE_FOLDER = focalboard
 
@@ -184,6 +184,13 @@ wails-precheck:
 		echo "wails is not installed. Install with: go install github.com/wailsapp/wails/v2/cmd/wails@latest"; \
 		exit 1; \
 	fi;
+
+dev-wails: wails-precheck ## Run the desktop app in dev mode with hot reload (webpack watch + wails dev). Ctrl+C stops both.
+	@echo "==> webpack watch (webapp/pack) + wails dev; the first frontend build takes a bit, then the webview auto-reloads on save. Ctrl+C stops both."
+	@echo "    (needs webapp deps — run 'make prebuild' once if webapp/node_modules is missing)"
+	@bash -c 'trap "kill 0" EXIT; \
+		( cd webapp && npm run watchdev ) & \
+		cd desktop && wails dev -tags "json1 sqlite3" -reloaddirs ../webapp/pack'
 
 # The Wails desktop app lives in desktop/ (its own Go module). The webapp is built
 # separately (`make webapp`), copied to desktop/pack, and compiled into the binary

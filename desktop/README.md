@@ -67,13 +67,30 @@ runtime).
 From the repo root:
 
 ```
-make webapp                 # build webapp/pack (once, or after frontend changes)
-cd desktop
-wails dev -tags "json1 sqlite3"
+make dev-wails
 ```
 
-`wails dev` (no `frontend` tag) serves the webapp from on-disk `pack`; run
-`make webapp` again after frontend changes.
+This runs `webpack --watch` (rebuilds `webapp/pack` on save) alongside
+`wails dev -tags "json1 sqlite3" -reloaddirs ../webapp/pack`, and stops both on
+Ctrl+C. Go changes trigger a `wails dev` rebuild/restart; frontend changes are
+rebuilt by webpack and the webview auto-reloads (via `-reloaddirs`). The first
+frontend build takes a moment. Needs webapp deps — run `make prebuild` once if
+`webapp/node_modules` is missing.
+
+The frontend is **not** managed by Wails here: the in-process server serves it
+(through `proxy.go`), so Wails' built-in Vite/HMR flow isn't used — the loop is
+`webpack --watch` + a webview reload. `wails dev` runs without the `frontend`
+tag, so it serves the on-disk `pack` (no embed).
+
+To run the pieces manually instead:
+
+```
+cd webapp && npm run watchdev          # terminal 1
+cd desktop && wails dev -tags "json1 sqlite3" -reloaddirs ../webapp/pack   # terminal 2
+```
+
+For pure webapp/CSS iteration, the browser loop is faster than the webview:
+`make watch` (server + webpack watch via `modd`), then open http://localhost:8000.
 
 ## Build release installers
 
