@@ -1,9 +1,9 @@
 # Focalboard desktop app (Wails)
 
 A single-binary desktop wrapper for Focalboard, built with
-[Wails v2](https://wails.io). One Go codebase builds **macOS, Windows and Linux**,
-replacing the three legacy wrappers (`mac/` Swift, `win-wpf/` C#/WPF, `linux/`
-WebKitGTK): the Focalboard server runs **in-process** (no spawned
+[Wails v2](https://wails.io). One Go codebase (this `desktop/` module) builds
+**macOS, Windows and Linux**, replacing the three former native wrappers (Swift,
+C#/WPF, WebKitGTK): the Focalboard server runs **in-process** (no spawned
 `focalboard-server` subprocess), so each platform ships as one executable.
 
 ## How it works
@@ -14,8 +14,14 @@ The Go code is platform-agnostic — the same files build for every OS:
   free port. The SQLite database and uploaded files live under the OS user config
   dir (`os.UserConfigDir()` → `~/Library/Application Support/Focalboard` on macOS,
   `%AppData%\Focalboard` on Windows, `~/.config/Focalboard` on Linux), **not** next
-  to the binary, because a signed/packaged app dir is read-only. The webapp `pack`
-  is loaded from next to the executable (`webPath()`).
+  to the binary, because a signed/packaged app dir is read-only.
+- `frontend_embed.go` / `frontend_disk.go` — the webapp `pack` is compiled into the
+  binary with `go:embed` (release builds, `-tags frontend`). Because `go:embed`
+  can't reach `../webapp`, the Makefile first copies `webapp/pack` → `desktop/pack`
+  (the `desktop-pack` target) and embeds that. At startup `resolveWebPath` extracts
+  the embedded pack to `<dataDir>/web` and points the server there (the server
+  templates `index.html` on read, so it needs files on disk). Without the tag
+  (`go build ./...`, tests) it falls back to on-disk `pack`.
 - `proxy.go` — a reverse proxy to the in-process server, wired into Wails as the
   `AssetServer.Handler`, so HTML/assets/API share the Wails origin. It injects a
   bootstrap `<script>` into the served HTML that: seeds the single-user session
@@ -35,11 +41,11 @@ The Go code is platform-agnostic — the same files build for every OS:
 - `app.go` — `App.OpenInBrowser`, bound into JS and called by that script.
 - `main.go` — wires it all together and runs the Wails window.
 
-This mirrors the already-working in-process approach the old `linux/main.go` used.
-
 Builds are **native per platform** (each on its own machine/CI runner) — cgo
 SQLite is not cross-compiled. macOS targets Apple Silicon (`arm64`); Windows and
-Linux target `amd64`.
+Linux target `amd64`. The Makefile targets pass `-skipbindings`: Wails' generated
+JS bindings are unused (the webapp calls `window.go.main.App.*` via the injected
+runtime).
 
 ## Prerequisites
 
@@ -50,10 +56,15 @@ Linux target `amd64`.
 - A C toolchain for the cgo SQLite build:
   - **macOS**: Xcode Command Line Tools.
   - **Linux**: `gcc`, plus `libgtk-3-dev` and `libwebkit2gtk-4.0-dev` (Wails).
-  - **Windows**: MinGW-w64 `gcc` on `PATH`, and the WebView2 runtime (bundled with
-    modern Windows).
+  - **Windows**: MinGW-w64 `gcc` on `PATH`, NSIS (`makensis`) for the installer,
+    and the WebView2 runtime (bundled with modern Windows).
+- **Linux installers**: `nfpm` for `.deb` (`go install
+  github.com/goreleaser/nfpm/v2/cmd/nfpm@latest`); the AppImage script downloads
+  `appimagetool` if it isn't already on `PATH`.
 
 ## Develop
+
+From the repo root:
 
 ```
 make webapp                 # build webapp/pack (once, or after frontend changes)
@@ -61,15 +72,23 @@ cd desktop
 wails dev -tags "json1 sqlite3"
 ```
 
-## Build a release bundle
+`wails dev` (no `frontend` tag) serves the webapp from on-disk `pack`; run
+`make webapp` again after frontend changes.
 
-From the repo root, per platform:
+## Build release installers
+
+From the repo root, per platform. The Makefile stages `webapp/pack` → `desktop/pack`
+and embeds it, so the artifacts are single-binary:
 
 ```
-make mac-app-wails      # macOS  → desktop/build/bin/Focalboard.app  (+ focalboard-mac.zip)
-make linux-app-wails    # Linux  → desktop/build/bin/Focalboard      (+ focalboard-linux.tar.gz)
-make win-app-wails      # Windows→ desktop/build/bin/Focalboard.exe  (packaged in CI)
+make mac-dmg-wails          # macOS   → desktop/build/bin/Focalboard.dmg (+ Focalboard.app)
+make win-app-wails          # Windows → desktop/build/bin/Focalboard-amd64-installer.exe (NSIS)
+make linux-installers-wails # Linux   → desktop/build/bin/Focalboard-x86_64.AppImage (+ .deb via nfpm)
 ```
+
+`make mac-app-wails` / `linux-app-wails` build just the `.app` / bare binary.
+Installer configs live in `desktop/build/` (`darwin/`, `windows/` NSIS,
+`linux/` `appimage.sh` + `nfpm.yaml` + `focalboard.desktop`).
 
 ## Sign & notarize macOS (single pass — one binary)
 
@@ -87,6 +106,6 @@ xcrun stapler staple desktop/build/bin/Focalboard.app
 
 ## Out of scope (MVP)
 
-Not yet ported from the legacy wrappers: the `nativeApp` bridge for persisting
-user settings, the What's New dialog, multi-window, in-app downloads / file
-picker, and window-position autosave.
+Not yet implemented: the `nativeApp` bridge for persisting user settings, the
+What's New dialog, multi-window, in-app downloads / file picker, and
+window-position autosave.

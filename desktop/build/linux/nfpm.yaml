@@ -1,0 +1,28 @@
+# nfpm config for the Focalboard Linux desktop app (.deb / .rpm).
+# Build from the repo root:
+#   VERSION=x.y.z nfpm package -f desktop/build/linux/nfpm.yaml -p deb -t desktop/build/bin
+name: focalboard
+arch: amd64
+platform: linux
+version: ${VERSION:-0.0.0}
+section: default
+priority: optional
+maintainer: Mattermost, Inc. <feedback@mattermost.com>
+description: |
+  Focalboard personal desktop — a single-binary Wails build of Focalboard
+  with the server running in-process.
+vendor: Mattermost, Inc.
+homepage: https://www.focalboard.com
+license: MIT
+depends:
+  - libwebkit2gtk-4.0-37
+  - libgtk-3-0
+contents:
+  - src: ./desktop/build/bin/Focalboard
+    dst: /usr/bin/focalboard
+    file_info:
+      mode: 0755
+  - src: ./desktop/build/linux/focalboard.desktop
+    dst: /usr/share/applications/focalboard.desktop
+  - src: ./desktop/build/appicon.png
+    dst: /usr/share/icons/hicolor/512x512/apps/focalboard.png

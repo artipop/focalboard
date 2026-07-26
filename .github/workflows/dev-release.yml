@@ -53,8 +53,11 @@ jobs:
         go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
         echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
-    - name: Build Linux server and Wails app
-      run: cd focalboard/; make server-linux-package linux-app-wails
+    - name: Install nfpm (for .deb)
+      run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+
+    - name: Build Linux server and Wails installers (.AppImage + .deb)
+      run: cd focalboard/; make server-linux-package linux-installers-wails
       env:
         BUILD_NUMBER: ${{ github.run_id }}
 
@@ -64,11 +67,17 @@ jobs:
         name: focalboard-server-linux-amd64.tar.gz
         path: ${{ github.workspace }}/focalboard/dist/focalboard-server-linux-amd64.tar.gz
 
-    - name: Upload app package
+    - name: Upload AppImage
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       with:
-        name: focalboard-linux.tar.gz
-        path: ${{ github.workspace }}/focalboard/desktop/build/bin/focalboard-linux.tar.gz
+        name: Focalboard-x86_64.AppImage
+        path: ${{ github.workspace }}/focalboard/desktop/build/bin/Focalboard-x86_64.AppImage
+
+    - name: Upload .deb
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      with:
+        name: focalboard-deb
+        path: ${{ github.workspace }}/focalboard/desktop/build/bin/*.deb
 
   macos:
     runs-on: macos-15
@@ -101,17 +110,17 @@ jobs:
         go install github.com/wailsapp/wails/v2/cmd/wails@v2.13.0
         echo "$(go env GOPATH)/bin" >> $GITHUB_PATH
 
-    - name: Build macOS
-      run: cd focalboard; make mac-app-wails
+    - name: Build macOS .dmg
+      run: cd focalboard; make mac-dmg-wails
       env:
         DEVELOPER_DIR: /Applications/Xcode_16.0.app/Contents/Developer
         BUILD_NUMBER: ${{ github.run_id }}
 
-    - name: Upload macOS package
+    - name: Upload macOS .dmg
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       with:
-        name: focalboard-mac.zip
-        path: ${{ github.workspace }}/focalboard/desktop/build/bin/focalboard-mac.zip
+        name: Focalboard.dmg
+        path: ${{ github.workspace }}/focalboard/desktop/build/bin/Focalboard.dmg
 
   windows:
     runs-on: windows-2022
@@ -142,28 +151,23 @@ jobs:
       shell: pwsh
       run: choco install mingw -y --no-progress
 
+    - name: Setup NSIS (Windows installer)
+      shell: pwsh
+      run: choco install nsis -y --no-progress
+
     - name: Verify C toolchain (cgo SQLite)
       shell: bash
       run: gcc --version
 
-    - name: Build Windows Wails app
+    - name: Build Windows NSIS installer
       shell: bash
       run: cd focalboard; make win-app-wails
       env:
         BUILD_NUMBER: ${{ github.run_id }}
         CGO_ENABLED: 1
 
-    - name: Package Windows app
-      shell: pwsh
-      run: |
-        $bin = "focalboard/desktop/build/bin"
-        Copy-Item -Recurse -Force focalboard/webapp/pack "$bin/pack"
-        Copy-Item -Force focalboard/NOTICE.txt "$bin/NOTICE.txt"
-        Copy-Item -Force focalboard/webapp/NOTICE.txt "$bin/webapp-NOTICE.txt"
-        Compress-Archive -Path "$bin/Focalboard.exe","$bin/pack","$bin/NOTICE.txt","$bin/webapp-NOTICE.txt" -DestinationPath "$bin/focalboard-win.zip" -Force
-
-    - name: Upload app zip package
+    - name: Upload Windows installer
       uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
       with:
-        name: focalboard-win.zip
-        path: ${{ github.workspace }}/focalboard/desktop/build/bin/focalboard-win.zip
+        name: Focalboard-amd64-installer.exe
+        path: ${{ github.workspace }}/focalboard/desktop/build/bin/Focalboard-amd64-installer.exe

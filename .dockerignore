@@ -3,9 +3,6 @@ README.md
 
 node_modules
 .github/
-mac/
-win-wpf/
 website/
-linux/
 go.work
 go.work.sum

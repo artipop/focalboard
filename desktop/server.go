@@ -5,6 +5,8 @@ package main
 
 import (
 	"fmt"
+	"io"
+	"io/fs"
 	"net"
 	"os"
 	"path"
@@ -50,19 +52,89 @@ func dataDir() (string, error) {
 	return dir, nil
 }
 
-// webPath resolves the bundled webapp `pack` directory, shipped next to the
-// executable on every platform (Contents/MacOS/pack in the macOS bundle,
-// alongside Focalboard.exe / the Linux binary otherwise).
-func webPath() string {
-	executable, err := os.Executable()
-	if err != nil {
-		return "./pack"
+// resolveWebPath returns a real on-disk directory the Focalboard server can
+// serve the webapp from (it templates index.html on read, so it needs files on
+// disk, not an fs.FS). Release builds (`-tags frontend`) compile the webapp
+// `pack` into the binary; it is extracted once per launch under the data dir.
+// Dev builds have nothing embedded and fall back to on-disk pack.
+func resolveWebPath(logger mlog.LoggerIFace) string {
+	if src, ok := embeddedFrontend(); ok {
+		dir, err := extractFrontend(src)
+		if err == nil {
+			return dir
+		}
+		logger.Error("failed to extract embedded frontend, falling back to disk", mlog.Err(err))
 	}
-	executableDir, err := filepath.EvalSymlinks(filepath.Dir(executable))
+	return diskWebPath()
+}
+
+// extractFrontend writes the embedded pack tree into <dataDir>/web, replacing
+// any previous extraction, and returns that directory.
+func extractFrontend(src fs.FS) (string, error) {
+	data, err := dataDir()
 	if err != nil {
-		executableDir = filepath.Dir(executable)
+		return "", err
 	}
-	return path.Join(executableDir, "pack")
+	dst := filepath.Join(data, "web")
+	if err := os.RemoveAll(dst); err != nil {
+		return "", err
+	}
+	err = fs.WalkDir(src, ".", func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, filepath.FromSlash(p))
+		if d.IsDir() {
+			return os.MkdirAll(target, 0o750)
+		}
+		in, err := src.Open(p)
+		if err != nil {
+			return err
+		}
+		defer in.Close()
+		if err := os.MkdirAll(filepath.Dir(target), 0o750); err != nil {
+			return err
+		}
+		out, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o640)
+		if err != nil {
+			return err
+		}
+		if _, err := io.Copy(out, in); err != nil {
+			out.Close()
+			return err
+		}
+		return out.Close()
+	})
+	if err != nil {
+		return "", err
+	}
+	return dst, nil
+}
+
+// diskWebPath resolves the webapp `pack` for dev/unpackaged runs: the bundle
+// next to the executable, else `pack` (desktop/pack) or `../webapp/pack`
+// relative to the working dir (`wails dev` runs from the desktop/ module dir).
+func diskWebPath() string {
+	if executable, err := os.Executable(); err == nil {
+		executableDir, err := filepath.EvalSymlinks(filepath.Dir(executable))
+		if err != nil {
+			executableDir = filepath.Dir(executable)
+		}
+		if next := path.Join(executableDir, "pack"); dirExists(next) {
+			return next
+		}
+	}
+	for _, cand := range []string{"pack", filepath.Join("..", "webapp", "pack")} {
+		if dirExists(cand) {
+			return cand
+		}
+	}
+	return "./pack"
+}
+
+func dirExists(p string) bool {
+	info, err := os.Stat(p)
+	return err == nil && info.IsDir()
 }
 
 // newServerLogger builds the logger shared by the server and the ACP backend.
@@ -88,7 +160,7 @@ func runServerWithLogger(logger mlog.LoggerIFace, port int, sessionToken string,
 		DBConfigString:          path.Join(data, "focalboard.db"),
 		UseSSL:                  false,
 		SecureCookie:            true,
-		WebPath:                 webPath(),
+		WebPath:                 resolveWebPath(logger),
 		FilesDriver:             "local",
 		FilesPath:               path.Join(data, "files"),
 		Telemetry:               true,

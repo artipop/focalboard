@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Focalboard
+Comment=Focalboard personal desktop
+Exec=focalboard
+Icon=focalboard
+Categories=Office;ProjectManagement;
+Terminal=false
+StartupWMClass=Focalboard
