@@ -17,10 +17,10 @@ exports[`components/kanban/calculations/KanbanCalculationOptions base case 1`] =
       role="log"
     />
     <div
-      class="CalculationOptions__control css-1s59geg-Control"
+      class="CalculationOptions__control css-1oxo8ox"
     >
       <div
-        class="CalculationOptions__value-container CalculationOptions__value-container--has-value css-1kliayw-ValueContainer"
+        class="CalculationOptions__value-container CalculationOptions__value-container--has-value css-5t68vv"
       >
         <div
           class="CalculationOptions__single-value css-3hkq9s-singleValue"
@@ -33,7 +33,7 @@ exports[`components/kanban/calculations/KanbanCalculationOptions base case 1`] =
           aria-expanded="false"
           aria-haspopup="true"
           aria-readonly="true"
-          class="css-mohuvp-dummyInput-DummyInput"
+          class="css-1s80ejz-dummyInput-DummyInput"
           id="react-select-2-input"
           inputmode="none"
           role="combobox"
@@ -42,7 +42,7 @@ exports[`components/kanban/calculations/KanbanCalculationOptions base case 1`] =
         />
       </div>
       <div
-        class="CalculationOptions__indicators css-1hb7zxy-IndicatorsContainer"
+        class="CalculationOptions__indicators css-1wy0on6"
       >
         <div
           aria-hidden="true"
@@ -100,10 +100,10 @@ exports[`components/kanban/calculations/KanbanCalculationOptions with menu open 
       role="log"
     />
     <div
-      class="CalculationOptions__control CalculationOptions__control--menu-is-open css-1s59geg-Control"
+      class="CalculationOptions__control CalculationOptions__control--menu-is-open css-1oxo8ox"
     >
       <div
-        class="CalculationOptions__value-container CalculationOptions__value-container--has-value css-1kliayw-ValueContainer"
+        class="CalculationOptions__value-container CalculationOptions__value-container--has-value css-5t68vv"
       >
         <div
           class="CalculationOptions__single-value css-3hkq9s-singleValue"
@@ -117,7 +117,7 @@ exports[`components/kanban/calculations/KanbanCalculationOptions with menu open 
           aria-expanded="true"
           aria-haspopup="true"
           aria-readonly="true"
-          class="css-mohuvp-dummyInput-DummyInput"
+          class="css-1s80ejz-dummyInput-DummyInput"
           id="react-select-3-input"
           inputmode="none"
           role="combobox"
@@ -126,7 +126,7 @@ exports[`components/kanban/calculations/KanbanCalculationOptions with menu open 
         />
       </div>
       <div
-        class="CalculationOptions__indicators css-1hb7zxy-IndicatorsContainer"
+        class="CalculationOptions__indicators css-1wy0on6"
       >
         <div
           aria-hidden="true"
@@ -163,7 +163,7 @@ exports[`components/kanban/calculations/KanbanCalculationOptions with menu open 
     >
       <div
         aria-multiselectable="false"
-        class="CalculationOptions__menu-list css-1d1qzc4-MenuList"
+        class="CalculationOptions__menu-list css-1fmksep"
         id="react-select-3-listbox"
         role="listbox"
       >
@@ -269,10 +269,10 @@ exports[`components/kanban/calculations/KanbanCalculationOptions with submenu op
       role="log"
     />
     <div
-      class="CalculationOptions__control CalculationOptions__control--menu-is-open css-1s59geg-Control"
+      class="CalculationOptions__control CalculationOptions__control--menu-is-open css-1oxo8ox"
     >
       <div
-        class="CalculationOptions__value-container CalculationOptions__value-container--has-value css-1kliayw-ValueContainer"
+        class="CalculationOptions__value-container CalculationOptions__value-container--has-value css-5t68vv"
       >
         <div
           class="CalculationOptions__single-value css-3hkq9s-singleValue"
@@ -286,7 +286,7 @@ exports[`components/kanban/calculations/KanbanCalculationOptions with submenu op
           aria-expanded="true"
           aria-haspopup="true"
           aria-readonly="true"
-          class="css-mohuvp-dummyInput-DummyInput"
+          class="css-1s80ejz-dummyInput-DummyInput"
           id="react-select-4-input"
           inputmode="none"
           role="combobox"
@@ -295,7 +295,7 @@ exports[`components/kanban/calculations/KanbanCalculationOptions with submenu op
         />
       </div>
       <div
-        class="CalculationOptions__indicators css-1hb7zxy-IndicatorsContainer"
+        class="CalculationOptions__indicators css-1wy0on6"
       >
         <div
           aria-hidden="true"
@@ -332,7 +332,7 @@ exports[`components/kanban/calculations/KanbanCalculationOptions with submenu op
     >
       <div
         aria-multiselectable="false"
-        class="CalculationOptions__menu-list css-1d1qzc4-MenuList"
+        class="CalculationOptions__menu-list css-1fmksep"
         id="react-select-4-listbox"
         role="listbox"
       >

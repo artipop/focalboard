@@ -17,10 +17,10 @@ exports[`properties/person not readOnly, show firstname 1`] = `
       role="log"
     />
     <div
-      class="react-select__control css-18140j1-Control"
+      class="react-select__control css-aetwxa"
     >
       <div
-        class="react-select__value-container react-select__value-container--has-value css-1gbdvdc-ValueContainer"
+        class="react-select__value-container react-select__value-container--has-value css-xwc5uq"
       >
         <div
           class="react-select__single-value css-qosd1h-singleValue"
@@ -32,7 +32,7 @@ exports[`properties/person not readOnly, show firstname 1`] = `
           </div>
         </div>
         <div
-          class="react-select__input-container css-1p5v8kp-Input"
+          class="react-select__input-container css-ehy5hl"
           data-value=""
         >
           <input
@@ -55,7 +55,7 @@ exports[`properties/person not readOnly, show firstname 1`] = `
         </div>
       </div>
       <div
-        class="react-select__indicators css-1hb7zxy-IndicatorsContainer"
+        class="react-select__indicators css-1wy0on6"
       >
         <div
           aria-hidden="true"
@@ -134,10 +134,10 @@ exports[`properties/person not readOnly, show me 1`] = `
       </span>
     </span>
     <div
-      class="react-select__control react-select__control--is-focused react-select__control--menu-is-open css-18140j1-Control"
+      class="react-select__control react-select__control--is-focused react-select__control--menu-is-open css-aetwxa"
     >
       <div
-        class="react-select__value-container css-1gbdvdc-ValueContainer"
+        class="react-select__value-container css-xwc5uq"
       >
         <div
           class="react-select__placeholder css-1jqq78o-placeholder"
@@ -146,7 +146,7 @@ exports[`properties/person not readOnly, show me 1`] = `
           Empty
         </div>
         <div
-          class="react-select__input-container css-1p5v8kp-Input"
+          class="react-select__input-container css-ehy5hl"
           data-value=""
         >
           <input
@@ -171,7 +171,7 @@ exports[`properties/person not readOnly, show me 1`] = `
         </div>
       </div>
       <div
-        class="react-select__indicators css-1hb7zxy-IndicatorsContainer"
+        class="react-select__indicators css-1wy0on6"
       >
         <span
           class="react-select__indicator-separator css-1uei4ir-indicatorSeparator"
@@ -200,7 +200,7 @@ exports[`properties/person not readOnly, show me 1`] = `
     >
       <div
         aria-multiselectable="false"
-        class="react-select__menu-list css-1d1qzc4-MenuList"
+        class="react-select__menu-list css-1fmksep"
         id="react-select-7-listbox"
         role="listbox"
       >
@@ -300,10 +300,10 @@ exports[`properties/person not readOnly, show me 2`] = `
       </span>
     </span>
     <div
-      class="react-select__control react-select__control--is-focused react-select__control--menu-is-open css-18140j1-Control"
+      class="react-select__control react-select__control--is-focused react-select__control--menu-is-open css-aetwxa"
     >
       <div
-        class="react-select__value-container css-1gbdvdc-ValueContainer"
+        class="react-select__value-container css-xwc5uq"
       >
         <div
           class="react-select__placeholder css-1jqq78o-placeholder"
@@ -312,7 +312,7 @@ exports[`properties/person not readOnly, show me 2`] = `
           Empty
         </div>
         <div
-          class="react-select__input-container css-1p5v8kp-Input"
+          class="react-select__input-container css-ehy5hl"
           data-value=""
         >
           <input
@@ -337,7 +337,7 @@ exports[`properties/person not readOnly, show me 2`] = `
         </div>
       </div>
       <div
-        class="react-select__indicators css-1hb7zxy-IndicatorsContainer"
+        class="react-select__indicators css-1wy0on6"
       >
         <span
           class="react-select__indicator-separator css-1uei4ir-indicatorSeparator"
@@ -366,7 +366,7 @@ exports[`properties/person not readOnly, show me 2`] = `
     >
       <div
         aria-multiselectable="false"
-        class="react-select__menu-list css-1d1qzc4-MenuList"
+        class="react-select__menu-list css-1fmksep"
         id="react-select-7-listbox"
         role="listbox"
       >
@@ -449,10 +449,10 @@ exports[`properties/person not readOnly, show modal 1`] = `
       role="log"
     />
     <div
-      class="react-select__control css-18140j1-Control"
+      class="react-select__control css-aetwxa"
     >
       <div
-        class="react-select__value-container css-1gbdvdc-ValueContainer"
+        class="react-select__value-container css-xwc5uq"
       >
         <div
           class="react-select__placeholder css-1jqq78o-placeholder"
@@ -461,7 +461,7 @@ exports[`properties/person not readOnly, show modal 1`] = `
           Empty
         </div>
         <div
-          class="react-select__input-container css-1p5v8kp-Input"
+          class="react-select__input-container css-ehy5hl"
           data-value=""
         >
           <input
@@ -485,7 +485,7 @@ exports[`properties/person not readOnly, show modal 1`] = `
         </div>
       </div>
       <div
-        class="react-select__indicators css-1hb7zxy-IndicatorsContainer"
+        class="react-select__indicators css-1wy0on6"
       >
         <span
           class="react-select__indicator-separator css-1uei4ir-indicatorSeparator"
@@ -547,10 +547,10 @@ exports[`properties/person not readOnly, show modal 2`] = `
       </span>
     </span>
     <div
-      class="react-select__control react-select__control--is-focused react-select__control--menu-is-open css-18140j1-Control"
+      class="react-select__control react-select__control--is-focused react-select__control--menu-is-open css-aetwxa"
     >
       <div
-        class="react-select__value-container css-1gbdvdc-ValueContainer"
+        class="react-select__value-container css-xwc5uq"
       >
         <div
           class="react-select__placeholder css-1jqq78o-placeholder"
@@ -559,7 +559,7 @@ exports[`properties/person not readOnly, show modal 2`] = `
           Empty
         </div>
         <div
-          class="react-select__input-container css-1p5v8kp-Input"
+          class="react-select__input-container css-ehy5hl"
           data-value=""
         >
           <input
@@ -584,7 +584,7 @@ exports[`properties/person not readOnly, show modal 2`] = `
         </div>
       </div>
       <div
-        class="react-select__indicators css-1hb7zxy-IndicatorsContainer"
+        class="react-select__indicators css-1wy0on6"
       >
         <span
           class="react-select__indicator-separator css-1uei4ir-indicatorSeparator"
@@ -613,7 +613,7 @@ exports[`properties/person not readOnly, show modal 2`] = `
     >
       <div
         aria-multiselectable="false"
-        class="react-select__menu-list css-1d1qzc4-MenuList"
+        class="react-select__menu-list css-1fmksep"
         id="react-select-4-listbox"
         role="listbox"
       >
@@ -682,10 +682,10 @@ exports[`properties/person not readOnly, show username 1`] = `
       role="log"
     />
     <div
-      class="react-select__control css-18140j1-Control"
+      class="react-select__control css-aetwxa"
     >
       <div
-        class="react-select__value-container react-select__value-container--has-value css-1gbdvdc-ValueContainer"
+        class="react-select__value-container react-select__value-container--has-value css-xwc5uq"
       >
         <div
           class="react-select__single-value css-qosd1h-singleValue"
@@ -697,7 +697,7 @@ exports[`properties/person not readOnly, show username 1`] = `
           </div>
         </div>
         <div
-          class="react-select__input-container css-1p5v8kp-Input"
+          class="react-select__input-container css-ehy5hl"
           data-value=""
         >
           <input
@@ -720,7 +720,7 @@ exports[`properties/person not readOnly, show username 1`] = `
         </div>
       </div>
       <div
-        class="react-select__indicators css-1hb7zxy-IndicatorsContainer"
+        class="react-select__indicators css-1wy0on6"
       >
         <div
           aria-hidden="true"
@@ -796,16 +796,16 @@ exports[`properties/person show multiple 1`] = `
       role="log"
     />
     <div
-      class="react-select__control css-18140j1-Control"
+      class="react-select__control css-aetwxa"
     >
       <div
-        class="react-select__value-container react-select__value-container--is-multi react-select__value-container--has-value css-pcwdi-ValueContainer"
+        class="react-select__value-container react-select__value-container--is-multi react-select__value-container--has-value css-1imil99"
       >
         <div
           class="react-select__multi-value css-1p3m7a8-multiValue"
         >
           <div
-            class="react-select__multi-value__label css-wsp0cs-MultiValueGeneric"
+            class="react-select__multi-value__label css-9jq23d"
           >
             <div
               class="MultiPerson-item"
@@ -815,7 +815,7 @@ exports[`properties/person show multiple 1`] = `
           </div>
           <div
             aria-label="Remove [object Object]"
-            class="react-select__multi-value__remove css-12a83d4-MultiValueRemove"
+            class="react-select__multi-value__remove css-v7duua"
             role="button"
           >
             <svg
@@ -836,7 +836,7 @@ exports[`properties/person show multiple 1`] = `
           class="react-select__multi-value css-1p3m7a8-multiValue"
         >
           <div
-            class="react-select__multi-value__label css-wsp0cs-MultiValueGeneric"
+            class="react-select__multi-value__label css-9jq23d"
           >
             <div
               class="MultiPerson-item"
@@ -846,7 +846,7 @@ exports[`properties/person show multiple 1`] = `
           </div>
           <div
             aria-label="Remove [object Object]"
-            class="react-select__multi-value__remove css-12a83d4-MultiValueRemove"
+            class="react-select__multi-value__remove css-v7duua"
             role="button"
           >
             <svg
@@ -864,7 +864,7 @@ exports[`properties/person show multiple 1`] = `
           </div>
         </div>
         <div
-          class="react-select__input-container css-1p5v8kp-Input"
+          class="react-select__input-container css-ehy5hl"
           data-value=""
         >
           <input
@@ -887,7 +887,7 @@ exports[`properties/person show multiple 1`] = `
         </div>
       </div>
       <div
-        class="react-select__indicators css-1hb7zxy-IndicatorsContainer"
+        class="react-select__indicators css-1wy0on6"
       >
         <div
           aria-hidden="true"
@@ -949,16 +949,16 @@ exports[`properties/person show multiple, display modal 1`] = `
       role="log"
     />
     <div
-      class="react-select__control css-18140j1-Control"
+      class="react-select__control css-aetwxa"
     >
       <div
-        class="react-select__value-container react-select__value-container--is-multi react-select__value-container--has-value css-pcwdi-ValueContainer"
+        class="react-select__value-container react-select__value-container--is-multi react-select__value-container--has-value css-1imil99"
       >
         <div
           class="react-select__multi-value css-1p3m7a8-multiValue"
         >
           <div
-            class="react-select__multi-value__label css-wsp0cs-MultiValueGeneric"
+            class="react-select__multi-value__label css-9jq23d"
           >
             <div
               class="MultiPerson-item"
@@ -968,7 +968,7 @@ exports[`properties/person show multiple, display modal 1`] = `
           </div>
           <div
             aria-label="Remove [object Object]"
-            class="react-select__multi-value__remove css-12a83d4-MultiValueRemove"
+            class="react-select__multi-value__remove css-v7duua"
             role="button"
           >
             <svg
@@ -989,7 +989,7 @@ exports[`properties/person show multiple, display modal 1`] = `
           class="react-select__multi-value css-1p3m7a8-multiValue"
         >
           <div
-            class="react-select__multi-value__label css-wsp0cs-MultiValueGeneric"
+            class="react-select__multi-value__label css-9jq23d"
           >
             <div
               class="MultiPerson-item"
@@ -999,7 +999,7 @@ exports[`properties/person show multiple, display modal 1`] = `
           </div>
           <div
             aria-label="Remove [object Object]"
-            class="react-select__multi-value__remove css-12a83d4-MultiValueRemove"
+            class="react-select__multi-value__remove css-v7duua"
             role="button"
           >
             <svg
@@ -1017,7 +1017,7 @@ exports[`properties/person show multiple, display modal 1`] = `
           </div>
         </div>
         <div
-          class="react-select__input-container css-1p5v8kp-Input"
+          class="react-select__input-container css-ehy5hl"
           data-value=""
         >
           <input
@@ -1040,7 +1040,7 @@ exports[`properties/person show multiple, display modal 1`] = `
         </div>
       </div>
       <div
-        class="react-select__indicators css-1hb7zxy-IndicatorsContainer"
+        class="react-select__indicators css-1wy0on6"
       >
         <div
           aria-hidden="true"
@@ -1119,16 +1119,16 @@ exports[`properties/person show multiple, display modal 2`] = `
       </span>
     </span>
     <div
-      class="react-select__control react-select__control--is-focused react-select__control--menu-is-open css-18140j1-Control"
+      class="react-select__control react-select__control--is-focused react-select__control--menu-is-open css-aetwxa"
     >
       <div
-        class="react-select__value-container react-select__value-container--is-multi react-select__value-container--has-value css-pcwdi-ValueContainer"
+        class="react-select__value-container react-select__value-container--is-multi react-select__value-container--has-value css-1imil99"
       >
         <div
           class="react-select__multi-value css-1p3m7a8-multiValue"
         >
           <div
-            class="react-select__multi-value__label css-wsp0cs-MultiValueGeneric"
+            class="react-select__multi-value__label css-9jq23d"
           >
             <div
               class="MultiPerson-item"
@@ -1138,7 +1138,7 @@ exports[`properties/person show multiple, display modal 2`] = `
           </div>
           <div
             aria-label="Remove [object Object]"
-            class="react-select__multi-value__remove css-12a83d4-MultiValueRemove"
+            class="react-select__multi-value__remove css-v7duua"
             role="button"
           >
             <svg
@@ -1159,7 +1159,7 @@ exports[`properties/person show multiple, display modal 2`] = `
           class="react-select__multi-value css-1p3m7a8-multiValue"
         >
           <div
-            class="react-select__multi-value__label css-wsp0cs-MultiValueGeneric"
+            class="react-select__multi-value__label css-9jq23d"
           >
             <div
               class="MultiPerson-item"
@@ -1169,7 +1169,7 @@ exports[`properties/person show multiple, display modal 2`] = `
           </div>
           <div
             aria-label="Remove [object Object]"
-            class="react-select__multi-value__remove css-12a83d4-MultiValueRemove"
+            class="react-select__multi-value__remove css-v7duua"
             role="button"
           >
             <svg
@@ -1187,7 +1187,7 @@ exports[`properties/person show multiple, display modal 2`] = `
           </div>
         </div>
         <div
-          class="react-select__input-container css-1p5v8kp-Input"
+          class="react-select__input-container css-ehy5hl"
           data-value=""
         >
           <input
@@ -1211,7 +1211,7 @@ exports[`properties/person show multiple, display modal 2`] = `
         </div>
       </div>
       <div
-        class="react-select__indicators css-1hb7zxy-IndicatorsContainer"
+        class="react-select__indicators css-1wy0on6"
       >
         <div
           aria-hidden="true"
@@ -1257,7 +1257,7 @@ exports[`properties/person show multiple, display modal 2`] = `
     >
       <div
         aria-multiselectable="true"
-        class="react-select__menu-list react-select__menu-list--is-multi css-1d1qzc4-MenuList"
+        class="react-select__menu-list react-select__menu-list--is-multi css-1fmksep"
         id="react-select-6-listbox"
         role="listbox"
       >

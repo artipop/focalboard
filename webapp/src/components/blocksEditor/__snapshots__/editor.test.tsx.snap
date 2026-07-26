@@ -60,19 +60,19 @@ exports[`components/blocksEditor/editor should match snapshot on empty 1`] = `
         role="log"
       />
       <div
-        class=" css-1haocjs-control"
+        class="css-1haocjs-control"
       >
         <div
-          class=" css-b2z5qd-ValueContainer"
+          class="css-1neafsd"
         >
           <div
-            class=" css-1jqq78o-placeholder"
+            class="css-1jqq78o-placeholder"
             id="react-select-2-placeholder"
           >
             Introduce your text or your slash command
           </div>
           <div
-            class=" css-26cneq-Input"
+            class="css-x14nly"
             data-value=""
           >
             <input
@@ -96,7 +96,7 @@ exports[`components/blocksEditor/editor should match snapshot on empty 1`] = `
           </div>
         </div>
         <div
-          class=" css-1hb7zxy-IndicatorsContainer"
+          class="css-1wy0on6"
         />
       </div>
     </div>
