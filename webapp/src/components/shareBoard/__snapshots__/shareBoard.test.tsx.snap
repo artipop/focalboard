@@ -63,19 +63,19 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Copy l
                 role="log"
               />
               <div
-                class=" css-1wmrr75-Control"
+                class="css-1lxuy2a"
               >
                 <div
-                  class=" css-b2z5qd-ValueContainer"
+                  class="css-1neafsd"
                 >
                   <div
-                    class=" css-1jqq78o-placeholder"
+                    class="css-1jqq78o-placeholder"
                     id="react-select-4-placeholder"
                   >
                     Search for people and channels
                   </div>
                   <div
-                    class=" css-1p5v8kp-Input"
+                    class="css-ehy5hl"
                     data-value=""
                   >
                     <input
@@ -99,7 +99,7 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Copy l
                   </div>
                 </div>
                 <div
-                  class=" css-1hb7zxy-IndicatorsContainer"
+                  class="css-1wy0on6"
                 />
               </div>
             </div>
@@ -274,19 +274,19 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Copy l
                 role="log"
               />
               <div
-                class=" css-1wmrr75-Control"
+                class="css-1lxuy2a"
               >
                 <div
-                  class=" css-b2z5qd-ValueContainer"
+                  class="css-1neafsd"
                 >
                   <div
-                    class=" css-1jqq78o-placeholder"
+                    class="css-1jqq78o-placeholder"
                     id="react-select-4-placeholder"
                   >
                     Search for people and channels
                   </div>
                   <div
-                    class=" css-1p5v8kp-Input"
+                    class="css-ehy5hl"
                     data-value=""
                   >
                     <input
@@ -310,7 +310,7 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Copy l
                   </div>
                 </div>
                 <div
-                  class=" css-1hb7zxy-IndicatorsContainer"
+                  class="css-1wy0on6"
                 />
               </div>
             </div>
@@ -485,19 +485,19 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Regene
                 role="log"
               />
               <div
-                class=" css-1wmrr75-Control"
+                class="css-1lxuy2a"
               >
                 <div
-                  class=" css-b2z5qd-ValueContainer"
+                  class="css-1neafsd"
                 >
                   <div
-                    class=" css-1jqq78o-placeholder"
+                    class="css-1jqq78o-placeholder"
                     id="react-select-5-placeholder"
                   >
                     Search for people and channels
                   </div>
                   <div
-                    class=" css-1p5v8kp-Input"
+                    class="css-ehy5hl"
                     data-value=""
                   >
                     <input
@@ -521,7 +521,7 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Regene
                   </div>
                 </div>
                 <div
-                  class=" css-1hb7zxy-IndicatorsContainer"
+                  class="css-1wy0on6"
                 />
               </div>
             </div>
@@ -719,19 +719,19 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                 role="log"
               />
               <div
-                class=" css-1wmrr75-Control"
+                class="css-1lxuy2a"
               >
                 <div
-                  class=" css-b2z5qd-ValueContainer"
+                  class="css-1neafsd"
                 >
                   <div
-                    class=" css-1jqq78o-placeholder"
+                    class="css-1jqq78o-placeholder"
                     id="react-select-10-placeholder"
                   >
                     Search for people and channels
                   </div>
                   <div
-                    class=" css-1p5v8kp-Input"
+                    class="css-ehy5hl"
                     data-value=""
                   >
                     <input
@@ -755,7 +755,7 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                   </div>
                 </div>
                 <div
-                  class=" css-1hb7zxy-IndicatorsContainer"
+                  class="css-1wy0on6"
                 />
               </div>
             </div>
@@ -933,19 +933,19 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                 </span>
               </span>
               <div
-                class=" css-1wmrr75-Control"
+                class="css-1lxuy2a"
               >
                 <div
-                  class=" css-b2z5qd-ValueContainer"
+                  class="css-1neafsd"
                 >
                   <div
-                    class=" css-1jqq78o-placeholder"
+                    class="css-1jqq78o-placeholder"
                     id="react-select-10-placeholder"
                   >
                     Search for people and channels
                   </div>
                   <div
-                    class=" css-1p5v8kp-Input"
+                    class="css-ehy5hl"
                     data-value=""
                   >
                     <input
@@ -970,22 +970,22 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                   </div>
                 </div>
                 <div
-                  class=" css-1hb7zxy-IndicatorsContainer"
+                  class="css-1wy0on6"
                 />
               </div>
               <div
-                class=" css-45h7mv-menu"
+                class="css-45h7mv-menu"
               >
                 <div
                   aria-multiselectable="false"
-                  class=" css-1d1qzc4-MenuList"
+                  class="css-1fmksep"
                   id="react-select-10-listbox"
                   role="listbox"
                 >
                   <div
                     aria-disabled="false"
                     aria-selected="false"
-                    class=" css-8e5kjb-option"
+                    class="css-8e5kjb-option"
                     id="react-select-10-option-0"
                     role="option"
                     tabindex="-1"
@@ -1010,7 +1010,7 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                   <div
                     aria-disabled="false"
                     aria-selected="false"
-                    class=" css-x3yilo-option"
+                    class="css-x3yilo-option"
                     id="react-select-10-option-1"
                     role="option"
                     tabindex="-1"
@@ -1035,7 +1035,7 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                   <div
                     aria-disabled="false"
                     aria-selected="false"
-                    class=" css-x3yilo-option"
+                    class="css-x3yilo-option"
                     id="react-select-10-option-2"
                     role="option"
                     tabindex="-1"
@@ -1060,7 +1060,7 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                   <div
                     aria-disabled="false"
                     aria-selected="false"
-                    class=" css-x3yilo-option"
+                    class="css-x3yilo-option"
                     id="react-select-10-option-3"
                     role="option"
                     tabindex="-1"
@@ -1242,19 +1242,19 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                 role="log"
               />
               <div
-                class=" css-1wmrr75-Control"
+                class="css-1lxuy2a"
               >
                 <div
-                  class=" css-b2z5qd-ValueContainer"
+                  class="css-1neafsd"
                 >
                   <div
-                    class=" css-1jqq78o-placeholder"
+                    class="css-1jqq78o-placeholder"
                     id="react-select-11-placeholder"
                   >
                     Search for people and channels
                   </div>
                   <div
-                    class=" css-1p5v8kp-Input"
+                    class="css-ehy5hl"
                     data-value=""
                   >
                     <input
@@ -1278,7 +1278,7 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                   </div>
                 </div>
                 <div
-                  class=" css-1hb7zxy-IndicatorsContainer"
+                  class="css-1wy0on6"
                 />
               </div>
             </div>
@@ -1456,19 +1456,19 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                 </span>
               </span>
               <div
-                class=" css-1wmrr75-Control"
+                class="css-1lxuy2a"
               >
                 <div
-                  class=" css-b2z5qd-ValueContainer"
+                  class="css-1neafsd"
                 >
                   <div
-                    class=" css-1jqq78o-placeholder"
+                    class="css-1jqq78o-placeholder"
                     id="react-select-11-placeholder"
                   >
                     Search for people and channels
                   </div>
                   <div
-                    class=" css-1p5v8kp-Input"
+                    class="css-ehy5hl"
                     data-value=""
                   >
                     <input
@@ -1493,22 +1493,22 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                   </div>
                 </div>
                 <div
-                  class=" css-1hb7zxy-IndicatorsContainer"
+                  class="css-1wy0on6"
                 />
               </div>
               <div
-                class=" css-45h7mv-menu"
+                class="css-45h7mv-menu"
               >
                 <div
                   aria-multiselectable="false"
-                  class=" css-1d1qzc4-MenuList"
+                  class="css-1fmksep"
                   id="react-select-11-listbox"
                   role="listbox"
                 >
                   <div
                     aria-disabled="false"
                     aria-selected="false"
-                    class=" css-8e5kjb-option"
+                    class="css-8e5kjb-option"
                     id="react-select-11-option-0"
                     role="option"
                     tabindex="-1"
@@ -1542,7 +1542,7 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                   <div
                     aria-disabled="false"
                     aria-selected="false"
-                    class=" css-x3yilo-option"
+                    class="css-x3yilo-option"
                     id="react-select-11-option-1"
                     role="option"
                     tabindex="-1"
@@ -1576,7 +1576,7 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                   <div
                     aria-disabled="false"
                     aria-selected="false"
-                    class=" css-x3yilo-option"
+                    class="css-x3yilo-option"
                     id="react-select-11-option-2"
                     role="option"
                     tabindex="-1"
@@ -1601,7 +1601,7 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                   <div
                     aria-disabled="false"
                     aria-selected="false"
-                    class=" css-x3yilo-option"
+                    class="css-x3yilo-option"
                     id="react-select-11-option-3"
                     role="option"
                     tabindex="-1"
@@ -1783,19 +1783,19 @@ exports[`src/components/shareBoard/shareBoard return shareBoard template and cli
                 role="log"
               />
               <div
-                class=" css-1wmrr75-Control"
+                class="css-1lxuy2a"
               >
                 <div
-                  class=" css-b2z5qd-ValueContainer"
+                  class="css-1neafsd"
                 >
                   <div
-                    class=" css-1jqq78o-placeholder"
+                    class="css-1jqq78o-placeholder"
                     id="react-select-13-placeholder"
                   >
                     Search for people
                   </div>
                   <div
-                    class=" css-1p5v8kp-Input"
+                    class="css-ehy5hl"
                     data-value=""
                   >
                     <input
@@ -1819,7 +1819,7 @@ exports[`src/components/shareBoard/shareBoard return shareBoard template and cli
                   </div>
                 </div>
                 <div
-                  class=" css-1hb7zxy-IndicatorsContainer"
+                  class="css-1wy0on6"
                 />
               </div>
             </div>
@@ -1946,19 +1946,19 @@ exports[`src/components/shareBoard/shareBoard return shareBoard template and cli
                 </span>
               </span>
               <div
-                class=" css-1wmrr75-Control"
+                class="css-1lxuy2a"
               >
                 <div
-                  class=" css-b2z5qd-ValueContainer"
+                  class="css-1neafsd"
                 >
                   <div
-                    class=" css-1jqq78o-placeholder"
+                    class="css-1jqq78o-placeholder"
                     id="react-select-13-placeholder"
                   >
                     Search for people
                   </div>
                   <div
-                    class=" css-1p5v8kp-Input"
+                    class="css-ehy5hl"
                     data-value=""
                   >
                     <input
@@ -1983,22 +1983,22 @@ exports[`src/components/shareBoard/shareBoard return shareBoard template and cli
                   </div>
                 </div>
                 <div
-                  class=" css-1hb7zxy-IndicatorsContainer"
+                  class="css-1wy0on6"
                 />
               </div>
               <div
-                class=" css-45h7mv-menu"
+                class="css-45h7mv-menu"
               >
                 <div
                   aria-multiselectable="false"
-                  class=" css-1d1qzc4-MenuList"
+                  class="css-1fmksep"
                   id="react-select-13-listbox"
                   role="listbox"
                 >
                   <div
                     aria-disabled="false"
                     aria-selected="false"
-                    class=" css-8e5kjb-option"
+                    class="css-8e5kjb-option"
                     id="react-select-13-option-0"
                     role="option"
                     tabindex="-1"
@@ -2023,7 +2023,7 @@ exports[`src/components/shareBoard/shareBoard return shareBoard template and cli
                   <div
                     aria-disabled="false"
                     aria-selected="false"
-                    class=" css-x3yilo-option"
+                    class="css-x3yilo-option"
                     id="react-select-13-option-1"
                     role="option"
                     tabindex="-1"
@@ -2048,7 +2048,7 @@ exports[`src/components/shareBoard/shareBoard return shareBoard template and cli
                   <div
                     aria-disabled="false"
                     aria-selected="false"
-                    class=" css-x3yilo-option"
+                    class="css-x3yilo-option"
                     id="react-select-13-option-2"
                     role="option"
                     tabindex="-1"
@@ -2073,7 +2073,7 @@ exports[`src/components/shareBoard/shareBoard return shareBoard template and cli
                   <div
                     aria-disabled="false"
                     aria-selected="false"
-                    class=" css-x3yilo-option"
+                    class="css-x3yilo-option"
                     id="react-select-13-option-3"
                     role="option"
                     tabindex="-1"
@@ -2204,19 +2204,19 @@ exports[`src/components/shareBoard/shareBoard return shareBoard, and click switc
                 role="log"
               />
               <div
-                class=" css-1wmrr75-Control"
+                class="css-1lxuy2a"
               >
                 <div
-                  class=" css-b2z5qd-ValueContainer"
+                  class="css-1neafsd"
                 >
                   <div
-                    class=" css-1jqq78o-placeholder"
+                    class="css-1jqq78o-placeholder"
                     id="react-select-6-placeholder"
                   >
                     Search for people and channels
                   </div>
                   <div
-                    class=" css-1p5v8kp-Input"
+                    class="css-ehy5hl"
                     data-value=""
                   >
                     <input
@@ -2240,7 +2240,7 @@ exports[`src/components/shareBoard/shareBoard return shareBoard, and click switc
                   </div>
                 </div>
                 <div
-                  class=" css-1hb7zxy-IndicatorsContainer"
+                  class="css-1wy0on6"
                 />
               </div>
             </div>
@@ -2438,19 +2438,19 @@ exports[`src/components/shareBoard/shareBoard return shareBoardComponent and cli
                 role="log"
               />
               <div
-                class=" css-1wmrr75-Control"
+                class="css-1lxuy2a"
               >
                 <div
-                  class=" css-b2z5qd-ValueContainer"
+                  class="css-1neafsd"
                 >
                   <div
-                    class=" css-1jqq78o-placeholder"
+                    class="css-1jqq78o-placeholder"
                     id="react-select-7-placeholder"
                   >
                     Search for people and channels
                   </div>
                   <div
-                    class=" css-1p5v8kp-Input"
+                    class="css-ehy5hl"
                     data-value=""
                   >
                     <input
@@ -2474,7 +2474,7 @@ exports[`src/components/shareBoard/shareBoard return shareBoardComponent and cli
                   </div>
                 </div>
                 <div
-                  class=" css-1hb7zxy-IndicatorsContainer"
+                  class="css-1wy0on6"
                 />
               </div>
             </div>
@@ -2672,19 +2672,19 @@ exports[`src/components/shareBoard/shareBoard should match snapshot 1`] = `
                 role="log"
               />
               <div
-                class=" css-1wmrr75-Control"
+                class="css-1lxuy2a"
               >
                 <div
-                  class=" css-b2z5qd-ValueContainer"
+                  class="css-1neafsd"
                 >
                   <div
-                    class=" css-1jqq78o-placeholder"
+                    class="css-1jqq78o-placeholder"
                     id="react-select-2-placeholder"
                   >
                     Search for people and channels
                   </div>
                   <div
-                    class=" css-1p5v8kp-Input"
+                    class="css-ehy5hl"
                     data-value=""
                   >
                     <input
@@ -2708,7 +2708,7 @@ exports[`src/components/shareBoard/shareBoard should match snapshot 1`] = `
                   </div>
                 </div>
                 <div
-                  class=" css-1hb7zxy-IndicatorsContainer"
+                  class="css-1wy0on6"
                 />
               </div>
             </div>
@@ -2883,19 +2883,19 @@ exports[`src/components/shareBoard/shareBoard should match snapshot with sharing
                 role="log"
               />
               <div
-                class=" css-1wmrr75-Control"
+                class="css-1lxuy2a"
               >
                 <div
-                  class=" css-b2z5qd-ValueContainer"
+                  class="css-1neafsd"
                 >
                   <div
-                    class=" css-1jqq78o-placeholder"
+                    class="css-1jqq78o-placeholder"
                     id="react-select-3-placeholder"
                   >
                     Search for people and channels
                   </div>
                   <div
-                    class=" css-1p5v8kp-Input"
+                    class="css-ehy5hl"
                     data-value=""
                   >
                     <input
@@ -2919,7 +2919,7 @@ exports[`src/components/shareBoard/shareBoard should match snapshot with sharing
                   </div>
                 </div>
                 <div
-                  class=" css-1hb7zxy-IndicatorsContainer"
+                  class="css-1wy0on6"
                 />
               </div>
             </div>
@@ -3094,19 +3094,19 @@ exports[`src/components/shareBoard/shareBoard should match snapshot with sharing
                 role="log"
               />
               <div
-                class=" css-1wmrr75-Control"
+                class="css-1lxuy2a"
               >
                 <div
-                  class=" css-b2z5qd-ValueContainer"
+                  class="css-1neafsd"
                 >
                   <div
-                    class=" css-1jqq78o-placeholder"
+                    class="css-1jqq78o-placeholder"
                     id="react-select-9-placeholder"
                   >
                     Search for people and channels
                   </div>
                   <div
-                    class=" css-1p5v8kp-Input"
+                    class="css-ehy5hl"
                     data-value=""
                   >
                     <input
@@ -3130,7 +3130,7 @@ exports[`src/components/shareBoard/shareBoard should match snapshot with sharing
                   </div>
                 </div>
                 <div
-                  class=" css-1hb7zxy-IndicatorsContainer"
+                  class="css-1wy0on6"
                 />
               </div>
             </div>
@@ -3305,19 +3305,19 @@ exports[`src/components/shareBoard/shareBoard should match snapshot with sharing
                 role="log"
               />
               <div
-                class=" css-1wmrr75-Control"
+                class="css-1lxuy2a"
               >
                 <div
-                  class=" css-b2z5qd-ValueContainer"
+                  class="css-1neafsd"
                 >
                   <div
-                    class=" css-1jqq78o-placeholder"
+                    class="css-1jqq78o-placeholder"
                     id="react-select-8-placeholder"
                   >
                     Search for people and channels
                   </div>
                   <div
-                    class=" css-1p5v8kp-Input"
+                    class="css-ehy5hl"
                     data-value=""
                   >
                     <input
@@ -3341,7 +3341,7 @@ exports[`src/components/shareBoard/shareBoard should match snapshot with sharing
                   </div>
                 </div>
                 <div
-                  class=" css-1hb7zxy-IndicatorsContainer"
+                  class="css-1wy0on6"
                 />
               </div>
             </div>
@@ -3516,19 +3516,19 @@ exports[`src/components/shareBoard/shareBoard should match snapshot, with templa
                 role="log"
               />
               <div
-                class=" css-1wmrr75-Control"
+                class="css-1lxuy2a"
               >
                 <div
-                  class=" css-b2z5qd-ValueContainer"
+                  class="css-1neafsd"
                 >
                   <div
-                    class=" css-1jqq78o-placeholder"
+                    class="css-1jqq78o-placeholder"
                     id="react-select-12-placeholder"
                   >
                     Search for people
                   </div>
                   <div
-                    class=" css-1p5v8kp-Input"
+                    class="css-ehy5hl"
                     data-value=""
                   >
                     <input
@@ -3552,7 +3552,7 @@ exports[`src/components/shareBoard/shareBoard should match snapshot, with templa
                   </div>
                 </div>
                 <div
-                  class=" css-1hb7zxy-IndicatorsContainer"
+                  class="css-1wy0on6"
                 />
               </div>
             </div>

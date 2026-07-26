@@ -34,7 +34,7 @@ endif
 all: webapp server ## Build server and webapp.
 
 prebuild: ## Run prebuild actions (install dependencies etc.).
-	cd webapp; npm install
+	cd webapp; npm ci
 
 ci: webapp-ci server-test ## Simulate CI, locally.
 

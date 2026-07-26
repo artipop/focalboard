@@ -17,10 +17,10 @@ exports[`properties/person select user - cancel 1`] = `
       role="log"
     />
     <div
-      class="react-select__control css-18140j1-Control"
+      class="react-select__control css-aetwxa"
     >
       <div
-        class="react-select__value-container react-select__value-container--has-value css-1gbdvdc-ValueContainer"
+        class="react-select__value-container react-select__value-container--has-value css-xwc5uq"
       >
         <div
           class="react-select__single-value css-qosd1h-singleValue"
@@ -32,7 +32,7 @@ exports[`properties/person select user - cancel 1`] = `
           </div>
         </div>
         <div
-          class="react-select__input-container css-1p5v8kp-Input"
+          class="react-select__input-container css-ehy5hl"
           data-value=""
         >
           <input
@@ -55,7 +55,7 @@ exports[`properties/person select user - cancel 1`] = `
         </div>
       </div>
       <div
-        class="react-select__indicators css-1hb7zxy-IndicatorsContainer"
+        class="react-select__indicators css-1wy0on6"
       >
         <div
           aria-hidden="true"
@@ -134,10 +134,10 @@ exports[`properties/person select user - cancel 2`] = `
       </span>
     </span>
     <div
-      class="react-select__control react-select__control--is-focused react-select__control--menu-is-open css-18140j1-Control"
+      class="react-select__control react-select__control--is-focused react-select__control--menu-is-open css-aetwxa"
     >
       <div
-        class="react-select__value-container react-select__value-container--has-value css-1gbdvdc-ValueContainer"
+        class="react-select__value-container react-select__value-container--has-value css-xwc5uq"
       >
         <div
           class="react-select__single-value css-qosd1h-singleValue"
@@ -149,7 +149,7 @@ exports[`properties/person select user - cancel 2`] = `
           </div>
         </div>
         <div
-          class="react-select__input-container css-1p5v8kp-Input"
+          class="react-select__input-container css-ehy5hl"
           data-value=""
         >
           <input
@@ -173,7 +173,7 @@ exports[`properties/person select user - cancel 2`] = `
         </div>
       </div>
       <div
-        class="react-select__indicators css-1hb7zxy-IndicatorsContainer"
+        class="react-select__indicators css-1wy0on6"
       >
         <div
           aria-hidden="true"
@@ -219,12 +219,12 @@ exports[`properties/person select user - cancel 2`] = `
     >
       <div
         aria-multiselectable="false"
-        class="react-select__menu-list css-1d1qzc4-MenuList"
+        class="react-select__menu-list css-1fmksep"
         id="react-select-4-listbox"
         role="listbox"
       >
         <div
-          class="react-select__group css-syji7d-Group"
+          class="react-select__group css-1s9izoc"
         >
           <div
             class="react-select__group-heading css-jtaw72-group"
@@ -286,10 +286,10 @@ exports[`properties/person select user - confirm 1`] = `
       role="log"
     />
     <div
-      class="react-select__control css-18140j1-Control"
+      class="react-select__control css-aetwxa"
     >
       <div
-        class="react-select__value-container react-select__value-container--has-value css-1gbdvdc-ValueContainer"
+        class="react-select__value-container react-select__value-container--has-value css-xwc5uq"
       >
         <div
           class="react-select__single-value css-qosd1h-singleValue"
@@ -301,7 +301,7 @@ exports[`properties/person select user - confirm 1`] = `
           </div>
         </div>
         <div
-          class="react-select__input-container css-1p5v8kp-Input"
+          class="react-select__input-container css-ehy5hl"
           data-value=""
         >
           <input
@@ -324,7 +324,7 @@ exports[`properties/person select user - confirm 1`] = `
         </div>
       </div>
       <div
-        class="react-select__indicators css-1hb7zxy-IndicatorsContainer"
+        class="react-select__indicators css-1wy0on6"
       >
         <div
           aria-hidden="true"
@@ -403,10 +403,10 @@ exports[`properties/person select user - confirm 2`] = `
       </span>
     </span>
     <div
-      class="react-select__control react-select__control--is-focused react-select__control--menu-is-open css-18140j1-Control"
+      class="react-select__control react-select__control--is-focused react-select__control--menu-is-open css-aetwxa"
     >
       <div
-        class="react-select__value-container react-select__value-container--has-value css-1gbdvdc-ValueContainer"
+        class="react-select__value-container react-select__value-container--has-value css-xwc5uq"
       >
         <div
           class="react-select__single-value css-qosd1h-singleValue"
@@ -418,7 +418,7 @@ exports[`properties/person select user - confirm 2`] = `
           </div>
         </div>
         <div
-          class="react-select__input-container css-1p5v8kp-Input"
+          class="react-select__input-container css-ehy5hl"
           data-value=""
         >
           <input
@@ -442,7 +442,7 @@ exports[`properties/person select user - confirm 2`] = `
         </div>
       </div>
       <div
-        class="react-select__indicators css-1hb7zxy-IndicatorsContainer"
+        class="react-select__indicators css-1wy0on6"
       >
         <div
           aria-hidden="true"
@@ -488,12 +488,12 @@ exports[`properties/person select user - confirm 2`] = `
     >
       <div
         aria-multiselectable="false"
-        class="react-select__menu-list css-1d1qzc4-MenuList"
+        class="react-select__menu-list css-1fmksep"
         id="react-select-2-listbox"
         role="listbox"
       >
         <div
-          class="react-select__group css-syji7d-Group"
+          class="react-select__group css-1s9izoc"
         >
           <div
             class="react-select__group-heading css-jtaw72-group"

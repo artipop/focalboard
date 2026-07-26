@@ -10,7 +10,7 @@ Check that you have recent versions of the basic dependencies installed:
 * [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
     * On Windows, install [Git for Windows](https://gitforwindows.org/) and use the git-bash terminal shell
 * [Go](https://golang.org/doc/install)
-* [Node](https://nodejs.org/en/download/) (v10+) and [npm](https://www.npmjs.com/get-npm)
+* [Node](https://nodejs.org/en/download/) and [npm](https://www.npmjs.com/get-npm) — the version in `webapp/.nvmrc` (Node 24, npm 11). `webapp/package.json` declares it in `engines` and `webapp/.npmrc` sets `engine-strict=true`, so installing on another Node fails with `EBADENGINE` instead of silently rewriting `package-lock.json`. With nvm: `cd webapp && nvm install && nvm use`.
 
 On Windows:
 * Install [Mingw64](https://chocolatey.org/packages/mingw) via [Chocolatey](https://chocolatey.org/)
@@ -46,8 +46,9 @@ Once the server is running, you can rebuild just the webapp with `make webapp` (
 
 Here's a recommended dev-test loop using VSCode:
 * Open a bash terminal window to the project folder
-* Run `make prebuild` to npm install
+* Run `make prebuild` to install webapp deps (`npm ci` — deterministic, never mutates the lock)
     * Do this again when dependencies change in `webapp/package.json`
+    * `npm ci` requires `package-lock.json` to be in sync with `package.json`; regenerate the lock deliberately (`npm install`) only on the pinned toolchain
 * Run `cd webapp && npm run watchdev`
     * This will auto-build the webapp on file changes
 * Open VSCode

@@ -45,18 +45,18 @@ jobs:
       with:
         path: "focalboard"
         
-    - name: npm ci
-      run: cd focalboard/webapp && npm ci && cd -
+    - name: Setup Node
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      with:
+        node-version-file: focalboard/webapp/.nvmrc
 
     - name: Set up Go
       uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5
       with:
         go-version-file: focalboard/server/go.mod
 
-    - name: Setup Node
-      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-      with:
-        node-version-file: focalboard/webapp/.nvmrc
+    - name: npm ci
+      run: cd focalboard/webapp && npm ci && cd -
 
     - name: Build Linux server
       run: cd focalboard; make server-linux-package

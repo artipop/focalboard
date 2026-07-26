@@ -10,7 +10,9 @@ This repository (`mattermost/focalboard`) is **standalone Focalboard** and is no
 
 A `.env` file in the repo root with `EXCLUDE_ENTERPRISE="1"` is expected for OSS development.
 
-- `make prebuild` — install webapp npm deps. Only needed after dependency changes.
+- `make prebuild` — install webapp npm deps (`npm ci`). Only needed after dependency changes.
+
+The webapp toolchain is pinned: `webapp/.nvmrc` = Node 24, `engines` in `webapp/package.json` (`node >=24 <25`, `npm >=11 <12`), and `webapp/.npmrc` with `engine-strict=true` — installs on another Node fail with `EBADENGINE` rather than silently re-resolving `package-lock.json` (lockfileVersion 3). `make prebuild` and CI both use `npm ci`, which never mutates the lock; regenerate it deliberately with `npm install` on the pinned toolchain only. `webapp/.npmrc` also carries an `allow-scripts[]` allowlist, since npm 11 blocks dependency install scripts by default.
 - `make` (or `make all`) — build webapp + server. Server binary lands at `bin/focalboard-server`.
 - `make server` — build server only. `make webapp` — build+pack webapp only (`cd webapp; npm run pack`).
 - `./bin/focalboard-server` — run server (serves on `http://localhost:8000`, port set in `config.json`).
