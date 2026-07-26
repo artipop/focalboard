@@ -34,6 +34,7 @@ import (
 	"github.com/beyond5959/acp-adapter/pkg/claudeacp"
 
 	"github.com/mattermost/focalboard/desktop/internal/acp/claudebridge"
+	"github.com/mattermost/focalboard/desktop/internal/procgroup"
 )
 
 func main() {
@@ -287,32 +288,22 @@ func runRaw(ctx context.Context, cwd, prompt string) error {
 	if err != nil {
 		return fmt.Errorf("claude binary not found in PATH: %w", err)
 	}
-	cmd := exec.CommandContext(ctx, claudeBin,
+	argv := []string{claudeBin,
 		"--input-format", "stream-json",
 		"--output-format", "stream-json",
 		"--verbose",
 		"--include-partial-messages",
 		"--permission-prompt-tool", "stdio", // ask the CLI to route permissions to us
 		"-p",
-	)
-	cmd.Dir = cwd
-	cmd.Env = append(os.Environ(), "CLAUDECODE=")
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	stdin, err := cmd.StdinPipe()
+	}
+	proc, err := procgroup.Spawn(ctx, argv, cwd, []string{"CLAUDECODE="})
 	if err != nil {
 		return err
 	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	cmd.Stderr = os.Stderr
-	if err := cmd.Start(); err != nil {
-		return err
-	}
+	stdin, stdout := proc.Stdin, proc.Stdout
 	defer func() {
-		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-		_, _ = cmd.Process.Wait()
+		proc.KillGroup(time.Second)
+		_ = proc.Wait()
 	}()
 
 	// Reader goroutine: print every NDJSON line; answer can_use_tool control requests.
