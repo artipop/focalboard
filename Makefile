@@ -1,4 +1,4 @@
-.PHONY: prebuild clean cleanall ci server server-mac server-linux server-win server-linux-package generate watch-server webapp mac-app mac-app-wails wails-precheck win-app-wpf linux-app modd-precheck templates-archive
+.PHONY: prebuild clean cleanall ci server server-mac server-linux server-win server-linux-package generate watch-server webapp desktop-pack dev-wails mac-app-wails mac-dmg-wails win-app-wails linux-app-wails linux-installers-wails wails-precheck modd-precheck templates-archive
 
 PACKAGE_FOLDER = focalboard
 
@@ -68,10 +68,6 @@ server-docker: ## Build server for Docker Architectures.
 server-win: ## Build server for Windows.
 	$(eval LDFLAGS += -X "github.com/mattermost/focalboard/server/model.Edition=win")
 	cd server; env GOOS=windows GOARCH=amd64 go build -ldflags '$(LDFLAGS)' -tags '$(BUILD_TAGS)' -o ../bin/win/focalboard-server.exe ./main
-
-server-dll: ## Build server as Windows DLL.
-	$(eval LDFLAGS += -X "github.com/mattermost/focalboard/server/model.Edition=win")
-	cd server; env GOOS=windows GOARCH=amd64 go build -ldflags '$(LDFLAGS)' -tags '$(BUILD_TAGS)' -buildmode=c-shared -o ../bin/win-dll/focalboard-server.dll ./main
 
 server-linux-package: server-linux webapp
 	rm -rf package
@@ -183,59 +179,66 @@ webapp-ci: ## Webapp CI: linting & testing.
 webapp-test: ## jest tests for webapp
 	cd webapp; npm run test
 
-mac-app: server-mac webapp ## Build Mac application.
-	rm -rf mac/temp
-	rm -rf mac/dist
-	rm -rf mac/resources/bin
-	rm -rf mac/resources/pack
-	mkdir -p mac/resources/bin
-	cp bin/mac/focalboard-server mac/resources/bin/focalboard-server
-	cp app-config.json mac/resources/config.json
-	cp -R webapp/pack mac/resources/pack
-	mkdir -p mac/temp
-	xcodebuild archive -workspace mac/Focalboard.xcworkspace -scheme Focalboard -archivePath mac/temp/focalboard.xcarchive CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED="NO" CODE_SIGNING_ALLOWED="NO" \
-		|| { echo "xcodebuild failed, did you install the full Xcode and not just the CLI tools?"; exit 1; }
-	mkdir -p mac/dist
-	cp -R mac/temp/focalboard.xcarchive/Products/Applications/Focalboard.app mac/dist/
-	# xcodebuild -exportArchive -archivePath mac/temp/focalboard.xcarchive -exportPath mac/dist -exportOptionsPlist mac/export.plist
-	cp NOTICE.txt mac/dist
-	cp webapp/NOTICE.txt mac/dist/webapp-NOTICE.txt
-	cd mac/dist; zip -r focalboard-mac.zip Focalboard.app MIT-COMPILED-LICENSE.md NOTICE.txt webapp-NOTICE.txt
-
 wails-precheck:
 	@if ! [ -x "$$(command -v wails)" ]; then \
 		echo "wails is not installed. Install with: go install github.com/wailsapp/wails/v2/cmd/wails@latest"; \
 		exit 1; \
 	fi;
 
-mac-app-wails: wails-precheck webapp ## Build Mac application via Wails (single in-process binary, Apple Silicon).
-	cd mac-wails && wails build -platform darwin/arm64 -tags "json1 sqlite3" -clean
-	# webPath() resolves `pack` next to the executable (Contents/MacOS).
-	rm -rf mac-wails/build/bin/Focalboard.app/Contents/MacOS/pack
-	cp -R webapp/pack mac-wails/build/bin/Focalboard.app/Contents/MacOS/pack
-	cp NOTICE.txt mac-wails/build/bin/
-	cp webapp/NOTICE.txt mac-wails/build/bin/webapp-NOTICE.txt
-	cd mac-wails/build/bin && zip -r focalboard-mac.zip Focalboard.app NOTICE.txt webapp-NOTICE.txt
-	@echo "Built mac-wails/build/bin/Focalboard.app (+ focalboard-mac.zip)"
+dev-wails: wails-precheck ## Run the desktop app in dev mode with hot reload (webpack watch + wails dev). Ctrl+C stops both.
+	@echo "==> webpack watch (webapp/pack) + wails dev; the first frontend build takes a bit, then the webview auto-reloads on save. Ctrl+C stops both."
+	@echo "    (needs webapp deps — run 'make prebuild' once if webapp/node_modules is missing)"
+	@bash -c 'set -m; \
+		( cd webapp && exec npm run watchdev ) & watch=$$!; \
+		( cd desktop && exec wails dev -tags "json1 sqlite3" -reloaddirs ../webapp/pack ) & wails=$$!; \
+		cleanup() { trap - INT TERM EXIT; kill -TERM -$$wails 2>/dev/null; kill -TERM -$$watch 2>/dev/null; wait 2>/dev/null; }; \
+		trap cleanup INT TERM EXIT; \
+		while kill -0 $$wails 2>/dev/null; do sleep 1; done; \
+		cleanup'
 
-win-wpf-app: server-dll webapp ## Build Windows WPF application.
-	cd win-wpf && ./build.bat
-	cd win-wpf && ./package.bat
-	cd win-wpf && ./package-zip.bat
+# The Wails desktop app lives in desktop/ (its own Go module). The webapp is built
+# separately (`make webapp`), copied to desktop/pack, and compiled into the binary
+# via go:embed (the `frontend` build tag) — go:embed can't reach ../webapp, hence
+# the copy. At startup the embedded pack is extracted and served by the in-process
+# server. Builds are native per platform (cgo SQLite is not cross-compiled).
+# -skipbindings: the generated JS bindings are unused (the webapp calls
+# window.go.main.App.* via the injected runtime).
+WAILS_TAGS := json1 sqlite3 frontend
+WAILS_BUILD = cd desktop && wails build -tags "$(WAILS_TAGS)" -skipbindings -clean
 
-linux-app: webapp ## Build Linux application.
-	rm -rf linux/temp
-	rm -rf linux/dist
-	mkdir -p linux/dist
-	mkdir -p linux/temp/focalboard-app
-	cp app-config.json linux/temp/focalboard-app/config.json
-	cp NOTICE.txt linux/temp/focalboard-app/
-	cp webapp/NOTICE.txt linux/temp/focalboard-app/webapp-NOTICE.txt
-	cp -R webapp/pack linux/temp/focalboard-app/pack
-	cd linux; make build
-	cp -R linux/bin/focalboard-app linux/temp/focalboard-app/
-	cd linux/temp; tar -zcf ../dist/focalboard-linux.tar.gz focalboard-app
-	rm -rf linux/temp
+# copy-pack: stage the built webapp bundle where desktop/ can go:embed it.
+desktop-pack: webapp
+	rm -rf desktop/pack
+	cp -R webapp/pack desktop/pack
+
+mac-app-wails: wails-precheck desktop-pack ## Build macOS .app via Wails (Apple Silicon, single in-process binary, frontend embedded).
+	$(WAILS_BUILD) -platform darwin/arm64
+	cp NOTICE.txt desktop/build/bin/
+	cp webapp/NOTICE.txt desktop/build/bin/webapp-NOTICE.txt
+	@echo "Built desktop/build/bin/Focalboard.app"
+
+mac-dmg-wails: mac-app-wails ## Package the macOS .app into a drag-to-Applications .dmg.
+	rm -rf desktop/build/dmg && mkdir -p desktop/build/dmg
+	cp -R desktop/build/bin/Focalboard.app desktop/build/dmg/
+	ln -s /Applications desktop/build/dmg/Applications
+	rm -f desktop/build/bin/Focalboard.dmg
+	hdiutil create -volname Focalboard -srcfolder desktop/build/dmg -ov -format UDZO desktop/build/bin/Focalboard.dmg
+	rm -rf desktop/build/dmg
+	@echo "Built desktop/build/bin/Focalboard.dmg"
+
+linux-app-wails: wails-precheck desktop-pack ## Build Linux binary via Wails (amd64, single in-process binary, frontend embedded).
+	$(WAILS_BUILD) -platform linux/amd64
+	@echo "Built desktop/build/bin/Focalboard"
+
+linux-installers-wails: linux-app-wails ## Package the Linux binary into .AppImage (+ .deb if nfpm is installed).
+	desktop/build/linux/appimage.sh
+	@if command -v nfpm >/dev/null 2>&1; then \
+		nfpm package -f desktop/build/linux/nfpm.yaml -p deb -t desktop/build/bin && echo "Built desktop/build/bin/*.deb"; \
+	else echo "nfpm not installed; skipping .deb (install: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest)"; fi
+
+win-app-wails: wails-precheck desktop-pack ## Build Windows NSIS installer via Wails (amd64, single in-process binary, frontend embedded).
+	$(WAILS_BUILD) -platform windows/amd64 -nsis
+	@echo "Built desktop/build/bin/Focalboard.exe + desktop/build/bin/Focalboard-amd64-installer.exe"
 
 swagger: ## Generate swagger API spec and clients based on it.
 	mkdir -p server/swagger/docs
@@ -253,12 +256,8 @@ clean: ## Clean build artifacts.
 	rm -rf bin
 	rm -rf dist
 	rm -rf webapp/pack
-	rm -rf mac/temp
-	rm -rf mac/dist
-	rm -rf mac-wails/build/bin
-	rm -rf linux/dist
-	rm -rf win-wpf/msix
-	rm -f win-wpf/focalboard.msix
+	rm -rf desktop/pack
+	rm -rf desktop/build/bin
 
 cleanall: clean ## Clean all build artifacts and dependencies.
 	rm -rf webapp/node_modules

@@ -13,12 +13,9 @@
         "**/node_modules": true,
         "bin": true,
         "files": true,
-        "linux/config.json": true,
-        "linux/dist/**": true,
-        "linux/webapp/**": true,
-        "mac/dist": true,
-        "mac/temp": true,
         "focalboard*.db": true,
+        "desktop/pack": true,
+        "desktop/build/bin": true,
         "webapp/dist/**": true,
         "webapp/pack": true
     },
@@ -27,14 +24,11 @@
         "**/node_modules": true,
         "bin": true,
         "files": true,
-        "mac/dist": true,
-        "mac/temp": true,
         "focalboard*.db": true,
+        "desktop/pack": true,
+        "desktop/build/bin": true,
         "webapp/pack": true,
-        "webapp/webpack-profile.html": true,
-        "linux/config.json": true,
-        "linux/webapp/**": true,
-        "linux/dist/**": true,
+        "webapp/webpack-profile.html": true
     },
     "editor.codeActionsOnSave": {
         "source.fixAll.eslint": "explicit"

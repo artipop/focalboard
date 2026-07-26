@@ -25,9 +25,9 @@ It helps define, organize, track and manage work across individuals and teams. F
 
 ### Personal Desktop (Windows, Mac or Linux Desktop)
 
-* **Windows**: Download from the [Windows App Store](https://www.microsoft.com/store/productId/9NLN2T0SX9VF) or download `focalboard-win.zip` from the [latest release](https://github.com/mattermost/focalboard/releases), unpack, and run `Focalboard.exe`.
-* **Mac**: Download from the [Mac App Store](https://apps.apple.com/us/app/focalboard-insiders/id1556908618?mt=12).
-* **Linux Desktop**: Download `focalboard-linux.tar.gz` from the [latest release](https://github.com/mattermost/focalboard/releases), unpack, and open `focalboard-app`.
+* **Windows**: Download `Focalboard-amd64-installer.exe` from the [latest release](https://github.com/mattermost/focalboard/releases) and run the installer.
+* **Mac**: Download `Focalboard.dmg` from the [latest release](https://github.com/mattermost/focalboard/releases) and drag Focalboard to Applications.
+* **Linux Desktop**: Download `Focalboard-x86_64.AppImage` (or the `.deb`) from the [latest release](https://github.com/mattermost/focalboard/releases); make the AppImage executable and run it.
 
 ### Personal Server
 
@@ -66,34 +66,14 @@ Once the server is running, you can rebuild just the web app via `make webapp` i
 
 ### Building and running standalone desktop apps
 
-You can build standalone apps that package the server to run locally against SQLite:
+You can build a single-binary desktop app (the Focalboard server runs in-process
+against SQLite) with [Wails](https://wails.io). Everything Wails lives in `desktop/`
+— see `desktop/README.md` for prerequisites and architecture. Install the Wails CLI
+once (`go install github.com/wailsapp/wails/v2/cmd/wails@latest`), then per platform:
 
-* **Windows**:
-  * *Requires Windows 10, [Windows 10 SDK](https://developer.microsoft.com/en-us/windows/downloads/sdk-archive/) 10.0.19041.0, and .NET 4.8 developer pack*
-  * Open a `git-bash` prompt.
-  * Run `make prebuild`
-  * The above prebuild step needs to be run only when you make changes to or want to install your npm dependencies, etc.
-  * Once the prebuild is completed, you can keep repeating the below steps to build the app & see the changes.
-  * Run `make win-wpf-app`
-  * Run `cd win-wpf/msix && focalboard.exe`
-* **Mac**:
-  * *Requires macOS 11.3+ and Xcode 13.2.1+*
-  * Run `make prebuild`
-  * The above prebuild step needs to be run only when you make changes to or want to install your npm dependencies, etc.
-  * Once the prebuild is completed, you can keep repeating the below steps to build the app & see the changes.
-  * Run `make mac-app`
-  * Run `open mac/dist/Focalboard.app`
-* **Linux**:
-  * *Tested on Ubuntu 18.04*
-  * Install `webgtk` dependencies
-    * Run `sudo apt-get install libgtk-3-dev`
-    * Run `sudo apt-get install libwebkit2gtk-4.0-dev`
-  * Run `make prebuild`
-  * The above prebuild step needs to be run only when you make changes to or want to install your npm dependencies, etc.
-  * Once the prebuild is completed, you can keep repeating the below steps to build the app & see the changes.
-  * Run `make linux-app`
-  * Uncompress `linux/dist/focalboard-linux.tar.gz` to a directory of your choice
-  * Run `focalboard-app` from the directory you have chosen
+* **Windows**: `make win-app-wails` → `desktop/build/bin/Focalboard-amd64-installer.exe` (NSIS; needs MinGW `gcc` + NSIS `makensis` on `PATH`).
+* **Mac**: `make mac-dmg-wails` → `desktop/build/bin/Focalboard.dmg` (Apple Silicon).
+* **Linux**: `make linux-installers-wails` → `desktop/build/bin/Focalboard-x86_64.AppImage` (+ `.deb`; needs `libgtk-3-dev`/`libwebkit2gtk-4.0-dev`).
 * **Docker**:
   * To run it locally from offical image:
     * `docker run -it -p 80:8000 mattermost/focalboard`
