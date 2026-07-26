@@ -94,6 +94,11 @@ jobs:
     - name: Replace token 2 server
       run: sed -i -e "s,placeholder_rudder_key,${{ secrets.RUDDER_DEV_KEY }},g" ${{ github.workspace }}/focalboard/server/services/telemetry/telemetry.go
 
+    - name: Setup Node
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      with:
+        node-version-file: focalboard/webapp/.nvmrc
+
     - name: npm ci
       run: cd focalboard/webapp; npm ci --no-optional
 
@@ -132,6 +137,11 @@ jobs:
         path: "focalboard"
     - name: Replace token 1 server
       run: sed -i -e "s,placeholder_rudder_dataplane_url,${{ secrets.RUDDER_DATAPLANE_URL }},g" ${{ github.workspace }}/focalboard/server/services/telemetry/telemetry.go
+
+    - name: Setup Node
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      with:
+        node-version-file: focalboard/webapp/.nvmrc
 
     - name: npm ci
       run: cd focalboard/webapp; npm ci --no-optional
