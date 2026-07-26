@@ -25,9 +25,9 @@ It helps define, organize, track and manage work across individuals and teams. F
 
 ### Personal Desktop (Windows, Mac or Linux Desktop)
 
-* **Windows**: Download from the [Windows App Store](https://www.microsoft.com/store/productId/9NLN2T0SX9VF) or download `focalboard-win.zip` from the [latest release](https://github.com/mattermost/focalboard/releases), unpack, and run `Focalboard.exe`.
-* **Mac**: Download from the [Mac App Store](https://apps.apple.com/us/app/focalboard-insiders/id1556908618?mt=12).
-* **Linux Desktop**: Download `focalboard-linux.tar.gz` from the [latest release](https://github.com/mattermost/focalboard/releases), unpack, and open `focalboard-app`.
+* **Windows**: Download `Focalboard-amd64-installer.exe` from the [latest release](https://github.com/mattermost/focalboard/releases) and run the installer.
+* **Mac**: Download `Focalboard.dmg` from the [latest release](https://github.com/mattermost/focalboard/releases) and drag Focalboard to Applications.
+* **Linux Desktop**: Download `Focalboard-x86_64.AppImage` (or the `.deb`) from the [latest release](https://github.com/mattermost/focalboard/releases); make the AppImage executable and run it.
 
 ### Personal Server
 
