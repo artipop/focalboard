@@ -6,8 +6,6 @@ describe('Group board by different properties', () => {
         cy.apiInitServer()
         cy.apiResetBoards()
         cy.apiGetMe().then((userID) => cy.apiSkipTour(userID))
-        localStorage.setItem('welcomePageViewed', 'true')
-        localStorage.setItem('language', 'en')
     })
 
     it('MM-T4291 Group by different property', () => {

@@ -1,6 +1,11 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
+declare module 'cypress-failed-log/src/failed' {
+    const failed: () => (args: unknown) => unknown
+    export default failed
+}
+
 declare namespace Cypress {
     type LoginData = {
         username: string
