@@ -2,9 +2,10 @@
   "$schema": "https://wails.io/schemas/config.v2.json",
   "name": "Focalboard",
   "outputfilename": "Focalboard",
-  "frontend:dir": "frontend",
+  "frontend:dir": "../webapp",
   "frontend:install": "",
   "frontend:build": "",
+  "frontend:dev:watcher": "npm run watchdev",
   "author": {
     "name": "Mattermost, Inc."
   },

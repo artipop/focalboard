@@ -185,16 +185,14 @@ wails-precheck:
 		exit 1; \
 	fi;
 
-dev-wails: wails-precheck ## Run the desktop app in dev mode with hot reload (webpack watch + wails dev). Ctrl+C stops both.
-	@echo "==> webpack watch (webapp/pack) + wails dev; the first frontend build takes a bit, then the webview auto-reloads on save. Ctrl+C stops both."
+# `wails dev` runs `npm run watchdev` itself (frontend:dev:watcher in wails.json),
+# which keeps rebuilding webapp/pack; -reloaddirs makes the webview reload when it
+# changes. The page is still served by the in-process Go server through proxy.go,
+# so nothing has to be told the port or the session token.
+dev-wails: wails-precheck ## Run the desktop app in dev mode (wails dev + vite build --watch).
+	@echo "==> wails dev; frontend edits rebuild webapp/pack and reload the window, Go edits rebuild the app."
 	@echo "    (needs webapp deps — run 'make prebuild' once if webapp/node_modules is missing)"
-	@bash -c 'set -m; \
-		( cd webapp && exec npm run watchdev ) & watch=$$!; \
-		( cd desktop && exec wails dev -tags "json1 sqlite3" -reloaddirs ../webapp/pack ) & wails=$$!; \
-		cleanup() { trap - INT TERM EXIT; kill -TERM -$$wails 2>/dev/null; kill -TERM -$$watch 2>/dev/null; wait 2>/dev/null; }; \
-		trap cleanup INT TERM EXIT; \
-		while kill -0 $$wails 2>/dev/null; do sleep 1; done; \
-		cleanup'
+	cd desktop && wails dev -tags "json1 sqlite3" -reloaddirs ../webapp/pack
 
 # The Wails desktop app lives in desktop/ (its own Go module). The webapp is built
 # separately (`make webapp`), copied to desktop/pack, and compiled into the binary

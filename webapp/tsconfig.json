@@ -2,7 +2,9 @@
     "compilerOptions": {
         "jsx": "react",
         "target": "es2019",
-        "module": "commonjs",
+        "module": "esnext",
+        "isolatedModules": true,
+        "noEmit": true,
         "esModuleInterop": true,
         "noImplicitAny": true,
         "strict": true,

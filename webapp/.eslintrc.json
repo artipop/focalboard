@@ -19,7 +19,7 @@
     "cypress/globals": true
   },
   "settings": {
-    "import/resolver": "webpack",
+    "import/resolver": "node",
     "react": {
         "pragma": "React",
         "version": "detect"

@@ -58,6 +58,8 @@ focalboard*.db
 .vscode/settings.json
 desktop/pack
 desktop/build/bin
+# `wails dev` writes its generated JS bindings into frontend:dir (../webapp).
+webapp/wailsjs
 webapp/cypress/screenshots
 webapp/cypress/videos
 server/swagger/clients

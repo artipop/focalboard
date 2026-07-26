@@ -70,27 +70,33 @@ From the repo root:
 make dev-wails
 ```
 
-This runs `webpack --watch` (rebuilds `webapp/pack` on save) alongside
-`wails dev -tags "json1 sqlite3" -reloaddirs ../webapp/pack`, and stops both on
-Ctrl+C. Go changes trigger a `wails dev` rebuild/restart; frontend changes are
-rebuilt by webpack and the webview auto-reloads (via `-reloaddirs`). The first
-frontend build takes a moment. Needs webapp deps — run `make prebuild` once if
-`webapp/node_modules` is missing.
+`wails.json` points `frontend:dir` at `../webapp` and declares
+`frontend:dev:watcher: "npm run watchdev"`, so `wails dev` starts
+`vite build --watch` for you and kills it on exit. Go changes trigger a
+`wails dev` rebuild/restart; frontend changes are rebuilt into `webapp/pack`
+and `-reloaddirs ../webapp/pack` reloads the window. Needs webapp deps — run
+`make prebuild` once if `webapp/node_modules` is missing.
 
-The frontend is **not** managed by Wails here: the in-process server serves it
-(through `proxy.go`), so Wails' built-in Vite/HMR flow isn't used — the loop is
-`webpack --watch` + a webview reload. `wails dev` runs without the `frontend`
-tag, so it serves the on-disk `pack` (no embed).
+`wails dev` runs without the `frontend` tag, so nothing is embedded and the Go
+side serves the on-disk `pack` (`diskWebPath` falls back to `../webapp/pack`).
+The page still goes through `proxy.go` exactly as in a release build, which is
+why nothing here needs to know the server port or the session token — both stay
+random per launch, and the bootstrap script is injected the usual way.
 
-To run the pieces manually instead:
+There is deliberately no `frontend:dev:serverUrl`: pointing the webview at the
+Vite dev server would buy HMR but would mean pinning the port and token up
+front and re-implementing `proxy.go`'s bootstrap in `vite.config.mjs`.
+
+To run it manually instead:
 
 ```
-cd webapp && npm run watchdev          # terminal 1
-cd desktop && wails dev -tags "json1 sqlite3" -reloaddirs ../webapp/pack   # terminal 2
+cd desktop && wails dev -tags "json1 sqlite3" -reloaddirs ../webapp/pack
 ```
 
-For pure webapp/CSS iteration, the browser loop is faster than the webview:
-`make watch` (server + webpack watch via `modd`), then open http://localhost:8000.
+For pure webapp/CSS iteration the browser loop is still faster than the webview:
+`make watch` (server + Vite build watch via `modd`), then open
+http://localhost:8000 — or `cd webapp && npm run dev` for HMR at
+http://localhost:5173.
 
 ## Build release installers
 
