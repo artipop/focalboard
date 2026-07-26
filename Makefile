@@ -188,9 +188,13 @@ wails-precheck:
 dev-wails: wails-precheck ## Run the desktop app in dev mode with hot reload (webpack watch + wails dev). Ctrl+C stops both.
 	@echo "==> webpack watch (webapp/pack) + wails dev; the first frontend build takes a bit, then the webview auto-reloads on save. Ctrl+C stops both."
 	@echo "    (needs webapp deps — run 'make prebuild' once if webapp/node_modules is missing)"
-	@bash -c 'trap "kill 0" EXIT; \
-		( cd webapp && npm run watchdev ) & \
-		cd desktop && wails dev -tags "json1 sqlite3" -reloaddirs ../webapp/pack'
+	@bash -c 'set -m; \
+		( cd webapp && exec npm run watchdev ) & watch=$$!; \
+		( cd desktop && exec wails dev -tags "json1 sqlite3" -reloaddirs ../webapp/pack ) & wails=$$!; \
+		cleanup() { trap - INT TERM EXIT; kill -TERM -$$wails 2>/dev/null; kill -TERM -$$watch 2>/dev/null; wait 2>/dev/null; }; \
+		trap cleanup INT TERM EXIT; \
+		while kill -0 $$wails 2>/dev/null; do sleep 1; done; \
+		cleanup'
 
 # The Wails desktop app lives in desktop/ (its own Go module). The webapp is built
 # separately (`make webapp`), copied to desktop/pack, and compiled into the binary
