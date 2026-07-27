@@ -266,8 +266,11 @@ type Config struct {
 	// "auto" (escalate to a worktree when the repo is busy/dirty) may come later.
 	WorktreeMode string `json:"worktreeMode"`
 
-	MaxConcurrent            int      `json:"maxConcurrent"`
+	MaxConcurrent int `json:"maxConcurrent"`
+	// SessionTimeoutMinutes bounds one agent turn; SessionIdleMinutes bounds
+	// how long an interactive session sits between turns before closing.
 	SessionTimeoutMinutes    int      `json:"sessionTimeoutMinutes"`
+	SessionIdleMinutes       int      `json:"sessionIdleMinutes"`
 	PermissionTimeoutMinutes int      `json:"permissionTimeoutMinutes"`
 	IdempotencyWindowSeconds int      `json:"idempotencyWindowSeconds"`
 	AutoAllowTools           []string `json:"autoAllowTools"`
@@ -291,10 +294,15 @@ func DefaultConfig(dataDir string) Config {
 		WorktreeMode:             "never",
 		MaxConcurrent:            3,
 		SessionTimeoutMinutes:    15,
+		SessionIdleMinutes:       30,
 		PermissionTimeoutMinutes: 5,
 		IdempotencyWindowSeconds: 10,
-		AutoAllowTools:           []string{"Read", "Grep", "Glob", "Edit", "Write", "MultiEdit", "NotebookEdit", "TodoWrite"},
-		WorktreeDir:              filepath.Join(dataDir, "worktrees"),
+		// Bash is on the list because a coding agent cannot do its job without a
+		// shell (tests, git, build), and a session with no console open has
+		// nobody to ask — every prompt would simply be rejected. Edit/Write are
+		// already allowed, so withholding the shell bought little in practice.
+		AutoAllowTools: []string{"Read", "Grep", "Glob", "Edit", "Write", "MultiEdit", "NotebookEdit", "TodoWrite", "Bash"},
+		WorktreeDir:    filepath.Join(dataDir, "worktrees"),
 	}
 }
 
@@ -322,8 +330,18 @@ func LoadConfig(path, dataDir string) (Config, error) {
 	return cfg, nil
 }
 
+// SessionTimeout bounds a single agent turn.
 func (c Config) SessionTimeout() time.Duration {
 	return time.Duration(c.SessionTimeoutMinutes) * time.Minute
+}
+
+// SessionIdle bounds how long an interactive session waits between turns
+// before closing itself and releasing its repository.
+func (c Config) SessionIdle() time.Duration {
+	if c.SessionIdleMinutes <= 0 {
+		return 30 * time.Minute
+	}
+	return time.Duration(c.SessionIdleMinutes) * time.Minute
 }
 
 func (c Config) PermissionTimeout() time.Duration {

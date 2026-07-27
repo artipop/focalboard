@@ -33,6 +33,7 @@ import {ClientConfig} from '../../config/clientConfig'
 import {getClientConfig} from '../../store/clientConfig'
 
 import CardSkeleton from '../../svg/card-skeleton'
+import SessionConsole, {isSessionConsoleAvailable} from '../acp/sessionConsole'
 
 import CommentsList from './commentsList'
 import {CardDetailProvider} from './cardDetailContext'
@@ -297,6 +298,13 @@ const CardDetail = (props: Props): JSX.Element|null => {
                         onDelete={onDelete}
                         addAttachment={addAttachment}
                     />
+                </Fragment>}
+
+                {/* Agent session console (desktop app only) */}
+
+                {!limited && !props.readonly && isSessionConsoleAvailable() && <Fragment>
+                    <hr/>
+                    <SessionConsole cardId={card.id}/>
                 </Fragment>}
 
                 {/* Comments */}

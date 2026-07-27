@@ -90,6 +90,8 @@ func main() {
 			log.Printf("acp: disabled, store error: %v", err)
 		} else {
 			mgr = acp.NewManager(acpCfg, filepath.Join(dir, "config.json"), store, boardadapter.NewWriter(srv.App()), emitter, nil)
+			// Lets the UI open a console on a card without moving it.
+			mgr.SetBoardReader(events)
 			if err := mgr.Start(context.Background(), events); err != nil {
 				log.Printf("acp: disabled, start error: %v", err)
 				mgr = nil

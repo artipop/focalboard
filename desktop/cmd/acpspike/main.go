@@ -9,6 +9,10 @@
 //	-mode raw: probe the `claude` binary's native stream-json stdio protocol
 //	           directly, to verify whether permission control requests
 //	           (can_use_tool) can be proxied — needed for the Phase-2 modal.
+//	-mode multiturn: probe conversation continuity across two turns, which the
+//	           interactive session console needs (both bridges currently respawn
+//	           the CLI per turn, so turn 2 would start with an empty context).
+//	           Selected with -agent claude|codex and -strategy live|resume|bridge.
 //
 // Exit criterion (spec §9 Phase 0): stream a hardcoded prompt to the console,
 // dump the agent's capabilities and protocol version.
@@ -26,10 +30,13 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	acp "github.com/coder/acp-go-sdk"
+	"github.com/google/uuid"
 
 	"github.com/beyond5959/acp-adapter/pkg/claudeacp"
 
@@ -37,10 +44,12 @@ import (
 )
 
 func main() {
-	mode := flag.String("mode", "lib", "lib | raw | bridge")
+	mode := flag.String("mode", "lib", "lib | raw | bridge | multiturn")
 	cwd := flag.String("cwd", "", "working directory for the session (default: temp dir)")
 	prompt := flag.String("prompt", "Create a file named hello.txt containing exactly 'hello from acp spike', then briefly summarize what you did.", "prompt to send")
 	timeout := flag.Duration("timeout", 5*time.Minute, "overall timeout")
+	agent := flag.String("agent", "claude", "multiturn: claude | codex")
+	strategy := flag.String("strategy", "live", "multiturn (claude only): live (one process, two stdin messages) | resume (respawn with --resume) | bridge (two ACP turns through claudebridge)")
 	flag.Parse()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -74,6 +83,10 @@ func main() {
 		if err := runBridge(ctx, abs, *prompt); err != nil {
 			log.Fatalf("bridge mode: %v", err)
 		}
+	case "multiturn":
+		if err := runMultiturn(ctx, abs, *agent, *strategy); err != nil {
+			log.Fatalf("multiturn mode: %v", err)
+		}
 	default:
 		log.Fatalf("unknown mode %q", *mode)
 	}
@@ -81,10 +94,26 @@ func main() {
 
 // ---- mode=lib: in-process ACP bridge (claudeacp) + coder SDK client ----
 
-// spikeClient implements acp.Client, printing everything it receives.
-type spikeClient struct{}
+// spikeClient implements acp.Client, printing everything it receives and
+// accumulating the agent's text so a mode can assert on it.
+type spikeClient struct {
+	mu   sync.Mutex
+	seen strings.Builder
+}
 
 var _ acp.Client = (*spikeClient)(nil)
+
+func (c *spikeClient) reset() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.seen.Reset()
+}
+
+func (c *spikeClient) text() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.seen.String()
+}
 
 func (c *spikeClient) RequestPermission(ctx context.Context, params acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
 	title := ""
@@ -115,6 +144,9 @@ func (c *spikeClient) SessionUpdate(ctx context.Context, params acp.SessionNotif
 	case u.AgentMessageChunk != nil:
 		if t := u.AgentMessageChunk.Content.Text; t != nil {
 			fmt.Print(t.Text)
+			c.mu.Lock()
+			c.seen.WriteString(t.Text)
+			c.mu.Unlock()
 		}
 	case u.AgentThoughtChunk != nil:
 		if t := u.AgentThoughtChunk.Content.Text; t != nil {
@@ -378,4 +410,365 @@ func runRaw(ctx context.Context, cwd, prompt string) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	}
+}
+
+// ---- mode=multiturn: does a second turn keep the first turn's context? ----
+
+// The memory probe: turn 1 plants a token, turn 2 asks for it back. A CLI that
+// silently starts a fresh conversation answers turn 2 with an apology instead.
+const (
+	memoryToken  = "4271"
+	memoryPrompt = "Remember this number for later: " + memoryToken + ". Reply with just OK, nothing else."
+	recallPrompt = "What number did I ask you to remember? Reply with just the number, nothing else."
+)
+
+func runMultiturn(ctx context.Context, cwd, agent, strategy string) error {
+	switch agent {
+	case "claude":
+		switch strategy {
+		case "live":
+			return multiturnClaudeLive(ctx, cwd)
+		case "resume":
+			return multiturnClaudeResume(ctx, cwd)
+		case "bridge":
+			return multiturnClaudeBridge(ctx, cwd)
+		default:
+			return fmt.Errorf("unknown -strategy %q (live | resume | bridge)", strategy)
+		}
+	case "codex":
+		return multiturnCodex(ctx, cwd)
+	default:
+		return fmt.Errorf("unknown -agent %q (claude | codex)", agent)
+	}
+}
+
+// verdict reports whether the recall answer actually contains the planted token.
+func verdict(answer string) error {
+	if strings.Contains(answer, memoryToken) {
+		fmt.Printf("\n✅ CONTEXT RETAINED — turn 2 recalled %s\n", memoryToken)
+		return nil
+	}
+	fmt.Printf("\n❌ CONTEXT LOST — turn 2 did not recall %s\n", memoryToken)
+	return fmt.Errorf("context not retained across turns")
+}
+
+// ---- claude ----
+
+// claudeProc is one `claude` stream-json subprocess with a persistent scanner,
+// so several turns can be read off the same stdout.
+type claudeProc struct {
+	cmd     *exec.Cmd
+	stdin   io.WriteCloser
+	scanner *bufio.Scanner
+}
+
+// startClaude spawns the CLI with exactly the production flags of claudebridge
+// (see internal/acp/claudebridge/bridge.go:runTurn) plus extraArgs.
+func startClaude(ctx context.Context, cwd string, extraArgs ...string) (*claudeProc, error) {
+	bin, err := exec.LookPath("claude")
+	if err != nil {
+		return nil, fmt.Errorf("claude binary not found in PATH: %w", err)
+	}
+	argv := append([]string{
+		"--input-format", "stream-json",
+		"--output-format", "stream-json",
+		"--verbose",
+		"--include-partial-messages",
+		"--permission-prompt-tool", "stdio",
+		"-p",
+	}, extraArgs...)
+	fmt.Printf("$ claude %s\n", strings.Join(argv, " "))
+
+	cmd := exec.CommandContext(ctx, bin, argv...)
+	cmd.Dir = cwd
+	cmd.Env = append(os.Environ(), "CLAUDECODE=")
+	cmd.Stderr = os.Stderr
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 0, 1024*1024), 32*1024*1024)
+	return &claudeProc{cmd: cmd, stdin: stdin, scanner: scanner}, nil
+}
+
+func (p *claudeProc) send(prompt string) error {
+	msg := map[string]any{
+		"type": "user",
+		"message": map[string]any{
+			"role":    "user",
+			"content": []map[string]any{{"type": "text", "text": prompt}},
+		},
+	}
+	b, _ := json.Marshal(msg)
+	fmt.Printf("→ user: %s\n", prompt)
+	_, err := p.stdin.Write(append(b, '\n'))
+	return err
+}
+
+// awaitResult scans until the turn's terminal "result" line, returning the
+// result text and the session_id advertised by system/init (empty if none seen).
+func (p *claudeProc) awaitResult() (result, sessionID string, err error) {
+	for p.scanner.Scan() {
+		line := p.scanner.Bytes()
+		var msg struct {
+			Type      string `json:"type"`
+			Subtype   string `json:"subtype"`
+			SessionID string `json:"session_id"`
+			IsError   bool   `json:"is_error"`
+			Result    string `json:"result"`
+		}
+		if err := json.Unmarshal(line, &msg); err != nil {
+			continue
+		}
+		if msg.SessionID != "" && sessionID == "" {
+			sessionID = msg.SessionID
+		}
+		switch msg.Type {
+		case "system":
+			fmt.Printf("← system/%s session_id=%s\n", msg.Subtype, msg.SessionID)
+		case "result":
+			if msg.IsError {
+				return msg.Result, sessionID, fmt.Errorf("claude reported an error: %s", msg.Result)
+			}
+			fmt.Printf("← result: %s\n", strings.TrimSpace(msg.Result))
+			return msg.Result, sessionID, nil
+		}
+	}
+	if err := p.scanner.Err(); err != nil {
+		return "", sessionID, fmt.Errorf("read claude stream: %w", err)
+	}
+	return "", sessionID, fmt.Errorf("claude exited without a result message")
+}
+
+func (p *claudeProc) kill() {
+	if p.cmd.Process != nil {
+		_ = syscall.Kill(-p.cmd.Process.Pid, syscall.SIGKILL)
+		_, _ = p.cmd.Process.Wait()
+	}
+}
+
+// multiturnClaudeLive tests the cheap path: keep one process alive and write a
+// second user message into the same stdin after the first turn's result.
+func multiturnClaudeLive(ctx context.Context, cwd string) error {
+	fmt.Println("== claude / strategy=live (one process, two stdin messages) ==")
+	proc, err := startClaude(ctx, cwd)
+	if err != nil {
+		return err
+	}
+	defer proc.kill()
+
+	if err := proc.send(memoryPrompt); err != nil {
+		return err
+	}
+	if _, sessionID, err := proc.awaitResult(); err != nil {
+		return fmt.Errorf("turn 1: %w", err)
+	} else {
+		fmt.Printf("   (turn 1 session_id=%s)\n", sessionID)
+	}
+
+	fmt.Println("\n-- turn 2 on the SAME process --")
+	if err := proc.send(recallPrompt); err != nil {
+		return fmt.Errorf("turn 2 send (process likely exited after turn 1): %w", err)
+	}
+	answer, _, err := proc.awaitResult()
+	if err != nil {
+		return fmt.Errorf("turn 2: %w", err)
+	}
+	return verdict(answer)
+}
+
+// multiturnClaudeResume tests the fallback path: dictate the session id up front
+// with --session-id, then respawn with --resume for the second turn.
+func multiturnClaudeResume(ctx context.Context, cwd string) error {
+	fmt.Println("== claude / strategy=resume (respawn with --resume) ==")
+	sessionID := uuid.NewString()
+
+	proc, err := startClaude(ctx, cwd, "--session-id", sessionID)
+	if err != nil {
+		return err
+	}
+	if err := proc.send(memoryPrompt); err != nil {
+		proc.kill()
+		return err
+	}
+	_, seen, err := proc.awaitResult()
+	proc.kill()
+	if err != nil {
+		return fmt.Errorf("turn 1: %w", err)
+	}
+	if seen != sessionID {
+		fmt.Printf("⚠️  session_id mismatch: asked for %s, CLI reported %s\n", sessionID, seen)
+	}
+
+	fmt.Println("\n-- turn 2 in a FRESH process with --resume --")
+	proc2, err := startClaude(ctx, cwd, "--resume", sessionID)
+	if err != nil {
+		return err
+	}
+	defer proc2.kill()
+	if err := proc2.send(recallPrompt); err != nil {
+		return err
+	}
+	answer, _, err := proc2.awaitResult()
+	if err != nil {
+		return fmt.Errorf("turn 2: %w", err)
+	}
+	return verdict(answer)
+}
+
+// multiturnClaudeBridge drives the production claudebridge through two ACP
+// turns on one session, checking that the bridge really reuses its subprocess
+// and keeps the conversation.
+func multiturnClaudeBridge(ctx context.Context, cwd string) error {
+	fmt.Println("== claude / strategy=bridge (production claudebridge, two ACP turns) ==")
+	claudeBin, err := exec.LookPath("claude")
+	if err != nil {
+		return fmt.Errorf("claude binary not found in PATH: %w", err)
+	}
+	bridge := claudebridge.New(claudebridge.Options{Launch: []string{claudeBin}})
+
+	clientIn, agentOut := io.Pipe()
+	agentIn, clientOut := io.Pipe()
+	agentConn := acp.NewAgentSideConnection(bridge, agentOut, agentIn)
+	bridge.SetConn(agentConn)
+	client := &spikeClient{}
+	conn := acp.NewClientSideConnection(client, clientOut, clientIn)
+	defer bridge.KillAll(2 * time.Second)
+
+	if _, err := conn.Initialize(ctx, acp.InitializeRequest{
+		ProtocolVersion: acp.ProtocolVersionNumber,
+		ClientCapabilities: acp.ClientCapabilities{
+			Fs: acp.FileSystemCapabilities{ReadTextFile: true, WriteTextFile: true},
+		},
+	}); err != nil {
+		return fmt.Errorf("initialize: %w", err)
+	}
+	sess, err := conn.NewSession(ctx, acp.NewSessionRequest{Cwd: cwd, McpServers: []acp.McpServer{}})
+	if err != nil {
+		return fmt.Errorf("session/new: %w", err)
+	}
+	fmt.Printf("📝 session %s\n", sess.SessionId)
+
+	turn := func(n int, prompt string) error {
+		fmt.Printf("\n-- ACP turn %d --\n→ %s\n", n, prompt)
+		client.reset()
+		resp, err := conn.Prompt(ctx, acp.PromptRequest{
+			SessionId: sess.SessionId,
+			Prompt:    []acp.ContentBlock{acp.TextBlock(prompt)},
+		})
+		if err != nil {
+			return err
+		}
+		fmt.Printf("\n(stopReason=%s)\n", resp.StopReason)
+		return nil
+	}
+
+	if err := turn(1, memoryPrompt); err != nil {
+		return fmt.Errorf("turn 1: %w", err)
+	}
+	if err := turn(2, recallPrompt); err != nil {
+		return fmt.Errorf("turn 2: %w", err)
+	}
+	return verdict(client.text())
+}
+
+// ---- codex ----
+
+// multiturnCodex captures thread_id from `thread.started` and replays the second
+// turn through `codex exec resume <id>`.
+func multiturnCodex(ctx context.Context, cwd string) error {
+	fmt.Println("== codex / exec resume ==")
+	bin, err := exec.LookPath("codex")
+	if err != nil {
+		return fmt.Errorf("codex binary not found in PATH: %w", err)
+	}
+
+	_, threadID, err := runCodex(ctx, bin, cwd,
+		"exec", "--json", "--skip-git-repo-check", "-C", cwd, memoryPrompt)
+	if err != nil {
+		return fmt.Errorf("turn 1: %w", err)
+	}
+	if threadID == "" {
+		return fmt.Errorf("turn 1 produced no thread_id")
+	}
+	fmt.Printf("   (turn 1 thread_id=%s)\n", threadID)
+
+	// `exec resume` takes no -C; the working directory comes from cmd.Dir.
+	fmt.Println("\n-- turn 2 via `codex exec resume` --")
+	answer, _, err := runCodex(ctx, bin, cwd,
+		"exec", "resume", threadID, "--json", "--skip-git-repo-check", recallPrompt)
+	if err != nil {
+		return fmt.Errorf("turn 2: %w", err)
+	}
+	return verdict(answer)
+}
+
+// runCodex runs one `codex exec` invocation, returning the concatenated
+// agent_message text and the thread id from thread.started.
+func runCodex(ctx context.Context, bin, cwd string, argv ...string) (text, threadID string, err error) {
+	fmt.Printf("$ codex %s\n", strings.Join(argv, " "))
+	cmd := exec.CommandContext(ctx, bin, argv...)
+	cmd.Dir = cwd
+	cmd.Stderr = os.Stderr
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", "", err
+	}
+	if err := cmd.Start(); err != nil {
+		return "", "", err
+	}
+	defer func() {
+		if cmd.Process != nil {
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		}
+	}()
+
+	var out strings.Builder
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 0, 1024*1024), 32*1024*1024)
+	for scanner.Scan() {
+		var msg struct {
+			Type     string `json:"type"`
+			ThreadID string `json:"thread_id"`
+			Item     *struct {
+				Type string `json:"type"`
+				Text string `json:"text"`
+			} `json:"item"`
+			Error *struct {
+				Message string `json:"message"`
+			} `json:"error"`
+		}
+		if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
+			continue
+		}
+		switch msg.Type {
+		case "thread.started":
+			threadID = msg.ThreadID
+			fmt.Printf("← thread.started %s\n", msg.ThreadID)
+		case "item.completed":
+			if msg.Item != nil && msg.Item.Type == "agent_message" {
+				fmt.Printf("← agent_message: %s\n", strings.TrimSpace(msg.Item.Text))
+				out.WriteString(msg.Item.Text)
+			}
+		case "turn.failed", "error":
+			if msg.Error != nil {
+				return out.String(), threadID, fmt.Errorf("codex error: %s", msg.Error.Message)
+			}
+			return out.String(), threadID, fmt.Errorf("codex reported %s", msg.Type)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return out.String(), threadID, err
+	}
+	return out.String(), threadID, cmd.Wait()
 }

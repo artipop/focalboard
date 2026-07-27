@@ -102,6 +102,43 @@ func (b *EventsBackend) BlockChanged(evt notify.BlockChangeEvent) error {
 	return nil
 }
 
+// CardByID reads a card on demand so a console can be opened on it without
+// moving it into the trigger column. The returned event carries no columns —
+// nothing moved — but everything repo/agent resolution needs.
+func (b *EventsBackend) CardByID(ctx context.Context, cardID string) (acp.CardMoved, error) {
+	b.mu.Lock()
+	a := b.app
+	b.mu.Unlock()
+	if a == nil {
+		return acp.CardMoved{}, fmt.Errorf("board app is not ready")
+	}
+	block, err := a.GetBlockByID(cardID)
+	if err != nil {
+		return acp.CardMoved{}, fmt.Errorf("get card %s: %w", cardID, err)
+	}
+	if block == nil || block.Type != model.TypeCard {
+		return acp.CardMoved{}, fmt.Errorf("block %s is not a card", cardID)
+	}
+	board, err := a.GetBoard(block.BoardID)
+	if err != nil {
+		return acp.CardMoved{}, fmt.Errorf("get board %s: %w", block.BoardID, err)
+	}
+	schema, err := model.ParsePropertySchema(board)
+	if err != nil {
+		return acp.CardMoved{}, fmt.Errorf("parse board schema: %w", err)
+	}
+	return acp.CardMoved{
+		EventID:     uuid.NewString(),
+		CardID:      block.ID,
+		BoardID:     board.ID,
+		Title:       block.Title,
+		Body:        b.cardBody(board.ID, block),
+		Props:       namedProperties(block, schema),
+		OptionNames: selectedOptionNames(rawProperties(block), schema),
+		At:          time.Now(),
+	}, nil
+}
+
 func column(def model.PropDef, optionID string) acp.Column {
 	name := ""
 	if opt, ok := def.Options[optionID]; ok {

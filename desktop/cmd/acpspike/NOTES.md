@@ -75,9 +75,38 @@ tool_call pending→in_progress→completed, `RequestPermission` с тремя �
 (allow_once / allow_always / reject_once) — allow исполняет инструмент,
 финальный `end_turn`, файл создан.
 
+## Многоходовость (спайк интерактивной консоли, 2026-07-26)
+
+Проверено на `claude` 2.1.220 режимом `-mode multiturn -agent claude -strategy live`.
+
+**Вердикт: процесс живёт между ходами, контекст сохраняется — `--resume` не нужен.**
+
+После терминальной строки `result` CLI **не завершается**: в тот же stdin пишется
+следующая NDJSON-строка `{"type":"user",…}`, и начинается новый ход. Проба «запомни
+4271» → «какое число я просил запомнить» вернула `4271` вторым ходом. `session_id`
+у обоих ходов один и тот же.
+
+Следствия для `claudebridge`:
+
+- `bufio.Scanner` должен создаваться **один раз на сессию**, а не на ход: он держит
+  собственный буфер поверх stdout, и новый сканер на втором ходу потерял бы уже
+  вычитанные байты.
+- `system/init` (и `system/status`) приходят **заново на каждом ходу** — парсер должен
+  спокойно переживать повторные init'ы, а не считать их началом новой сессии.
+- `proc.KillGroup` переезжает из «конца хода» в закрытие сессии.
+
+Мост при этом задаёт id разговора сам: `NewSession` и так генерирует UUID, он уходит
+в `--session-id <uuid>` при первом запуске, а при respawn'е (отмена хода, падение CLI)
+— в `--resume <uuid>`. Поэтому отменённый ход не стоит истории разговора.
+`-strategy resume` гоняет этот путь отдельно.
+
+Боевой мост проверен `-strategy bridge` (2026-07-26): два ACP-хода на одной сессии,
+один подпроцесс, `4271` вспомнилось вторым ходом, оба хода `stopReason=end_turn`.
+
 ## Прочее
 
 - `initialize` через lib-мост: protocol v1, `agentCapabilities.loadSession: true`,
   promptCapabilities: image+embeddedContext.
 - Стоимость happy-path прогона (создание файла): ~$0.16, 2 хода.
-- Запуск спайка: `go build ./cmd/acpspike && ./acpspike -mode lib|raw [-cwd DIR] [-prompt ...]`.
+- Запуск спайка: `go build ./cmd/acpspike && ./acpspike -mode lib|raw|bridge [-cwd DIR] [-prompt ...]`,
+  либо `./acpspike -mode multiturn -agent claude|codex [-strategy live|resume]`.

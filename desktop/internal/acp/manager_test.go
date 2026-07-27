@@ -33,16 +33,48 @@ func (w *fakeWriter) cardComments(cardID string) []string {
 	return append([]string(nil), w.comments[cardID]...)
 }
 
-// fakeEmitter records UI events.
+// fakeEmitter records UI events with their payloads.
 type fakeEmitter struct {
-	mu     sync.Mutex
-	events []string
+	mu       sync.Mutex
+	events   []string
+	payloads []map[string]any
 }
 
 func (e *fakeEmitter) Emit(event string, payload any) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.events = append(e.events, event)
+	p, _ := payload.(map[string]any)
+	e.payloads = append(e.payloads, p)
+}
+
+// pendingPermissionID returns the request id of the permission prompt the UI
+// was asked to answer, or "" while none is waiting.
+func (e *fakeEmitter) pendingPermissionID() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for i, name := range e.events {
+		if name != EventPermission {
+			continue
+		}
+		p := e.payloads[i]
+		if p == nil || p["pending"] != true {
+			continue
+		}
+		if id, ok := p["requestId"].(string); ok {
+			return id
+		}
+	}
+	return ""
+}
+
+// fakeReader serves one card to the "open a console" path.
+type fakeReader struct{ ev CardMoved }
+
+func (r *fakeReader) CardByID(ctx context.Context, cardID string) (CardMoved, error) {
+	ev := r.ev
+	ev.CardID = cardID
+	return ev, nil
 }
 
 // fakeEvents is a manual BoardEvents feed.
@@ -77,6 +109,12 @@ sleep 300
 
 func testManager(t *testing.T, claudeScript string, mutate func(*Config)) (*Manager, *fakeWriter, *fakeEvents, string) {
 	t.Helper()
+	m, w, ev, repo, _ := testManagerWithEmitter(t, claudeScript, mutate)
+	return m, w, ev, repo
+}
+
+func testManagerWithEmitter(t *testing.T, claudeScript string, mutate func(*Config)) (*Manager, *fakeWriter, *fakeEvents, string, *fakeEmitter) {
+	t.Helper()
 	repo := initTestRepo(t)
 	dir := t.TempDir()
 	cfg := DefaultConfig(dir)
@@ -93,12 +131,19 @@ func testManager(t *testing.T, claudeScript string, mutate func(*Config)) (*Mana
 	}
 	writer := newFakeWriter()
 	events := &fakeEvents{ch: make(chan CardMoved, 16)}
-	m := NewManager(cfg, "", st, writer, &fakeEmitter{}, nil)
+	emitter := &fakeEmitter{}
+	m := NewManager(cfg, "", st, writer, emitter, nil)
+	m.SetBoardReader(&fakeReader{ev: CardMoved{
+		BoardID: "board1",
+		Title:   "Test task",
+		Body:    "Do nothing useful.",
+		Props:   map[string]string{"repo_path": repo},
+	}})
 	if err := m.Start(context.Background(), events); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { m.Shutdown(3 * time.Second) })
-	return m, writer, events, repo
+	return m, writer, events, repo, emitter
 }
 
 func moveEvent(cardID, repo, from, to string) CardMoved {
@@ -313,4 +358,190 @@ func TestFindClaudeErrorIsClear(t *testing.T) {
 	if _, err := m.findClaude(); err == nil || !strings.Contains(err.Error(), "claudePath") {
 		t.Errorf("expected clear claudePath error, got %v", err)
 	}
+}
+
+// fakeClaudeMultiTurn stays alive across turns the way the real CLI does,
+// answering every user message it reads with one text delta and a result.
+const fakeClaudeMultiTurn = `#!/bin/sh
+turn=0
+while read line; do
+  turn=$((turn+1))
+  printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-multi"}'
+  printf '{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"turn %s done"}}}\n' "$turn"
+  printf '{"type":"result","is_error":false,"result":"turn %s done"}\n' "$turn"
+done
+`
+
+// fakeClaudeAsksPermission requests a tool that is not on autoAllowTools, then waits
+// for the control_response before finishing the turn.
+const fakeClaudeAsksPermission = `#!/bin/sh
+read line
+printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-perm"}'
+printf '%s\n' '{"type":"control_request","request_id":"r1","request":{"subtype":"can_use_tool","tool_name":"WebFetch","tool_use_id":"tu1","description":"fetch https://example.com","input":{}}}'
+read response
+printf '%s\n' '{"type":"result","is_error":false,"result":"finished"}'
+`
+
+func liveSession(t *testing.T, m *Manager, cardID string) *Session {
+	t.Helper()
+	s, err := m.StartSessionForCard(cardID)
+	if err != nil {
+		t.Fatalf("open console session: %v", err)
+	}
+	return s
+}
+
+func waitStatus(t *testing.T, s *Session, want SessionStatus) {
+	t.Helper()
+	waitFor(t, 15*time.Second, "session status "+string(want), func() bool {
+		return s.Status() == want
+	})
+}
+
+func TestConsoleSessionRunsSecondTurn(t *testing.T) {
+	m, writer, _, _, _ := testManagerWithEmitter(t, fakeClaudeMultiTurn, nil)
+
+	s := liveSession(t, m, "cardConsole")
+
+	// A console session parks between turns instead of finishing.
+	waitStatus(t, s, StatusIdle)
+	if got := writer.cardComments("cardConsole"); len(got) < 2 || !strings.Contains(got[len(got)-1], "turn 1 done") {
+		t.Fatalf("first turn should still report to the card, got %v", got)
+	}
+
+	if err := m.PromptSession(s.ID, "keep going"); err != nil {
+		t.Fatalf("prompt: %v", err)
+	}
+	waitFor(t, 15*time.Second, "second turn to run", func() bool {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return s.turnNo >= 2
+	})
+	waitStatus(t, s, StatusIdle)
+
+	// Only the first turn comments; the rest belongs to the console.
+	if got := writer.cardComments("cardConsole"); strings.Contains(strings.Join(got, "\n"), "turn 2 done") {
+		t.Errorf("second turn should not comment on the card, got %v", got)
+	}
+
+	if err := m.CloseSession(s.ID); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	waitStatus(t, s, StatusDone)
+	if last := writer.cardComments("cardConsole"); !strings.Contains(last[len(last)-1], "ходов: 2") {
+		t.Errorf("closing comment should record the turn count, got %v", last)
+	}
+}
+
+func TestPermissionPromptAnsweredByUser(t *testing.T) {
+	m, _, _, _, emitter := testManagerWithEmitter(t, fakeClaudeAsksPermission, nil)
+
+	s := liveSession(t, m, "cardPerm")
+
+	// A watched session asks instead of rejecting by policy.
+	waitStatus(t, s, StatusWaitingPermission)
+	var requestID string
+	waitFor(t, 5*time.Second, "permission prompt on the console", func() bool {
+		requestID = emitter.pendingPermissionID()
+		return requestID != ""
+	})
+
+	if err := m.AnswerPermission(s.ID, requestID, "allow"); err != nil {
+		t.Fatalf("answer permission: %v", err)
+	}
+	waitStatus(t, s, StatusIdle)
+
+	// The slot is gone once answered.
+	if err := m.AnswerPermission(s.ID, requestID, "allow"); err == nil {
+		t.Error("answering the same prompt twice should fail")
+	}
+}
+
+func TestPermissionRejectedWithoutConsole(t *testing.T) {
+	m, _, events, repo, emitter := testManagerWithEmitter(t, fakeClaudeAsksPermission, nil)
+
+	// A card-triggered session has nobody watching: it must decide by policy
+	// straight away rather than block until the prompt times out.
+	events.ch <- moveEvent("cardAuto", repo, "opt-backlog", "opt-agent")
+	waitFor(t, 15*time.Second, "session done", func() bool {
+		sessions, _, err := m.store.SessionsForCard("cardAuto")
+		return err == nil && len(sessions) == 1 && sessions[0].Status == StatusDone
+	})
+	if id := emitter.pendingPermissionID(); id != "" {
+		t.Errorf("unattended session should not have prompted the user, got request %s", id)
+	}
+}
+
+func TestDetachEndsIdleSession(t *testing.T) {
+	m, _, _, _, _ := testManagerWithEmitter(t, fakeClaudeMultiTurn, nil)
+
+	s := liveSession(t, m, "cardDetach")
+	waitStatus(t, s, StatusIdle)
+
+	// The last console leaving must not leave the repository held.
+	m.DetachSession(s.ID)
+	waitStatus(t, s, StatusDone)
+}
+
+func TestIdleConsoleFreesConcurrencySlot(t *testing.T) {
+	m, _, events, repo, _ := testManagerWithEmitter(t, fakeClaudeMultiTurn, func(c *Config) {
+		c.MaxConcurrent = 1
+		c.WorktreeMode = "always" // otherwise the repo lock, not the slot, would block
+	})
+
+	s := liveSession(t, m, "cardIdle")
+	waitStatus(t, s, StatusIdle)
+
+	// The idle console holds no slot, so another card still runs.
+	events.ch <- moveEvent("cardOther", repo, "opt-backlog", "opt-agent")
+	waitFor(t, 15*time.Second, "second card to finish while a console idles", func() bool {
+		sessions, _, err := m.store.SessionsForCard("cardOther")
+		return err == nil && len(sessions) == 1 && sessions[0].Status == StatusDone
+	})
+	if s.Status() != StatusIdle {
+		t.Errorf("console session should still be idle, got %s", s.Status())
+	}
+}
+
+// fakeClaudeSlowPermission waits before asking, leaving a window for a console
+// to attach to an already-running session.
+const fakeClaudeSlowPermission = `#!/bin/sh
+read line
+printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-slow"}'
+sleep 1
+printf '%s\n' '{"type":"control_request","request_id":"r1","request":{"subtype":"can_use_tool","tool_name":"WebFetch","tool_use_id":"tu1","description":"fetch https://example.com","input":{}}}'
+read response
+printf '%s\n' '{"type":"result","is_error":false,"result":"finished"}'
+`
+
+// A card-triggered session starts unattended, so opening its card mid-run must
+// be enough to get the permission prompt instead of a policy rejection.
+func TestConsoleAttachedAfterTriggerGetsPrompt(t *testing.T) {
+	m, _, events, repo, emitter := testManagerWithEmitter(t, fakeClaudeSlowPermission, nil)
+
+	events.ch <- moveEvent("cardLate", repo, "opt-backlog", "opt-agent")
+
+	var s *Session
+	waitFor(t, 10*time.Second, "session to start", func() bool {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		s = m.byCard["cardLate"]
+		return s != nil
+	})
+	if !m.AttachSession(s.ID) {
+		t.Fatal("AttachSession refused a live session")
+	}
+
+	waitStatus(t, s, StatusWaitingPermission)
+	var requestID string
+	waitFor(t, 5*time.Second, "permission prompt on the console", func() bool {
+		requestID = emitter.pendingPermissionID()
+		return requestID != ""
+	})
+	if err := m.AnswerPermission(s.ID, requestID, "allow"); err != nil {
+		t.Fatalf("answer permission: %v", err)
+	}
+
+	// Attaching also turned it into a console session: it waits rather than ending.
+	waitStatus(t, s, StatusIdle)
 }

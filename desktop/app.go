@@ -226,6 +226,60 @@ func (a *App) SetAgentSystemPrompt(text string) error {
 	return a.mgr.SetSystemPrompt(text)
 }
 
+// StartCardSession opens an interactive agent session on a card (or attaches to
+// the one already running) and returns its session id.
+func (a *App) StartCardSession(cardID string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	s, err := a.mgr.StartSessionForCard(cardID)
+	if err != nil {
+		return "", err
+	}
+	return s.ID, nil
+}
+
+// PromptSession sends a follow-up message to a live session.
+func (a *App) PromptSession(sessionID, text string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	return a.mgr.PromptSession(sessionID, text)
+}
+
+// AnswerPermission delivers the user's choice for a pending permission prompt.
+func (a *App) AnswerPermission(sessionID, requestID, optionID string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	return a.mgr.AnswerPermission(sessionID, requestID, optionID)
+}
+
+// AttachSession marks the console as watching a session, keeping it alive
+// between turns. Returns false when the session is no longer live.
+func (a *App) AttachSession(sessionID string) bool {
+	if a.mgr == nil {
+		return false
+	}
+	return a.mgr.AttachSession(sessionID)
+}
+
+// DetachSession drops the console; an unattended idle session then closes.
+func (a *App) DetachSession(sessionID string) {
+	if a.mgr == nil {
+		return
+	}
+	a.mgr.DetachSession(sessionID)
+}
+
+// CloseSession ends a session after its current turn.
+func (a *App) CloseSession(sessionID string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	return a.mgr.CloseSession(sessionID)
+}
+
 // GetCardSessions returns the card's persisted agent sessions and their event
 // logs as JSON: {"sessions": [...], "events": [...]}.
 func (a *App) GetCardSessions(cardID string) (string, error) {

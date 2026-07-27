@@ -22,6 +22,7 @@ type Manager struct {
 	cfgPath string       // where registry edits are persisted; empty in tests
 	store   *Store
 	writer  BoardWriter
+	reader  BoardReader // optional; enables opening a console on a card
 	ui      UIEmitter
 	log     *slog.Logger
 
@@ -29,11 +30,24 @@ type Manager struct {
 	active map[string]*Session // session ID → session
 	byCard map[string]*Session // card ID → live (non-terminal) session
 
+	permMu sync.Mutex
+	perms  map[string]pendingPermission // request ID → prompt awaiting a human
+
 	sem     chan struct{}
 	rootCtx context.Context
 	stop    context.CancelFunc
 	wg      sync.WaitGroup
 }
+
+// pendingPermission is one permission prompt waiting for a human decision.
+type pendingPermission struct {
+	sessionID string
+	answer    chan string // receives the chosen option id
+}
+
+// SetBoardReader supplies on-demand card reads, which the "open a console on
+// this card" path needs. Optional: without it, sessions start only on a move.
+func (m *Manager) SetBoardReader(r BoardReader) { m.reader = r }
 
 // NewManager wires the manager. cfgPath is where repo-registry edits are
 // persisted (may be empty in tests). Call Start to begin consuming events.
@@ -54,6 +68,7 @@ func NewManager(cfg Config, cfgPath string, st *Store, w BoardWriter, ui UIEmitt
 		log:     log,
 		active:  make(map[string]*Session),
 		byCard:  make(map[string]*Session),
+		perms:   make(map[string]pendingPermission),
 		sem:     make(chan struct{}, maxConc),
 	}
 }
@@ -101,6 +116,12 @@ func (m *Manager) recover() {
 // StartSessionForEvent creates and launches a session for a validated trigger
 // event. Callers must have passed idempotency/liveness checks.
 func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
+	return m.startSession(ev, false)
+}
+
+// startSession is the shared launch path. An interactive session survives its
+// turns and waits for the user; a triggered one runs the card task and ends.
+func (m *Manager) startSession(ev CardMoved, interactive bool) (*Session, error) {
 	repoPath, err := m.resolveRepo(ev)
 	if err != nil {
 		return nil, err
@@ -126,7 +147,7 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 		}
 		m.mu.Unlock()
 		if busyCard != "" {
-			return nil, fmt.Errorf("в репозитории %s уже работает сессия другой карточки (%s) — дождитесь её завершения", repoPath, busyCard)
+			return nil, fmt.Errorf("в репозитории %s уже работает сессия другой карточки (%s) — дождитесь её завершения или закройте её консоль", repoPath, busyCard)
 		}
 	}
 
@@ -134,16 +155,22 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 	systemPrompt := m.cfg.SystemPrompt
 	m.cfgMu.RUnlock()
 	s := &Session{
-		ID:         uuid.NewString(),
-		CardID:     ev.CardID,
-		BoardID:    ev.BoardID,
-		RepoPath:   repoPath,
-		BaseBranch: ev.Props["branch"],
-		Agent:      agent,
-		Net:        net,
-		PromptText: composePrompt(ev, agent, systemPrompt, m.cfg.UseWorktrees()),
-		status:     StatusQueued,
-		allowTools: make(map[string]bool),
+		ID:          uuid.NewString(),
+		CardID:      ev.CardID,
+		BoardID:     ev.BoardID,
+		RepoPath:    repoPath,
+		BaseBranch:  ev.Props["branch"],
+		Agent:       agent,
+		Net:         net,
+		PromptText:  composePrompt(ev, agent, systemPrompt, m.cfg.UseWorktrees()),
+		status:      StatusQueued,
+		allowTools:  make(map[string]bool),
+		interactive: interactive,
+		turns:       make(chan turnRequest, 1),
+		closeCh:     make(chan struct{}),
+	}
+	if interactive {
+		s.attached = 1
 	}
 	rec := SessionRecord{
 		ID:        s.ID,
@@ -168,7 +195,9 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 	return s, nil
 }
 
-// CancelSessionForCard cancels the live session of a card, if any.
+// CancelSessionForCard cancels the live session of a card, if any. An
+// interactive session goes back to idle and keeps its conversation; a
+// card-triggered one ends.
 func (m *Manager) CancelSessionForCard(cardID, reason string) bool {
 	m.mu.Lock()
 	s := m.byCard[cardID]
@@ -179,15 +208,150 @@ func (m *Manager) CancelSessionForCard(cardID, reason string) bool {
 	m.log.Info("acp: cancelling session", "session", s.ID, "card", cardID, "reason", reason)
 	s.mu.Lock()
 	s.cancelSent = true
-	cancel := s.cancel
+	cancel := s.turnCancel
+	running := s.status == StatusRunning || s.status == StatusWaitingPermission
 	s.mu.Unlock()
-	if cancel != nil {
+	if cancel != nil && running {
 		cancel()
-	} else {
-		// Still queued: mark terminal right away; runSession will observe.
+	} else if !s.isInteractive() {
+		// Queued, or idle and nobody is talking to it: end it outright.
 		m.finishSession(s, StatusCancelled, reason)
+		s.requestClose()
 	}
 	return true
+}
+
+// StartSessionForCard opens an interactive session on a card without moving it
+// into the trigger column — the "open a console" path from the UI.
+func (m *Manager) StartSessionForCard(cardID string) (*Session, error) {
+	if m.reader == nil {
+		return nil, fmt.Errorf("чтение карточек недоступно")
+	}
+	m.mu.Lock()
+	live := m.byCard[cardID]
+	m.mu.Unlock()
+	if live != nil {
+		live.attach()
+		m.emitSession(live, "")
+		return live, nil
+	}
+
+	ctx, cancel := context.WithTimeout(m.rootCtx, 10*time.Second)
+	defer cancel()
+	ev, err := m.reader.CardByID(ctx, cardID)
+	if err != nil {
+		return nil, fmt.Errorf("не удалось прочитать карточку: %w", err)
+	}
+	s, err := m.startSession(ev, true)
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// PromptSession queues a follow-up message onto a live session.
+func (m *Manager) PromptSession(sessionID, text string) error {
+	if strings.TrimSpace(text) == "" {
+		return fmt.Errorf("пустое сообщение")
+	}
+	s := m.session(sessionID)
+	if s == nil {
+		return fmt.Errorf("сессия %s не активна", sessionID)
+	}
+	s.attach() // typing into a session is what makes it interactive
+	s.appendEvent(m, "prompt", map[string]any{"text": text})
+	m.ui.Emit(EventPrompt, map[string]any{
+		"sessionId": s.ID, "cardId": s.CardID, "text": text,
+	})
+
+	// The queue holds one message, so typing while the agent is still working
+	// is fine: the turn loop picks it up as soon as it goes idle.
+	req := turnRequest{text: text, done: make(chan error, 1)}
+	select {
+	case s.turns <- req:
+		return nil
+	case <-s.closeCh:
+		return fmt.Errorf("сессия закрывается")
+	default:
+		return fmt.Errorf("предыдущее сообщение ещё не взято в работу")
+	}
+}
+
+// AttachSession marks a console as watching the session, which keeps it alive
+// between turns instead of finishing after the card task.
+func (m *Manager) AttachSession(sessionID string) bool {
+	s := m.session(sessionID)
+	if s == nil {
+		m.log.Info("acp: console asked to attach to a session that is no longer live", "session", sessionID)
+		return false
+	}
+	s.attach()
+	m.log.Info("acp: console attached", "session", s.ID, "card", s.CardID)
+	m.emitSession(s, "")
+	return true
+}
+
+// DetachSession drops a console. The last one leaving ends an idle session so
+// it stops holding its repository.
+func (m *Manager) DetachSession(sessionID string) {
+	s := m.session(sessionID)
+	if s == nil {
+		return
+	}
+	if s.detach() && s.Status() == StatusIdle {
+		s.requestClose()
+	}
+}
+
+// CloseSession ends a session after its current turn.
+func (m *Manager) CloseSession(sessionID string) error {
+	s := m.session(sessionID)
+	if s == nil {
+		return fmt.Errorf("сессия %s не активна", sessionID)
+	}
+	s.requestClose()
+	return nil
+}
+
+// session looks up a live session by id.
+func (m *Manager) session(sessionID string) *Session {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.active[sessionID]
+}
+
+// ---- permission prompts ----
+
+// registerPermission opens a slot for a human decision and returns the channel
+// the answer arrives on.
+func (m *Manager) registerPermission(requestID, sessionID string) chan string {
+	ch := make(chan string, 1)
+	m.permMu.Lock()
+	m.perms[requestID] = pendingPermission{sessionID: sessionID, answer: ch}
+	m.permMu.Unlock()
+	return ch
+}
+
+func (m *Manager) forgetPermission(requestID string) {
+	m.permMu.Lock()
+	delete(m.perms, requestID)
+	m.permMu.Unlock()
+}
+
+// AnswerPermission delivers the user's choice for a pending permission prompt.
+func (m *Manager) AnswerPermission(sessionID, requestID, optionID string) error {
+	m.permMu.Lock()
+	p, ok := m.perms[requestID]
+	m.permMu.Unlock()
+	if !ok || p.sessionID != sessionID {
+		return fmt.Errorf("запрос разрешения %s больше не ждёт ответа", requestID)
+	}
+	select {
+	case p.answer <- optionID:
+		return nil
+	default:
+		return fmt.Errorf("на запрос разрешения %s уже ответили", requestID)
+	}
 }
 
 // CardSessions returns persisted sessions and events for a card (UI hydration).
@@ -240,6 +404,19 @@ func (m *Manager) releaseSession(s *Session) {
 	m.mu.Unlock()
 }
 
+// setStatus moves a live (non-terminal) session between running states, e.g.
+// in and out of a permission prompt. Terminal sessions are left alone.
+func (m *Manager) setStatus(s *Session, status SessionStatus) {
+	s.mu.Lock()
+	if s.status.Terminal() {
+		s.mu.Unlock()
+		return
+	}
+	s.status = status
+	s.mu.Unlock()
+	m.persistStatus(s, status, "")
+}
+
 func (m *Manager) persistStatus(s *Session, status SessionStatus, errText string) {
 	if err := m.store.SetSessionStatus(s.ID, status, errText); err != nil {
 		m.log.Warn("acp: failed to persist status", "session", s.ID, "status", status, "err", err)
@@ -248,11 +425,16 @@ func (m *Manager) persistStatus(s *Session, status SessionStatus, errText string
 }
 
 func (m *Manager) emitSession(s *Session, errText string) {
+	s.mu.Lock()
+	status, interactive, turn := s.status, s.interactive, s.turnNo
+	s.mu.Unlock()
 	m.ui.Emit(EventSession, map[string]any{
-		"sessionId": s.ID,
-		"cardId":    s.CardID,
-		"status":    string(s.Status()),
-		"error":     errText,
+		"sessionId":   s.ID,
+		"cardId":      s.CardID,
+		"status":      string(status),
+		"error":       errText,
+		"interactive": interactive,
+		"turn":        turn,
 	})
 }
 
