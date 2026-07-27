@@ -1,0 +1,100 @@
+.DeployTargetsDialog {
+    .DeployTargetsDialog__content {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 0 24px 24px;
+        min-width: 560px;
+    }
+
+    .DeployTargetsDialog__empty {
+        color: rgba(var(--center-channel-color-rgb), 0.64);
+        padding: 8px 0;
+    }
+
+    .DeployTargetsDialog__row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+
+        .DeployTargetsDialog__name {
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .DeployTargetsDialog__where {
+            flex: 1;
+            color: rgba(var(--center-channel-color-rgb), 0.64);
+            font-size: 12px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    }
+
+    .DeployTargetsDialog__form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin: 8px 0;
+        padding: 12px;
+        border: 1px solid rgba(var(--center-channel-color-rgb), 0.12);
+        border-radius: 6px;
+
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-weight: 600;
+        }
+
+        // A checkbox belongs beside its label, not above it.
+        label.DeployTargetsDialog__checkbox {
+            flex-direction: row;
+            align-items: flex-start;
+            gap: 8px;
+            font-weight: 400;
+
+            input {
+                width: auto;
+                margin-top: 3px;
+            }
+        }
+
+        input,
+        select,
+        textarea {
+            border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+            border-radius: 4px;
+            padding: 6px 8px;
+            background: rgb(var(--center-channel-bg-rgb));
+            color: rgb(var(--center-channel-color-rgb));
+            font-weight: 400;
+            font-family: inherit;
+        }
+
+        textarea {
+            resize: vertical;
+        }
+
+        // The hostname is composed from the fields above it, so it is shown
+        // rather than typed.
+        .DeployTargetsDialog__hint {
+            margin-top: -4px;
+            color: rgba(var(--center-channel-color-rgb), 0.64);
+            font-size: 12px;
+        }
+    }
+
+    .DeployTargetsDialog__formActions,
+    .DeployTargetsDialog__actions {
+        display: flex;
+        gap: 8px;
+        padding-top: 4px;
+    }
+
+    .DeployTargetsDialog__error {
+        color: rgb(var(--error-text-color-rgb, 210, 75, 78));
+        padding-top: 8px;
+    }
+}

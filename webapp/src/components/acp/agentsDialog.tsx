@@ -50,14 +50,15 @@ export function isAgentsAvailable(): boolean {
 }
 
 // envToText / textToEnv convert between the KEY=VALUE textarea and the env map.
-function envToText(env?: {[key: string]: string}): string {
+// Exported: the deploy-target dialog edits an env map the same way.
+export function envToText(env?: {[key: string]: string}): string {
     if (!env) {
         return ''
     }
     return Object.entries(env).map(([k, v]) => `${k}=${v}`).join('\n')
 }
 
-function textToEnv(text: string): {[key: string]: string} {
+export function textToEnv(text: string): {[key: string]: string} {
     const env: {[key: string]: string} = {}
     for (const line of text.split('\n')) {
         const trimmed = line.trim()

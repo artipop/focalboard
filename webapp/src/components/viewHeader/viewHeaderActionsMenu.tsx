@@ -18,6 +18,7 @@ import ModalWrapper from '../modalWrapper'
 import {sendFlashMessage} from '../flashMessages'
 import AgentReposDialog, {isAgentReposAvailable} from '../acp/agentReposDialog'
 import AgentsDialog, {isAgentsAvailable} from '../acp/agentsDialog'
+import DeployTargetsDialog, {isDeployTargetsAvailable} from '../acp/deployTargetsDialog'
 import PlanningDialog, {isPlanningAvailable} from '../acp/planningDialog'
 
 type Props = {
@@ -102,6 +103,7 @@ const ViewHeaderActionsMenu = (props: Props) => {
     const intl = useIntl()
     const [showAgentRepos, setShowAgentRepos] = useState(false)
     const [showAgents, setShowAgents] = useState(false)
+    const [showDeployTargets, setShowDeployTargets] = useState(false)
     const [showPlanning, setShowPlanning] = useState(false)
 
     return (
@@ -145,6 +147,14 @@ const ViewHeaderActionsMenu = (props: Props) => {
                             onClick={() => setShowAgents(true)}
                         />,
                     ] : []}
+                    {isDeployTargetsAvailable() ? [
+                        <Menu.Text
+                            key='deployTargets'
+                            id='deployTargets'
+                            name={intl.formatMessage({id: 'ViewHeader.deploy-targets', defaultMessage: 'Deploy targets…'})}
+                            onClick={() => setShowDeployTargets(true)}
+                        />,
+                    ] : []}
                     {/*
                     <Menu.Separator/>
 
@@ -180,6 +190,10 @@ const ViewHeaderActionsMenu = (props: Props) => {
                 <AgentsDialog
                     board={board}
                     onClose={() => setShowAgents(false)}
+                />}
+            {showDeployTargets &&
+                <DeployTargetsDialog
+                    onClose={() => setShowDeployTargets(false)}
                 />}
             {showPlanning &&
                 <PlanningDialog

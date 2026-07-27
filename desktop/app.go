@@ -226,6 +226,63 @@ func (a *App) RemoveProxy(name string) error {
 	return a.mgr.RemoveProxy(name)
 }
 
+// ListDeployTargets returns the deploy registry as JSON:
+// [{"name","sshHost","baseDomain",…}, …].
+func (a *App) ListDeployTargets() (string, error) {
+	if a.mgr == nil {
+		return "[]", nil
+	}
+	out, err := json.Marshal(a.mgr.Deploys())
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// AddDeployTarget registers a Dokku destination from a JSON-encoded DeployEntry
+// and returns the created entry as JSON.
+func (a *App) AddDeployTarget(entryJSON string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	var entry acp.DeployEntry
+	if err := json.Unmarshal([]byte(entryJSON), &entry); err != nil {
+		return "", err
+	}
+	saved, err := a.mgr.AddDeploy(entry)
+	if err != nil {
+		return "", err
+	}
+	out, _ := json.Marshal(saved)
+	return string(out), nil
+}
+
+// UpdateDeployTarget replaces an existing destination (matched by name) from a
+// JSON-encoded DeployEntry and returns the saved entry as JSON.
+func (a *App) UpdateDeployTarget(entryJSON string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	var entry acp.DeployEntry
+	if err := json.Unmarshal([]byte(entryJSON), &entry); err != nil {
+		return "", err
+	}
+	saved, err := a.mgr.UpdateDeploy(entry)
+	if err != nil {
+		return "", err
+	}
+	out, _ := json.Marshal(saved)
+	return string(out), nil
+}
+
+// RemoveDeployTarget deletes a Dokku destination by name.
+func (a *App) RemoveDeployTarget(name string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	return a.mgr.RemoveDeploy(name)
+}
+
 // GetAgentSystemPrompt returns the board/column-level system prompt.
 func (a *App) GetAgentSystemPrompt() (string, error) {
 	if a.mgr == nil {
