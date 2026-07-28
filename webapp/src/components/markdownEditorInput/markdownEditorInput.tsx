@@ -163,6 +163,17 @@ const MarkdownEditorInput = (props: Props): ReactElement => {
                     placeholder={null}
                     ErrorBoundary={LexicalErrorBoundary}
                 />
+                {/*
+                  * TODO: undo/redo does not actually work here since the draft-js ->
+                  * Lexical migration (96cd8494). Ctrl/Cmd+Z is a no-op: not just after a
+                  * cut, but for plain typing too. Confirmed outside of test-runner
+                  * synthetic events, with CDP-level key presses, for both Meta+Z and
+                  * Ctrl+Z. HistoryPlugin is mounted, so the wiring looks correct and the
+                  * cause is still unknown -- LiveMarkdownPlugin below is the first
+                  * suspect, being the one plugin that rewrites content on every change.
+                  * The E2E test covering this (GH-2520 in cypress/e2e/createBoard.ts) is
+                  * skipped until it works again.
+                  */}
                 <HistoryPlugin/>
                 <OnChangePlugin
                     onChange={handleChange}

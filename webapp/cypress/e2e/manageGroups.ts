@@ -6,8 +6,6 @@ describe('Manage groups', () => {
         cy.apiInitServer()
         cy.apiResetBoards()
         cy.apiGetMe().then((userID) => cy.apiSkipTour(userID))
-        localStorage.setItem('welcomePageViewed', 'true')
-        localStorage.setItem('language', 'en')
     })
 
     it('MM-T4284 Adding a group', () => {
@@ -35,7 +33,7 @@ describe('Manage groups', () => {
 
         cy.get('.KanbanColumnHeader').last().within(() => {
             cy.get('.icon-dots-horizontal').click({force: true})
-            cy.get('.menu-options').should('exist').within(() => {
+            cy.get('.menu-options').first().within(() => {
                 cy.contains('Hide').should('exist')
                 cy.contains('Delete').should('exist')
 
@@ -72,7 +70,7 @@ describe('Manage groups', () => {
         // Step 2: Click on the three dots next to "Group 1"
         cy.get('.KanbanColumnHeader').last().within(() => {
             cy.get('.icon-dots-horizontal').click({force: true})
-            cy.get('.menu-options').should('exist').within(() => {
+            cy.get('.menu-options').first().within(() => {
                 cy.contains('Hide').should('exist')
                 cy.contains('Delete').should('exist')
 
@@ -91,7 +89,11 @@ describe('Manage groups', () => {
         // Step 4: Click "Group 1", then click "Show" in the dropdown
         cy.contains('Group 1').click({force: true})
         cy.contains('Show').click({force: true})
-        cy.get('.octo-board-hidden-item').contains('Group 1').should('not.exist')
+
+        // Single query: unhiding removes the hidden-items container entirely, and
+        // cy.get(container).contains(x) errors out when the container is gone rather
+        // than reporting the absence this step is actually asserting.
+        cy.contains('.octo-board-hidden-item', 'Group 1').should('not.exist')
         cy.get('.KanbanColumnHeader .Editable[value=\'Group 1\']').should('exist')
     })
 })

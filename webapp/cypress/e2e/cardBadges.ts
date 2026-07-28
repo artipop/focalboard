@@ -6,8 +6,6 @@ describe('Card badges', () => {
         cy.apiInitServer()
         cy.apiResetBoards()
         cy.apiGetMe().then((userID) => cy.apiSkipTour(userID))
-        localStorage.setItem('welcomePageViewed', 'true')
-        localStorage.setItem('language', 'en')
     })
 
     it('Shows and hides card badges', () => {
@@ -28,7 +26,13 @@ describe('Card badges', () => {
         // Add card description
         cy.log('**Add card description**')
         cy.findByText('Add a description...').click()
-        cy.findByRole('combobox').type('## Header\n- [ ] one\n- [x] two{esc}')
+
+        // LEXICAL FALLOUT: the draft-js editor exposed role=combobox, Lexical's
+        // ContentEditable exposes role=textbox. The migration (96cd8494) updated the
+        // jest snapshots but left the Cypress specs on the old contract.
+        // The query also has to be scoped now -- with comments already added, the
+        // comment editor is a role=textbox as well, so an unscoped find matches several.
+        cy.get('.CardDetailContents').findByRole('textbox').type('## Header\n- [ ] one\n- [x] two{esc}')
 
         // Add checkboxes
         cy.log('**Add checkboxes**')
@@ -63,7 +67,12 @@ describe('Card badges', () => {
 
     const addComment = (text: string) => {
         cy.findByText('Add a comment...').click()
-        cy.findByRole('combobox').type(text).blur()
+
+        // role=textbox and the scoping are LEXICAL FALLOUT, same as above.
+        // The .blur() this used to chain is gone for a different reason: blurring drops
+        // the editor out of edit mode and unmounts it, so the subject detaches and
+        // Cypress cannot requery it. Send is what commits the comment anyway.
+        cy.get('.CommentsList').findByRole('textbox').type(text)
         cy.findByRole('button', {name: 'Send'}).click()
     }
 })

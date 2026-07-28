@@ -6,8 +6,6 @@ describe('Card URL Property', () => {
         cy.apiInitServer()
         cy.apiResetBoards()
         cy.apiGetMe().then((userID) => cy.apiSkipTour(userID))
-        localStorage.setItem('welcomePageViewed', 'true')
-        localStorage.setItem('language', 'en')
     })
 
     const url = 'https://mattermost.com'
