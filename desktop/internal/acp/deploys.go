@@ -152,6 +152,20 @@ func (m *Manager) deployAppName(repoPath string) string {
 	return filepath.Base(filepath.Clean(repoPath))
 }
 
+// deployTools are the dokku tools a deploy session may use without asking, for
+// the same reason a test session gets its browser tools: a card-triggered
+// deploy has no console watching, and asking nobody means rejecting.
+// destroy_deployment is deliberately absent — tearing a preview down is worth a
+// human answer when there is one to be had.
+func deployTools() map[string]bool {
+	names := []string{"deploy_branch", "deployment_status", "app_logs", "list_deployments"}
+	allow := make(map[string]bool, len(names))
+	for _, n := range names {
+		allow["mcp__"+dokku.ServerName+"__"+n] = true
+	}
+	return allow
+}
+
 // resolveDeployBranch is the branch a deploy session publishes: the card's
 // explicit "branch" property, otherwise whatever the repository has checked out.
 func resolveDeployBranch(ev CardMoved, repoPath string) (string, error) {

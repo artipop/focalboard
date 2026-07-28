@@ -29,7 +29,9 @@ func (m *Manager) handleEvent(ev CardMoved) {
 		m.handleEnter(ev)
 	case m.isDeployColumn(ev.ToColumn):
 		m.handleDeployEnter(ev)
-	case m.isTriggerColumn(ev.FromColumn), m.isDeployColumn(ev.FromColumn):
+	case m.isTestColumn(ev.ToColumn):
+		m.handleTestEnter(ev)
+	case m.isTriggerColumn(ev.FromColumn), m.isDeployColumn(ev.FromColumn), m.isTestColumn(ev.FromColumn):
 		if m.CancelSessionForCard(ev.CardID, "карточка убрана из триггерной колонки") {
 			m.log.Info("acp: session cancelled by card move", "card", ev.CardID)
 		}
@@ -58,10 +60,25 @@ func (m *Manager) handleDeployEnter(ev CardMoved) {
 	s, err := m.StartDeploySessionForEvent(ev)
 	if err != nil {
 		m.log.Warn("acp: deploy session not started", "card", ev.CardID, "err", err)
-		m.commentCard(ev.CardID, fmt.Sprintf("⚠️ Деплой не запущен: %v", err))
+		m.commentCard(ev.CardID, fmt.Sprintf("Деплой не запущен: %v", err))
 		return
 	}
 	m.log.Info("acp: deploy session started", "session", s.ID, "card", ev.CardID, "repo", s.RepoPath, "branch", s.DeployBranch)
+}
+
+// handleTestEnter is handleEnter for the test column: a session pointed at the
+// card's deployed preview, checking it instead of writing it.
+func (m *Manager) handleTestEnter(ev CardMoved) {
+	if !m.claimMove(ev, "test") {
+		return
+	}
+	s, err := m.StartTestSessionForEvent(ev)
+	if err != nil {
+		m.log.Warn("acp: test session not started", "card", ev.CardID, "err", err)
+		m.commentCard(ev.CardID, fmt.Sprintf("Тестирование не запущено: %v", err))
+		return
+	}
+	m.log.Info("acp: test session started", "session", s.ID, "card", ev.CardID, "url", s.Test.URL)
 }
 
 // claimMove applies the guards every trigger column shares: one move is one
@@ -102,6 +119,19 @@ func (m *Manager) isTriggerColumn(c Column) bool {
 func (m *Manager) isDeployColumn(c Column) bool {
 	m.cfgMu.RLock()
 	property, column := m.cfg.TriggerProperty, m.cfg.DeployColumn
+	m.cfgMu.RUnlock()
+	if strings.TrimSpace(column) == "" {
+		return false
+	}
+	return strings.EqualFold(c.PropertyName, property) &&
+		strings.EqualFold(c.Name, column)
+}
+
+// isTestColumn matches the test column on the same property. As with deploy, an
+// empty testColumn disables the trigger rather than matching every unnamed one.
+func (m *Manager) isTestColumn(c Column) bool {
+	m.cfgMu.RLock()
+	property, column := m.cfg.TriggerProperty, m.cfg.TestColumn
 	m.cfgMu.RUnlock()
 	if strings.TrimSpace(column) == "" {
 		return false

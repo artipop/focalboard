@@ -11,25 +11,17 @@ import (
 	acpsdk "github.com/coder/acp-go-sdk"
 
 	"github.com/mattermost/focalboard/desktop/internal/dokku"
+	"github.com/mattermost/focalboard/desktop/internal/webtest"
 )
 
-// A session can offer its agent extra tools through MCP servers. Today there is
-// exactly one — the dokku deploy server — and it is our own binary re-invoked as
-// `<self> mcp dokku`, configured entirely through its environment.
+// A session can offer its agent extra tools through MCP servers. There are two
+// — the dokku deploy server and the webtest browser server — and both are our
+// own binary re-invoked as `<self> mcp <name>`, configured entirely through
+// their environment, so the model picks steps but never targets.
 //
 // Every agent kind takes the same description by a different road: claude gets
 // --mcp-config, codex gets -c overrides, and an ACP-native agent gets the
 // servers in session/new, where the protocol has a field for them.
-
-// dokkuAutoAllowTools are the deploy tools a session may call unasked. Reading
-// the state of a deployment is safe and is most of what the agent does between
-// pushes; tearing one down is not, so destroy_deployment still asks.
-var dokkuAutoAllowTools = []string{
-	"mcp__dokku__deploy_branch",
-	"mcp__dokku__deployment_status",
-	"mcp__dokku__app_logs",
-	"mcp__dokku__list_deployments",
-}
 
 // mcpServerSpec is one stdio MCP server offered to an agent.
 type mcpServerSpec struct {
@@ -39,39 +31,60 @@ type mcpServerSpec struct {
 	Env     map[string]string
 }
 
-// sessionMCPServers returns the MCP servers a session runs with. Only a deploy
-// session has any: an ordinary card task gets the agent's own configuration
-// untouched.
-func sessionMCPServers(s *Session) ([]mcpServerSpec, error) {
-	if s.Deploy == nil {
+// sessionMCPServers returns the MCP servers a session runs with. Only the
+// deploy and test columns have any: an ordinary card task gets the agent's own
+// configuration untouched.
+func sessionMCPServers(s *Session, cfg Config) ([]mcpServerSpec, error) {
+	if s.Deploy == nil && s.Test == nil {
 		return nil, nil
 	}
 	self, err := os.Executable()
 	if err != nil {
 		return nil, fmt.Errorf("не удалось определить путь к приложению для MCP-сервера: %w", err)
 	}
-	target, err := json.Marshal(s.Deploy.Target)
-	if err != nil {
-		return nil, fmt.Errorf("не удалось сериализовать цель деплоя: %w", err)
+	if s.Deploy != nil {
+		target, err := json.Marshal(s.Deploy.Target)
+		if err != nil {
+			return nil, fmt.Errorf("не удалось сериализовать цель деплоя: %w", err)
+		}
+		s.markMCPConfigured()
+		return []mcpServerSpec{{
+			Name:    dokku.ServerName,
+			Command: self,
+			Args:    []string{"mcp", dokku.ServerName},
+			Env: map[string]string{
+				dokku.EnvTarget: string(target),
+				dokku.EnvRepo:   s.RepoPath,
+				dokku.EnvBranch: s.DeployBranch,
+			},
+		}}, nil
 	}
-	// The tools of the server we are configuring: an unattended deploy has
-	// nobody to ask, and seeding the session (rather than the config's
-	// autoAllowTools) also reaches installs whose config.json predates the
-	// deploy feature. destroy_deployment is deliberately not here.
-	for _, tool := range dokkuAutoAllowTools {
-		s.allowToolAlways(tool)
+
+	env := map[string]string{
+		webtest.EnvBaseURL:   s.Test.URL,
+		webtest.EnvArtifacts: s.Test.Artifacts,
+		webtest.EnvHeadless:  boolEnv(cfg.HeadlessBrowser()),
+	}
+	if cfg.BrowserPath != "" {
+		env[webtest.EnvBrowser] = cfg.BrowserPath
+	}
+	if cfg.BrowserViewport != "" {
+		env[webtest.EnvViewport] = cfg.BrowserViewport
 	}
 	s.markMCPConfigured()
 	return []mcpServerSpec{{
-		Name:    dokku.ServerName,
+		Name:    webtest.ServerName,
 		Command: self,
-		Args:    []string{"mcp", dokku.ServerName},
-		Env: map[string]string{
-			dokku.EnvTarget: string(target),
-			dokku.EnvRepo:   s.RepoPath,
-			dokku.EnvBranch: s.DeployBranch,
-		},
+		Args:    []string{"mcp", webtest.ServerName},
+		Env:     env,
 	}}, nil
+}
+
+func boolEnv(v bool) string {
+	if v {
+		return "1"
+	}
+	return "0"
 }
 
 // claudeMCPArgs renders the servers as claude's --mcp-config payload, which

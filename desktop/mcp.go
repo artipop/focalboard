@@ -14,10 +14,11 @@ import (
 	"syscall"
 
 	"github.com/mattermost/focalboard/desktop/internal/dokku"
+	"github.com/mattermost/focalboard/desktop/internal/webtest"
 )
 
-// maybeRunMCP handles `<binary> mcp dokku`: the same executable doubles as the
-// MCP server an agent session spawns, which keeps the desktop app a single
+// maybeRunMCP handles `<binary> mcp <server>`: the same executable doubles as
+// the MCP servers an agent session spawns, which keeps the desktop app a single
 // binary with nothing extra to install. It must run before the Focalboard
 // server and Wails are touched, and it never returns — stdout belongs to the
 // JSON-RPC stream from here on.
@@ -26,20 +27,24 @@ func maybeRunMCP(args []string) {
 		return
 	}
 	if len(args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: focalboard mcp dokku")
+		fmt.Fprintf(os.Stderr, "usage: focalboard mcp %s|%s\n", dokku.ServerName, webtest.ServerName)
 		os.Exit(2)
 	}
+	var err error
 	switch args[1] {
 	case dokku.ServerName:
-		if err := runDokkuMCP(); err != nil {
-			fmt.Fprintf(os.Stderr, "mcp dokku: %v\n", err)
-			os.Exit(1)
-		}
-		os.Exit(0)
+		err = runDokkuMCP()
+	case webtest.ServerName:
+		err = runWebtestMCP()
 	default:
-		fmt.Fprintf(os.Stderr, "неизвестный MCP-сервер %q (есть только %q)\n", args[1], dokku.ServerName)
+		fmt.Fprintf(os.Stderr, "неизвестный MCP-сервер %q (есть %q и %q)\n", args[1], dokku.ServerName, webtest.ServerName)
 		os.Exit(2)
 	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "mcp %s: %v\n", args[1], err)
+		os.Exit(1)
+	}
+	os.Exit(0)
 }
 
 func runDokkuMCP() error {
@@ -63,6 +68,31 @@ func runDokkuMCP() error {
 
 	// The agent closing our stdio is how a session ends, so EOF is success.
 	if err := dokku.ServeStdio(ctx, cl); err != nil &&
+		!errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
+		return err
+	}
+	return nil
+}
+
+// runWebtestMCP serves the browser tools. The browser is launched up front
+// rather than on the first tool call: a session whose browser cannot start is
+// better off failing at once, with the reason on the card, than half-way
+// through a scenario.
+func runWebtestMCP() error {
+	cfg, err := webtest.ConfigFromEnv()
+	if err != nil {
+		return err
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	browser, err := webtest.Launch(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = browser.Close() }()
+
+	if err := webtest.ServeStdio(ctx, cfg, browser, webtest.NewArtifacts(cfg.Artifacts)); err != nil &&
 		!errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
 		return err
 	}

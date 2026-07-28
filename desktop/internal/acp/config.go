@@ -285,6 +285,16 @@ type Config struct {
 	// Dokku target it resolves to. Empty disables the deploy trigger.
 	DeployColumn string `json:"deployColumn"`
 
+	// TestColumn is the third trigger on the same property: a card dragged into
+	// it starts a session that opens the card's preview in a real browser and
+	// checks it against the card's description. Empty disables the test trigger.
+	TestColumn string `json:"testColumn"`
+
+	// TestPassColumn and TestFailColumn are where the card goes once the verdict
+	// is in. Empty means the card stays put and a human decides.
+	TestPassColumn string `json:"testPassColumn"`
+	TestFailColumn string `json:"testFailColumn"`
+
 	// RepoWhitelist lists directory roots a card's repo_path must be under.
 	// Empty means every repo_path is rejected (explicit opt-in).
 	RepoWhitelist []string `json:"repoWhitelist"`
@@ -316,6 +326,22 @@ type Config struct {
 	// DeployPrompt is what a deploy session is told to do; the concrete facts
 	// (repository, branch, target, expected URL) are appended to it.
 	DeployPrompt string `json:"deployPrompt"`
+
+	// TestPrompt is what a test session is told to do; the preview URL and the
+	// card's own description (which is the scenario) are appended to it.
+	TestPrompt string `json:"testPrompt"`
+
+	// Browser settings for test sessions. BrowserPath is an explicit binary;
+	// empty means an installed Chrome, else a managed Chromium downloaded once.
+	// TestTimeoutMinutes replaces SessionTimeoutMinutes for a test turn, which
+	// clicks through a whole scenario and needs longer than a code edit.
+	BrowserPath        string `json:"browserPath,omitempty"`
+	BrowserHeadless    *bool  `json:"browserHeadless,omitempty"`
+	BrowserViewport    string `json:"browserViewport,omitempty"`
+	TestTimeoutMinutes int    `json:"testTimeoutMinutes"`
+
+	// ArtifactsDir is where screenshots and result.json of test runs are kept.
+	ArtifactsDir string `json:"artifactsDir"`
 
 	// WorktreeMode controls where sessions run: "always" (default) — a
 	// dedicated git worktree per session, which is what gives a card its own
@@ -362,15 +388,20 @@ func DefaultConfig(dataDir string) Config {
 		TriggerProperty:          "Status",
 		TriggerColumn:            DefaultTriggerColumn,
 		DeployColumn:             "Deploy",
+		TestColumn:               "To Test",
+		TestPassColumn:           "Tested",
+		TestFailColumn:           "Failed",
 		RepoWhitelist:            []string{},
 		Repos:                    []RepoEntry{},
 		Agents:                   []AgentEntry{},
 		Proxies:                  []ProxyEntry{},
 		Deploys:                  []DeployEntry{},
 		DeployPrompt:             DefaultDeployPrompt,
+		TestPrompt:               DefaultTestPrompt,
 		WorktreeMode:             "always",
 		MaxConcurrent:            3,
 		SessionTimeoutMinutes:    15,
+		TestTimeoutMinutes:       30,
 		SessionIdleMinutes:       30,
 		ShowThoughts:             true,
 		PermissionTimeoutMinutes: 5,
@@ -388,7 +419,8 @@ func DefaultConfig(dataDir string) Config {
 			"mcp__dokku__deploy_branch", "mcp__dokku__app_logs",
 			"mcp__dokku__deployment_status", "mcp__dokku__list_deployments",
 		},
-		WorktreeDir: filepath.Join(dataDir, "worktrees"),
+		WorktreeDir:  filepath.Join(dataDir, "worktrees"),
+		ArtifactsDir: filepath.Join(dataDir, "artifacts"),
 	}
 }
 
@@ -404,6 +436,43 @@ app_logs показывает логи сборки и приложения, dep
 конфиг сборки). Не переписывай логику приложения — вместо этого опиши проблему.
 
 В конце ответа дай URL превью.`
+
+// DefaultTestPrompt is the task text a test session starts with. It is written
+// for a tester, not a developer: the job is to find what is broken on the
+// preview, not to fix it.
+const DefaultTestPrompt = `Задача: проверить в браузере превью этой карточки — вместо ручного тестировщика.
+
+Сценарий бери из описания карточки: что должно было измениться, то и проверяй,
+плюс убедись, что рядом ничего не развалилось. Работай только инструментами
+mcp__webtest__*: open_page открывает страницу, snapshot показывает её текстом
+со ссылками [e12], дальше click/fill/select_option по этим ссылкам. После
+любого действия, меняющего страницу, делай новый snapshot — старые ссылки
+протухают.
+
+Обязательно посмотри console_log и network_log: ошибки JS и упавшие запросы —
+это дефекты, даже если внешне всё нарисовалось. Делай screenshot на ключевых
+шагах и на каждом найденном дефекте: скриншоты попадут в карточку.
+
+Ничего не чини и не меняй код — ты тестируешь. В самом конце вызови
+report_result: pass — сценарий прошёл, fail — есть дефекты (перечисли их
+в bugs: что ожидалось и что произошло), blocked — проверить не удалось
+(превью не открывается, нет доступа).`
+
+// TestTimeout bounds one test turn. A browser scenario takes much longer than a
+// code edit, so it has its own budget instead of SessionTimeoutMinutes.
+func (c Config) TestTimeout() time.Duration {
+	if c.TestTimeoutMinutes <= 0 {
+		return c.SessionTimeout()
+	}
+	return time.Duration(c.TestTimeoutMinutes) * time.Minute
+}
+
+// HeadlessBrowser reports whether test runs hide the browser window. It is a
+// pointer in the config so an existing file without the key still gets the
+// default rather than "false".
+func (c Config) HeadlessBrowser() bool {
+	return c.BrowserHeadless == nil || *c.BrowserHeadless
+}
 
 // LoadConfig reads path, creating it with defaults when absent.
 func LoadConfig(path, dataDir string) (Config, error) {

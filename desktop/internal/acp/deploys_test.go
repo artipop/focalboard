@@ -180,13 +180,13 @@ func TestComposeDeployPromptCarriesTheFacts(t *testing.T) {
 }
 
 func TestSessionMCPServersOnlyForDeploySessions(t *testing.T) {
-	if specs, err := sessionMCPServers(&Session{RepoPath: "/repo"}); err != nil || specs != nil {
+	if specs, err := sessionMCPServers(&Session{RepoPath: "/repo"}, Config{}); err != nil || specs != nil {
 		t.Fatalf("an ordinary session must get no MCP servers: %+v, %v", specs, err)
 	}
 
 	target := deployEntry("prod")
 	target.SSHKey = "/keys/id_ed25519"
-	specs, err := sessionMCPServers(&Session{RepoPath: "/repo", Deploy: &target, DeployBranch: "feat/x"})
+	specs, err := sessionMCPServers(&Session{RepoPath: "/repo", Deploy: &target, DeployBranch: "feat/x"}, Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,35 +211,45 @@ func TestSessionMCPServersOnlyForDeploySessions(t *testing.T) {
 }
 
 func TestDeploySessionMayUseItsOwnTools(t *testing.T) {
-	target := deployEntry("prod")
-	s := &Session{RepoPath: "/repo", Deploy: &target, DeployBranch: "feat/x", allowTools: map[string]bool{}}
-	if _, err := sessionMCPServers(s); err != nil {
-		t.Fatal(err)
-	}
-
 	// Nobody is watching a card-triggered deploy, so the tools it was started
 	// for have to be allowed without asking — including on an install whose
 	// config predates them.
-	for _, tool := range dokkuAutoAllowTools {
-		if !s.toolAllowed(tool) {
+	allow := deployTools()
+	for _, tool := range []string{"deploy_branch", "deployment_status", "app_logs", "list_deployments"} {
+		if !allow["mcp__dokku__"+tool] {
 			t.Errorf("%s is not allowed for a deploy session", tool)
 		}
 	}
 	// Tearing a deployment down still asks.
-	if s.toolAllowed("mcp__dokku__destroy_deployment") {
+	if allow["mcp__dokku__destroy_deployment"] {
 		t.Error("destroy_deployment must not be auto-allowed")
 	}
-	if !s.usesOurMCP() {
-		t.Error("the session should know it was given an MCP server")
+
+	// Both servers we configure ourselves answer the agent's "may I launch
+	// MCP?" prompt, which some agents send with no tool name to match on.
+	target := deployEntry("prod")
+	cfg := DefaultConfig(t.TempDir())
+	deploySession := &Session{RepoPath: "/repo", Deploy: &target, DeployBranch: "feat/x"}
+	if _, err := sessionMCPServers(deploySession, cfg); err != nil {
+		t.Fatal(err)
+	}
+	testSession := &Session{RepoPath: "/repo", Test: &TestRun{URL: "http://preview.example.com", Artifacts: t.TempDir()}}
+	if _, err := sessionMCPServers(testSession, cfg); err != nil {
+		t.Fatal(err)
+	}
+	for name, s := range map[string]*Session{"deploy": deploySession, "test": testSession} {
+		if !s.usesOurMCP() {
+			t.Errorf("the %s session should know it was given an MCP server", name)
+		}
 	}
 
 	// An ordinary session gets neither.
-	plain := &Session{RepoPath: "/repo", allowTools: map[string]bool{}}
-	if _, err := sessionMCPServers(plain); err != nil {
+	plain := &Session{RepoPath: "/repo"}
+	if _, err := sessionMCPServers(plain, cfg); err != nil {
 		t.Fatal(err)
 	}
-	if plain.usesOurMCP() || plain.toolAllowed("mcp__dokku__deploy_branch") {
-		t.Error("an ordinary session must not inherit the deploy tools")
+	if plain.usesOurMCP() {
+		t.Error("an ordinary session must not be marked as having our MCP server")
 	}
 }
 
