@@ -15,6 +15,7 @@ import (
 
 	"github.com/mattermost/focalboard/desktop/internal/acp/claudebridge"
 	"github.com/mattermost/focalboard/desktop/internal/dokku"
+	"github.com/mattermost/focalboard/desktop/internal/vcs"
 )
 
 // Manager owns all agent sessions: it consumes board events, enforces limits
@@ -37,6 +38,8 @@ type Manager struct {
 
 	permMu sync.Mutex
 	perms  map[string]pendingPermission // request ID → prompt awaiting a human
+
+	watchers []vcs.Watcher // repository watchers feeding the flow engine
 
 	sem     chan struct{}
 	rootCtx context.Context
@@ -73,17 +76,18 @@ func NewManager(cfg Config, cfgPath string, st *Store, w BoardWriter, ui UIEmitt
 		ui = &tracingEmitter{inner: ui, tr: tr}
 	}
 	return &Manager{
-		cfg:     cfg,
-		cfgPath: cfgPath,
-		store:   st,
-		writer:  w,
-		ui:      ui,
-		log:     log,
-		tr:      tr,
-		active:  make(map[string]*Session),
-		byCard:  make(map[string]*Session),
-		perms:   make(map[string]pendingPermission),
-		sem:     make(chan struct{}, maxConc),
+		cfg:      cfg,
+		cfgPath:  cfgPath,
+		store:    st,
+		writer:   w,
+		ui:       ui,
+		log:      log,
+		tr:       tr,
+		watchers: defaultWatchers(cfg),
+		active:   make(map[string]*Session),
+		byCard:   make(map[string]*Session),
+		perms:    make(map[string]pendingPermission),
+		sem:      make(chan struct{}, maxConc),
 	}
 }
 
@@ -108,6 +112,13 @@ func (m *Manager) Start(ctx context.Context, events BoardEvents) error {
 	}
 	m.wg.Add(1)
 	go m.triggerLoop(ch)
+
+	// Repository polling only matters once some card waits on a branch, but the
+	// loop itself is cheap: it does nothing at all until FlowTargets is non-empty.
+	if m.cfg.VCSPoll() > 0 && len(m.watchers) > 0 {
+		m.wg.Add(1)
+		go m.vcsLoop()
+	}
 	return nil
 }
 
@@ -140,6 +151,12 @@ type startOptions struct {
 	// repoName picks a repository explicitly, for a console opened on a card
 	// that does not say which one it is about.
 	repoName string
+	// flowName/flowNodeID tie the session to the stage of a route that started
+	// it, so its outcome can move the card on.
+	flowName, flowNodeID string
+	// agentOverride/deployOverride let a flow node pin the agent or the deploy
+	// target for its stage only.
+	agentOverride, deployOverride string
 }
 
 // StartSessionForEvent creates and launches a session for a validated trigger
@@ -172,18 +189,22 @@ func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error
 	if err != nil {
 		return nil, err
 	}
-	deploy, deployBranch, err := m.resolveDeploy(ev, repoPath, opts.deploy)
+	deploy, deployBranch, err := m.resolveDeploy(ev, repoPath, opts.deploy, opts.deployOverride)
 	if err != nil {
 		return nil, err
 	}
 	sessionID := uuid.NewString()
-	test, err := m.resolveTestRun(ev, repoPath, sessionID, opts.test)
+	artifacts, err := m.artifactsDir(sessionID)
+	if err != nil {
+		return nil, err
+	}
+	test, err := m.resolveTestRun(ev, repoPath, artifacts, opts.test)
 	if err != nil {
 		return nil, err
 	}
 	// A deploy no longer pins its own agent: the card decides, as it does for
-	// every other kind of session.
-	agent, err := m.resolveAgent(ev)
+	// every other kind of session — unless a flow node pinned one for its stage.
+	agent, err := m.resolvePinnedAgent(ev, opts.agentOverride)
 	if err != nil {
 		return nil, err
 	}
@@ -250,6 +271,9 @@ func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error
 		Deploy:       deploy,
 		DeployBranch: deployBranch,
 		Test:         test,
+		Artifacts:    artifacts,
+		FlowName:     opts.flowName,
+		FlowNodeID:   opts.flowNodeID,
 		PromptText:   prompt,
 		Policy:       agentPolicy(agent),
 		status:       StatusQueued,

@@ -19,6 +19,7 @@ import {sendFlashMessage} from '../flashMessages'
 import AgentReposDialog, {isAgentReposAvailable} from '../acp/agentReposDialog'
 import AgentsDialog, {isAgentsAvailable} from '../acp/agentsDialog'
 import DeployTargetsDialog, {isDeployTargetsAvailable} from '../acp/deployTargetsDialog'
+import WorkflowsDialog, {isWorkflowsAvailable} from '../acp/workflowsDialog'
 import PlanningDialog, {isPlanningAvailable} from '../acp/planningDialog'
 
 type Props = {
@@ -104,6 +105,7 @@ const ViewHeaderActionsMenu = (props: Props) => {
     const [showAgentRepos, setShowAgentRepos] = useState(false)
     const [showAgents, setShowAgents] = useState(false)
     const [showDeployTargets, setShowDeployTargets] = useState(false)
+    const [showWorkflows, setShowWorkflows] = useState(false)
     const [showPlanning, setShowPlanning] = useState(false)
 
     return (
@@ -155,6 +157,14 @@ const ViewHeaderActionsMenu = (props: Props) => {
                             onClick={() => setShowDeployTargets(true)}
                         />,
                     ] : []}
+                    {isWorkflowsAvailable() ? [
+                        <Menu.Text
+                            key='workflows'
+                            id='workflows'
+                            name={intl.formatMessage({id: 'ViewHeader.workflows', defaultMessage: 'Workflows…'})}
+                            onClick={() => setShowWorkflows(true)}
+                        />,
+                    ] : []}
                     {/*
                     <Menu.Separator/>
 
@@ -194,6 +204,11 @@ const ViewHeaderActionsMenu = (props: Props) => {
             {showDeployTargets &&
                 <DeployTargetsDialog
                     onClose={() => setShowDeployTargets(false)}
+                />}
+            {showWorkflows &&
+                <WorkflowsDialog
+                    board={board}
+                    onClose={() => setShowWorkflows(false)}
                 />}
             {showPlanning &&
                 <PlanningDialog

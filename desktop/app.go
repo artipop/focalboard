@@ -283,6 +283,72 @@ func (a *App) RemoveDeployTarget(name string) error {
 	return a.mgr.RemoveDeploy(name)
 }
 
+// ListFlows returns the flow registry as JSON: the routes cards take across the
+// board, each a graph of nodes (column + action) and edges (event + target).
+func (a *App) ListFlows() (string, error) {
+	if a.mgr == nil {
+		return "[]", nil
+	}
+	out, err := json.Marshal(a.mgr.Flows())
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// ListFlowTriggers returns the closed set of edge triggers the engine
+// implements, so the editor can only offer transitions that actually work.
+func (a *App) ListFlowTriggers() (string, error) {
+	out, err := json.Marshal(acp.FlowTriggers)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// AddFlow registers a route from a JSON-encoded FlowEntry and returns it.
+func (a *App) AddFlow(entryJSON string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	var entry acp.FlowEntry
+	if err := json.Unmarshal([]byte(entryJSON), &entry); err != nil {
+		return "", err
+	}
+	saved, err := a.mgr.AddFlow(entry)
+	if err != nil {
+		return "", err
+	}
+	out, _ := json.Marshal(saved)
+	return string(out), nil
+}
+
+// UpdateFlow replaces an existing route (matched by name) and returns it.
+func (a *App) UpdateFlow(entryJSON string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	var entry acp.FlowEntry
+	if err := json.Unmarshal([]byte(entryJSON), &entry); err != nil {
+		return "", err
+	}
+	saved, err := a.mgr.UpdateFlow(entry)
+	if err != nil {
+		return "", err
+	}
+	out, _ := json.Marshal(saved)
+	return string(out), nil
+}
+
+// RemoveFlow deletes a route by name. Cards standing on it simply stop moving
+// by themselves.
+func (a *App) RemoveFlow(name string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	return a.mgr.RemoveFlow(name)
+}
+
 // GetAgentSystemPrompt returns the board/column-level system prompt.
 func (a *App) GetAgentSystemPrompt() (string, error) {
 	if a.mgr == nil {

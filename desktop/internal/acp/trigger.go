@@ -24,6 +24,11 @@ func (m *Manager) triggerLoop(ch <-chan CardMoved) {
 }
 
 func (m *Manager) handleEvent(ev CardMoved) {
+	// A card with a route is driven by its flow; the standalone trigger columns
+	// below are the fallback for cards that have none.
+	if m.handleFlowMove(ev) {
+		return
+	}
 	switch {
 	case m.isTriggerColumn(ev.ToColumn):
 		m.handleEnter(ev)
@@ -81,11 +86,10 @@ func (m *Manager) handleTestEnter(ev CardMoved) {
 	m.log.Info("acp: test session started", "session", s.ID, "card", ev.CardID, "url", s.Test.URL)
 }
 
-// claimMove applies the guards every trigger column shares: one move is one
-// session (a drag-and-drop produces a burst of patches), and a card with a live
-// session is left alone. kind namespaces the idempotency key, so the agent and
-// deploy columns cannot suppress each other's events.
-func (m *Manager) claimMove(ev CardMoved, kind string) bool {
+// claimIdempotent collapses the burst of patches one drag-and-drop produces
+// into a single move. kind namespaces the key, so the agent, deploy, test and
+// flow paths cannot suppress each other's events.
+func (m *Manager) claimIdempotent(ev CardMoved, kind string) bool {
 	key := fmt.Sprintf("%s|%s|%s|%s", kind, ev.CardID, ev.FromColumn.OptionID, ev.ToColumn.OptionID)
 	fresh, err := m.store.ClaimIdempotency(key, "", m.cfg.IdempotencyWindow())
 	if err != nil {
@@ -94,6 +98,15 @@ func (m *Manager) claimMove(ev CardMoved, kind string) bool {
 	}
 	if !fresh {
 		m.log.Debug("acp: duplicate move suppressed", "card", ev.CardID, "kind", kind)
+		return false
+	}
+	return true
+}
+
+// claimMove adds the guard the standalone trigger columns need on top: a card
+// with a live session is left alone.
+func (m *Manager) claimMove(ev CardMoved, kind string) bool {
+	if !m.claimIdempotent(ev, kind) {
 		return false
 	}
 

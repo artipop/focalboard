@@ -26,8 +26,28 @@ func (m *Manager) reportTestRun(s *Session, finalText string, turnErr error) {
 	res, err := m.readTestResult(s)
 	m.comment(s, testComment(s, res, err, finalText, turnErr))
 	m.attachTestArtifacts(s, res)
-	if err == nil {
+	s.setOutcome(testOutcome(res, err))
+	// A session that belongs to a flow is moved by the flow: two movers would
+	// fight over the card.
+	if err == nil && s.FlowName == "" {
 		m.moveAfterTest(s, res)
+	}
+}
+
+// testOutcome maps a verdict onto the event the card's route moves on. No
+// verdict at all counts as "could not be checked" rather than as a failure —
+// the run says nothing about the application.
+func testOutcome(res TestResult, resErr error) (string, string) {
+	if resErr != nil {
+		return TriggerBlocked, "тест не дал вердикта"
+	}
+	switch res.Verdict {
+	case VerdictPass:
+		return TriggerSuccess, "тест пройден"
+	case VerdictFail:
+		return TriggerFailure, "тест не пройден"
+	default:
+		return TriggerBlocked, "протестировать не удалось"
 	}
 }
 

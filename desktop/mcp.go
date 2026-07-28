@@ -64,7 +64,7 @@ func runDokkuMCP() error {
 	defer stop()
 
 	// The agent closing our stdio is how a session ends, so EOF is success.
-	if err := dokku.ServeStdio(ctx, cl); err != nil &&
+	if err := dokku.ServeStdio(ctx, cl, os.Getenv(dokku.EnvArtifacts)); err != nil &&
 		!errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
 		return err
 	}

@@ -346,6 +346,11 @@ type Config struct {
 	// column. The matching target is handed to the session's dokku MCP server.
 	Deploys []DeployEntry `json:"deploys"`
 
+	// Flows is the registry of named routes across the board: which column
+	// follows which, and on what event. A card without a matching flow falls
+	// back to the standalone trigger columns above. See flows.go.
+	Flows []FlowEntry `json:"flows"`
+
 	// SystemPrompt is the board/column-level instruction prepended to every
 	// triggered session's prompt (before the agent's own system prompt and the
 	// card task). One trigger column today; may become a per-column map later.
@@ -367,6 +372,16 @@ type Config struct {
 
 	// ArtifactsDir is where screenshots and result.json of test runs are kept.
 	ArtifactsDir string `json:"artifactsDir"`
+
+	// VCSPollSeconds is how often the repositories cards wait on are polled for
+	// branch and pull-request events. Zero disables repository watching.
+	VCSPollSeconds int `json:"vcsPollSeconds"`
+	// GitRemote is the remote consulted for those events.
+	GitRemote string `json:"gitRemote"`
+	// GithubToken authorizes the pull-request triggers. Empty falls back to
+	// GITHUB_TOKEN in the environment; without either, only public repositories
+	// answer, and slowly (60 requests an hour).
+	GithubToken string `json:"githubToken,omitempty"`
 
 	// WorktreeMode controls where sessions run: "always" (default) — a
 	// dedicated git worktree per session, which is what gives a card its own
@@ -421,6 +436,7 @@ func DefaultConfig(dataDir string) Config {
 		Agents:                   []AgentEntry{},
 		Proxies:                  []ProxyEntry{},
 		Deploys:                  []DeployEntry{},
+		Flows:                    []FlowEntry{},
 		DeployPrompt:             DefaultDeployPrompt,
 		TestPrompt:               DefaultTestPrompt,
 		WorktreeMode:             "always",
@@ -444,8 +460,10 @@ func DefaultConfig(dataDir string) Config {
 			"mcp__dokku__deploy_branch", "mcp__dokku__app_logs",
 			"mcp__dokku__deployment_status", "mcp__dokku__list_deployments",
 		},
-		WorktreeDir:  filepath.Join(dataDir, "worktrees"),
-		ArtifactsDir: filepath.Join(dataDir, "artifacts"),
+		VCSPollSeconds: 60,
+		GitRemote:      "origin",
+		WorktreeDir:    filepath.Join(dataDir, "worktrees"),
+		ArtifactsDir:   filepath.Join(dataDir, "artifacts"),
 	}
 }
 
@@ -503,7 +521,7 @@ func (c Config) TestTimeout() time.Duration {
 func LoadConfig(path, dataDir string) (Config, error) {
 	b, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		cfg := DefaultConfig(dataDir)
+		cfg := withDefaultFlow(DefaultConfig(dataDir))
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return cfg, err
 		}
@@ -522,11 +540,51 @@ func LoadConfig(path, dataDir string) (Config, error) {
 	}
 	// An existing config keeps whatever it says, so the old default would live
 	// on forever in installs that never touched it. Only the abandoned default
-	// is rewritten; a column the user chose is left alone.
+	// is rewritten; a column the user chose is left alone. It happens before the
+	// route is seeded, so the seeded stages name the column cards land in now.
 	if strings.EqualFold(strings.TrimSpace(cfg.TriggerColumn), legacyTriggerColumn) {
 		cfg.TriggerColumn = DefaultTriggerColumn
 	}
-	return cfg, nil
+	// Seed a route only when the file has no "flows" key at all. An empty list
+	// is a decision — the user deleted every route — and must survive restarts,
+	// which an emptiness check could not tell from a config written before
+	// flows existed.
+	var probe struct {
+		Flows *[]FlowEntry `json:"flows"`
+	}
+	if err := json.Unmarshal(b, &probe); err == nil && probe.Flows != nil {
+		return cfg, nil
+	}
+	return withDefaultFlow(cfg), nil
+}
+
+// withDefaultFlow seeds the registry with a route built from the trigger
+// columns the config already names. It runs after unmarshalling so the flow
+// reflects the user's own column names rather than the defaults.
+func withDefaultFlow(cfg Config) Config {
+	f := DefaultFlow(cfg)
+	if len(f.Nodes) == 0 {
+		return cfg
+	}
+	cfg.Flows = []FlowEntry{f}
+	return cfg
+}
+
+// GithubTokenValue is the token to authorize pull-request polling with: the
+// configured one, else whatever the environment already holds.
+func (c Config) GithubTokenValue() string {
+	if t := strings.TrimSpace(c.GithubToken); t != "" {
+		return t
+	}
+	return strings.TrimSpace(os.Getenv("GITHUB_TOKEN"))
+}
+
+// VCSPoll is how often repositories are polled; zero turns watching off.
+func (c Config) VCSPoll() time.Duration {
+	if c.VCSPollSeconds <= 0 {
+		return 0
+	}
+	return time.Duration(c.VCSPollSeconds) * time.Second
 }
 
 // SessionTimeout bounds a single agent turn.

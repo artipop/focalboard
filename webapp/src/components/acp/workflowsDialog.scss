@@ -1,0 +1,176 @@
+.WorkflowsDialog {
+    .WorkflowsDialog__content {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 0 24px 24px;
+        min-width: 640px;
+    }
+
+    .WorkflowsDialog__empty {
+        color: rgba(var(--center-channel-color-rgb), 0.64);
+        padding: 8px 0;
+    }
+
+    .WorkflowsDialog__row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+
+        .WorkflowsDialog__name {
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .WorkflowsDialog__route {
+            flex: 1;
+            color: rgba(var(--center-channel-color-rgb), 0.64);
+            font-size: 12px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    }
+
+    .WorkflowsDialog__form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin: 8px 0;
+        padding: 12px;
+        border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+        border-radius: 4px;
+
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 12px;
+            color: rgba(var(--center-channel-color-rgb), 0.72);
+        }
+
+        input,
+        select {
+            padding: 6px 8px;
+            border: 1px solid rgba(var(--center-channel-color-rgb), 0.24);
+            border-radius: 4px;
+            background: rgba(var(--center-channel-bg-rgb), 1);
+            color: rgba(var(--center-channel-color-rgb), 1);
+        }
+    }
+
+    .WorkflowsDialog__formHeader {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 12px;
+    }
+
+    .WorkflowsDialog__node {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px;
+        border: 1px solid rgba(var(--center-channel-color-rgb), 0.12);
+        border-radius: 4px;
+        background: rgba(var(--center-channel-color-rgb), 0.04);
+    }
+
+    .WorkflowsDialog__nodeHead,
+    .WorkflowsDialog__wait {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .WorkflowsDialog__outcomes {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    .WorkflowsDialog__arrow {
+        color: rgba(var(--center-channel-color-rgb), 0.56);
+    }
+
+    .WorkflowsDialog__formActions,
+    .WorkflowsDialog__actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 4px;
+    }
+
+    .WorkflowsDialog__hint {
+        font-size: 12px;
+        color: rgba(var(--center-channel-color-rgb), 0.56);
+    }
+
+    .WorkflowsDialog__error {
+        color: rgba(var(--error-text-color-rgb), 1);
+        font-size: 12px;
+    }
+
+    // The diagram: stages as boxes, transitions as arcs beside them.
+    .FlowDiagram {
+        max-width: 100%;
+        margin: 4px 0 8px;
+
+        .FlowDiagram__box {
+            fill: rgba(var(--center-channel-bg-rgb), 1);
+            stroke: rgba(var(--center-channel-color-rgb), 0.32);
+        }
+
+        .FlowDiagram__box--agent {
+            stroke: rgba(var(--link-color-rgb), 0.8);
+        }
+
+        .FlowDiagram__box--deploy {
+            stroke: rgba(var(--sidebar-text-active-border-rgb), 0.8);
+        }
+
+        .FlowDiagram__box--test {
+            stroke: rgba(var(--online-indicator-rgb), 0.8);
+        }
+
+        .FlowDiagram__column {
+            fill: rgba(var(--center-channel-color-rgb), 1);
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .FlowDiagram__action,
+        .FlowDiagram__edgeLabel {
+            fill: rgba(var(--center-channel-color-rgb), 0.56);
+            font-size: 10px;
+        }
+
+        .FlowDiagram__edge path {
+            stroke-width: 1.5;
+        }
+
+        .FlowDiagram__edge--success {
+            color: rgba(var(--online-indicator-rgb), 1);
+
+            path {
+                stroke: rgba(var(--online-indicator-rgb), 1);
+            }
+        }
+
+        .FlowDiagram__edge--failure {
+            color: rgba(var(--error-text-color-rgb), 1);
+
+            path {
+                stroke: rgba(var(--error-text-color-rgb), 1);
+                stroke-dasharray: 5 3;
+            }
+        }
+
+        .FlowDiagram__edge--event {
+            color: rgba(var(--center-channel-color-rgb), 0.56);
+
+            path {
+                stroke: rgba(var(--center-channel-color-rgb), 0.56);
+                stroke-dasharray: 2 3;
+            }
+        }
+    }
+}

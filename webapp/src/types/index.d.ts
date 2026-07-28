@@ -40,6 +40,11 @@ export interface IAppWindow extends Window {
                 AddDeployTarget(entryJSON: string): Promise<string>
                 UpdateDeployTarget(entryJSON: string): Promise<string>
                 RemoveDeployTarget(name: string): Promise<void>
+                ListFlows(): Promise<string>
+                ListFlowTriggers(): Promise<string>
+                AddFlow(entryJSON: string): Promise<string>
+                UpdateFlow(entryJSON: string): Promise<string>
+                RemoveFlow(name: string): Promise<void>
                 GetAgentSystemPrompt(): Promise<string>
                 SetAgentSystemPrompt(text: string): Promise<void>
                 GetCardSessions(cardId: string): Promise<string>

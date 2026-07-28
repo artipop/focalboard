@@ -59,9 +59,10 @@ func sessionMCPServers(s *Session, _ Config) ([]mcpServerSpec, error) {
 			Command: self,
 			Args:    []string{"mcp", dokku.ServerName},
 			Env: map[string]string{
-				dokku.EnvTarget: string(target),
-				dokku.EnvRepo:   s.RepoPath,
-				dokku.EnvBranch: s.DeployBranch,
+				dokku.EnvTarget:    string(target),
+				dokku.EnvRepo:      s.RepoPath,
+				dokku.EnvBranch:    s.DeployBranch,
+				dokku.EnvArtifacts: s.Artifacts,
 			},
 		}}, specs...)
 	}

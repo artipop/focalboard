@@ -25,7 +25,7 @@ type TestRun struct {
 
 // resolveTestRun gathers what a test session needs. For any other session it
 // returns nothing and no error, so the launch path can call it unconditionally.
-func (m *Manager) resolveTestRun(ev CardMoved, repoPath, sessionID string, test bool) (*TestRun, error) {
+func (m *Manager) resolveTestRun(ev CardMoved, repoPath, artifacts string, test bool) (*TestRun, error) {
 	if !test {
 		return nil, nil
 	}
@@ -33,18 +33,26 @@ func (m *Manager) resolveTestRun(ev CardMoved, repoPath, sessionID string, test 
 	if err != nil {
 		return nil, err
 	}
-	m.cfgMu.RLock()
-	root := m.cfg.ArtifactsDir
-	m.cfgMu.RUnlock()
+	return &TestRun{URL: previewURL, Branch: branch, Artifacts: artifacts}, nil
+}
 
-	run := &TestRun{URL: previewURL, Branch: branch}
-	if strings.TrimSpace(root) != "" {
-		run.Artifacts = filepath.Join(root, sessionID)
-		if err := os.MkdirAll(run.Artifacts, 0o755); err != nil {
-			return nil, fmt.Errorf("не удалось создать каталог артефактов: %w", err)
-		}
+// artifactsDir is where one session's evidence goes — the screenshots and
+// verdict a test run leaves behind, the outcome a deploy records. It is created
+// here rather than by whoever writes into it: the agent's own browser server
+// writes the evidence, and it will not create our directory for us. Empty when
+// the config names no artifacts root.
+func (m *Manager) artifactsDir(sessionID string) (string, error) {
+	m.cfgMu.RLock()
+	root := strings.TrimSpace(m.cfg.ArtifactsDir)
+	m.cfgMu.RUnlock()
+	if root == "" {
+		return "", nil
 	}
-	return run, nil
+	dir := filepath.Join(root, sessionID)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("не удалось создать каталог артефактов: %w", err)
+	}
+	return dir, nil
 }
 
 // resolvePreviewURL is where the card's preview lives. Priority:

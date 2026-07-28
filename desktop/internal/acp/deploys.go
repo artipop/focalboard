@@ -118,12 +118,13 @@ func (m *Manager) resolveDeployTarget(ev CardMoved) (DeployEntry, error) {
 
 // resolveDeploy gathers what a deploy session needs: the target and the branch
 // to publish. For an ordinary session it returns nothing and no error, so the
-// launch path can call it unconditionally.
-func (m *Manager) resolveDeploy(ev CardMoved, repoPath string, deploy bool) (*DeployEntry, string, error) {
+// launch path can call it unconditionally. override names the target a flow
+// node pinned, which wins over the card's own resolution.
+func (m *Manager) resolveDeploy(ev CardMoved, repoPath string, deploy bool, override string) (*DeployEntry, string, error) {
 	if !deploy {
 		return nil, "", nil
 	}
-	target, err := m.resolveDeployTarget(ev)
+	target, err := m.resolveDeployTargetNamed(ev, override)
 	if err != nil {
 		return nil, "", err
 	}
@@ -133,6 +134,42 @@ func (m *Manager) resolveDeploy(ev CardMoved, repoPath string, deploy bool) (*De
 		return nil, "", err
 	}
 	return &target, branch, nil
+}
+
+// resolveDeployTargetNamed is resolveDeployTarget with an explicit name taking
+// precedence — how a flow node pins the destination for its stage alone.
+func (m *Manager) resolveDeployTargetNamed(ev CardMoved, name string) (DeployEntry, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return m.resolveDeployTarget(ev)
+	}
+	m.cfgMu.RLock()
+	deploys := append([]DeployEntry(nil), m.cfg.Deploys...)
+	m.cfgMu.RUnlock()
+	for _, d := range deploys {
+		if strings.EqualFold(d.Name, name) {
+			return d, nil
+		}
+	}
+	return DeployEntry{}, fmt.Errorf("цель деплоя %q не найдена в реестре (%s)", name, deployNames(deploys))
+}
+
+// resolvePinnedAgent is resolveAgent with a flow node's override on top: a
+// stage may name the agent it runs on, and that beats the card's own option.
+func (m *Manager) resolvePinnedAgent(ev CardMoved, override string) (AgentEntry, error) {
+	name := strings.TrimSpace(override)
+	if name == "" {
+		return m.resolveAgent(ev)
+	}
+	m.cfgMu.RLock()
+	agents := append([]AgentEntry(nil), m.cfg.Agents...)
+	m.cfgMu.RUnlock()
+	for _, a := range agents {
+		if strings.EqualFold(a.Name, name) {
+			return a, nil
+		}
+	}
+	return AgentEntry{}, fmt.Errorf("закреплённый агент %q не найден в реестре (%s)", name, agentNames(agents))
 }
 
 // deployAppName is what a target without an explicit base app names its apps

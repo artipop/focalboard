@@ -56,36 +56,43 @@ func TestResolvePreviewURL(t *testing.T) {
 	}
 }
 
-func TestResolveTestRunUsesAPerSessionArtifactsDir(t *testing.T) {
+func TestSessionArtifactsDir(t *testing.T) {
 	m := agentManager(t, "")
 	root := t.TempDir()
 	m.cfg.ArtifactsDir = root
+
+	dir, err := m.artifactsDir("sess-1")
+	if err != nil || dir != filepath.Join(root, "sess-1") {
+		t.Fatalf("artifacts dir: %q, %v", dir, err)
+	}
+	// The agent is told to write its report there, so the directory has to
+	// exist before it tries.
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		t.Fatalf("artifacts dir not created: %v", err)
+	}
+	// No configured root means no artifacts, not a broken path.
+	m.cfg.ArtifactsDir = ""
+	if dir, err := m.artifactsDir("sess-1"); err != nil || dir != "" {
+		t.Fatalf("without a root: %q, %v", dir, err)
+	}
+}
+
+func TestResolveTestRun(t *testing.T) {
+	m := agentManager(t, "")
 	ev := CardMoved{Props: map[string]string{"preview_url": "https://feat-x.example.com"}}
 
 	// An ordinary session resolves nothing, so the launch path can call this
 	// unconditionally.
-	if run, err := m.resolveTestRun(ev, "/repo", "sess-1", false); run != nil || err != nil {
+	if run, err := m.resolveTestRun(ev, "/repo", "/data/run", false); run != nil || err != nil {
 		t.Fatalf("non-test session: %+v, %v", run, err)
 	}
 
-	run, err := m.resolveTestRun(ev, "/repo", "sess-1", true)
+	run, err := m.resolveTestRun(ev, "/repo", "/data/run", true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if run.Artifacts != filepath.Join(root, "sess-1") {
-		t.Fatalf("artifacts dir: %q", run.Artifacts)
-	}
-	// The agent is told to write its report there, so the directory has to
-	// exist before it tries.
-	if info, err := os.Stat(run.Artifacts); err != nil || !info.IsDir() {
-		t.Fatalf("artifacts dir not created: %v", err)
-	}
-
-	// No configured root means no artifacts, not a broken path.
-	m.cfg.ArtifactsDir = ""
-	run, err = m.resolveTestRun(ev, "/repo", "sess-1", true)
-	if err != nil || run.Artifacts != "" {
-		t.Fatalf("without a root: %+v, %v", run, err)
+	if run.URL != "https://feat-x.example.com" || run.Artifacts != "/data/run" {
+		t.Fatalf("test run: %+v", run)
 	}
 }
 

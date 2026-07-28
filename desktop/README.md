@@ -75,6 +75,13 @@ runtime).
   gets a directory under `artifactsDir` (default
   `<dataDir>/artifacts/<session-id>`) where the agent is asked to save its
   screenshots and write `result.json` — that verdict is what moves the card.
+- **Flows** (board "…" menu → *Workflows*) join those columns into a route and
+  move cards along it. Repository events are polled from the branches parked
+  cards wait on: plain git needs nothing, while `pr.*`, `review.approved` and
+  `checks.*` call the GitHub API and want a token in `githubToken` (or
+  `GITHUB_TOKEN`) — public repositories work without one, more slowly. The
+  interval is `vcsPollSeconds` (default 60) and the remote is `gitRemote`
+  (default `origin`).
 
 ## Develop
 
