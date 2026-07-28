@@ -185,13 +185,15 @@ describe('Create and delete board / card', () => {
         cy.get('.Kanban').invoke('scrollLeft').should('equal', 0)
     })
 
-    // Skipped: undo/redo genuinely does not work in the comment editor since the
-    // draft-js -> Lexical migration, so this test is red for a real reason. Verified
+    // LEXICAL REGRESSION -- skipped, the code is at fault, not this test.
+    // Undo/redo genuinely does not work in the comment editor since the draft-js ->
+    // Lexical migration (96cd8494), so this test is red for a real reason. Verified
     // outside of Cypress' synthetic events -- with cypress-real-events sending
     // CDP-level key presses, neither Meta+z nor Control+z undoes anything, and it is
     // not specific to the cut path: undoing plain typing does nothing either.
     // markdownEditorInput.tsx does mount <HistoryPlugin/>, so the wiring looks right
-    // and the cause is still unknown. Re-enable once undo works again.
+    // and the cause is still unknown; see the TODO next to that plugin.
+    // Re-enable once undo works again.
     // eslint-disable-next-line no-only-tests/no-only-tests -- deliberate, see above
     it.skip('GH-2520 make cut/undo/redo work in comments', () => {
         const isMAC = navigator.userAgent.indexOf('Mac') !== -1

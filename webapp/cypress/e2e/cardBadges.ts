@@ -27,9 +27,11 @@ describe('Card badges', () => {
         cy.log('**Add card description**')
         cy.findByText('Add a description...').click()
 
-        // Scope to the description block: with comments already added, the comment
-        // editor is a role=textbox too. (The editor is Lexical's contenteditable,
-        // role=textbox -- it was role=combobox before the draft-js -> Lexical move.)
+        // LEXICAL FALLOUT: the draft-js editor exposed role=combobox, Lexical's
+        // ContentEditable exposes role=textbox. The migration (96cd8494) updated the
+        // jest snapshots but left the Cypress specs on the old contract.
+        // The query also has to be scoped now -- with comments already added, the
+        // comment editor is a role=textbox as well, so an unscoped find matches several.
         cy.get('.CardDetailContents').findByRole('textbox').type('## Header\n- [ ] one\n- [x] two{esc}')
 
         // Add checkboxes
@@ -66,8 +68,10 @@ describe('Card badges', () => {
     const addComment = (text: string) => {
         cy.findByText('Add a comment...').click()
 
-        // No .blur() here: blurring drops the editor out of edit mode and unmounts it,
-        // so Cypress cannot requery the detached subject. Send commits the comment.
+        // role=textbox and the scoping are LEXICAL FALLOUT, same as above.
+        // The .blur() this used to chain is gone for a different reason: blurring drops
+        // the editor out of edit mode and unmounts it, so the subject detaches and
+        // Cypress cannot requery it. Send is what commits the comment anyway.
         cy.get('.CommentsList').findByRole('textbox').type(text)
         cy.findByRole('button', {name: 'Send'}).click()
     }
