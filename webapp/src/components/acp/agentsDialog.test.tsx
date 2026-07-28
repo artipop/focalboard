@@ -109,6 +109,45 @@ describe('components/acp/agentsDialog', () => {
         })
     })
 
+    test('offers the ACP-native kinds and saves one without a launch command', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([])),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AddAgent: jest.fn().mockResolvedValue(JSON.stringify({name: 'junie-a', kind: 'junie'})),
+            UpdateAgent: jest.fn(),
+            RemoveAgent: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByRole('button', {name: 'Add agent…'})).toBeInTheDocument())
+
+        userEvent.click(screen.getByRole('button', {name: 'Add agent…'}))
+        await waitFor(() => expect(screen.getAllByRole('combobox')).toHaveLength(2))
+
+        const kindSelect = screen.getAllByRole('combobox')[0]
+        expect(Array.from(kindSelect.querySelectorAll('option')).map((o) => o.value)).
+            toEqual(['claude', 'codex', 'antigravity', 'copilot', 'junie', 'acp'])
+
+        userEvent.selectOptions(kindSelect, 'junie')
+        userEvent.type(screen.getByPlaceholderText('Name (matches the "Agent" option)'), 'junie-a')
+
+        // The kind carries its own default launch flags, so the command input
+        // only shows them as a placeholder and stays empty.
+        expect(screen.getByPlaceholderText('junie --acp=true')).toHaveValue('')
+
+        userEvent.click(screen.getByRole('button', {name: 'Save'}))
+        await waitFor(() => expect(bindings.AddAgent).toBeCalled())
+        const payload = JSON.parse(bindings.AddAgent.mock.calls[0][0])
+        expect(payload).toMatchObject({name: 'junie-a', kind: 'junie', command: []})
+    })
+
     test('creates an Agent select field and adds missing options', async () => {
         const bindings = {
             ListAgents: jest.fn().mockResolvedValue(JSON.stringify([

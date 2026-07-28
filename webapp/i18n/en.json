@@ -34,7 +34,7 @@
   "Agents.remove": "Remove",
   "Agents.save": "Save",
   "Agents.save-system-prompt": "Save system prompt",
-  "Agents.subtitle": "Register coding agents (Claude / Codex) with their own prompt, model, launch command, environment and proxy. Cards route to an agent by the \"Agent\" field.",
+  "Agents.subtitle": "Register coding agents (Claude, Codex, Antigravity, GitHub Copilot, JetBrains Junie or any other ACP agent) with their own prompt, model, launch command, environment and proxy. Cards route to an agent by the \"Agent\" field.",
   "Agents.sync": "Sync to board",
   "Agents.system-prompt": "Board system prompt (prepended to every agent prompt)",
   "Agents.system-prompt-saved": "Saved board system prompt",

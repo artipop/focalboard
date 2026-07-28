@@ -33,14 +33,15 @@ func validateAgent(a AgentEntry) (AgentEntry, error) {
 	}
 	a.Command = command
 	a.Kind = strings.TrimSpace(strings.ToLower(a.Kind))
-	switch a.Kind {
-	case AgentKindClaude, AgentKindCodex, AgentKindAntigravity:
-	case AgentKindACP:
+	switch {
+	case a.Kind == AgentKindACP:
 		if len(a.Command) == 0 {
 			return AgentEntry{}, fmt.Errorf("для агента типа %q нужно задать команду запуска (argv ACP-агента)", AgentKindACP)
 		}
+	case a.Kind == AgentKindClaude || a.Kind == AgentKindCodex:
+	case IsExternalACP(a.Kind):
 	default:
-		return AgentEntry{}, fmt.Errorf("неизвестный тип агента %q (допустимо: %s, %s, %s, %s)", a.Kind, AgentKindClaude, AgentKindCodex, AgentKindAntigravity, AgentKindACP)
+		return AgentEntry{}, fmt.Errorf("неизвестный тип агента %q (допустимо: %s)", a.Kind, strings.Join(AgentKinds, ", "))
 	}
 	a.ProxyName = strings.TrimSpace(a.ProxyName)
 	return a, nil

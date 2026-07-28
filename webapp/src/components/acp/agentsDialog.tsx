@@ -40,6 +40,8 @@ const commandPlaceholders: {[kind: string]: string} = {
     claude: 'proxychains4 -q -f /etc/myproxy.conf claude',
     codex: 'proxychains4 -q -f /etc/myproxy.conf codex',
     antigravity: 'antigravity --acp',
+    copilot: 'copilot --acp',
+    junie: 'junie --acp=true',
     acp: 'gemini --acp',
 }
 
@@ -256,7 +258,7 @@ const AgentsDialog = (props: Props) => {
         <Dialog
             className='AgentsDialog'
             title={<span>{intl.formatMessage({id: 'Agents.title', defaultMessage: 'Agents'})}</span>}
-            subtitle={<span>{intl.formatMessage({id: 'Agents.subtitle', defaultMessage: 'Register coding agents (Claude / Codex) with their own prompt, model, launch command, environment and proxy. Cards route to an agent by the "Agent" field.'})}</span>}
+            subtitle={<span>{intl.formatMessage({id: 'Agents.subtitle', defaultMessage: 'Register coding agents (Claude, Codex, Antigravity, GitHub Copilot, JetBrains Junie or any other ACP agent) with their own prompt, model, launch command, environment and proxy. Cards route to an agent by the "Agent" field.'})}</span>}
             onClose={onClose}
         >
             <div className='AgentsDialog__content'>
@@ -301,6 +303,8 @@ const AgentsDialog = (props: Props) => {
                                 <option value='claude'>{'Claude'}</option>
                                 <option value='codex'>{'Codex'}</option>
                                 <option value='antigravity'>{'Antigravity'}</option>
+                                <option value='copilot'>{'GitHub Copilot'}</option>
+                                <option value='junie'>{'JetBrains Junie'}</option>
                                 <option value='acp'>{'ACP (other)'}</option>
                             </select>
                         </label>

@@ -69,9 +69,12 @@ func TestAddUpdateRemoveAgentPersists(t *testing.T) {
 func TestAgentKindValidation(t *testing.T) {
 	m := agentManager(t, "")
 
-	// antigravity needs no command; the generic acp kind does.
-	if _, err := m.AddAgent(AgentEntry{Name: "grav", Kind: "antigravity"}); err != nil {
-		t.Errorf("antigravity without command should be valid: %v", err)
+	// The ACP-native kinds we know how to launch need no command; the generic
+	// acp kind does.
+	for _, kind := range []string{"antigravity", "copilot", "junie"} {
+		if _, err := m.AddAgent(AgentEntry{Name: kind, Kind: kind}); err != nil {
+			t.Errorf("%s without command should be valid: %v", kind, err)
+		}
 	}
 	if _, err := m.AddAgent(AgentEntry{Name: "gen", Kind: "acp"}); err == nil {
 		t.Error("acp kind without command should be rejected")
@@ -93,19 +96,27 @@ func TestExternalACPCommand(t *testing.T) {
 		t.Errorf("acp command argv = %q", got)
 	}
 
-	// antigravity with an explicit binPath defaults to `<bin> --acp` + model.
+	// A known ACP-native kind with an explicit binPath defaults to
+	// `<bin> <acp flag>` + model. Junie's flag takes a boolean value.
 	bin := writeFakeClaude(t, "#!/bin/sh\n") // any existing executable
-	argv, err = m.externalACPCommand(AgentEntry{Name: "g", Kind: "antigravity", BinPath: bin, Model: "gemini-3-pro"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := strings.Join(argv, " "); got != bin+" --acp --model gemini-3-pro" {
-		t.Errorf("antigravity argv = %q", got)
-	}
+	for kind, want := range map[string]string{
+		"antigravity": bin + " --acp --model m1",
+		"copilot":     bin + " --acp --model m1",
+		"junie":       bin + " --acp=true --model m1",
+	} {
+		argv, err = m.externalACPCommand(AgentEntry{Name: "g", Kind: kind, BinPath: bin, Model: "m1"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Join(argv, " "); got != want {
+			t.Errorf("%s argv = %q, want %q", kind, got, want)
+		}
 
-	// antigravity with a missing binary errors clearly.
-	if _, err := m.externalACPCommand(AgentEntry{Name: "g", Kind: "antigravity", BinPath: "/no/such/antigravity"}); err == nil {
-		t.Error("missing antigravity binary should error")
+		// A missing binary errors clearly, naming the CLI.
+		_, err = m.externalACPCommand(AgentEntry{Name: "g", Kind: kind, BinPath: "/no/such/" + kind})
+		if err == nil {
+			t.Errorf("missing %s binary should error", kind)
+		}
 	}
 }
 

@@ -23,7 +23,7 @@ type RepoEntry struct {
 // each its own CODEX_HOME/OPENAI_API_KEY (or CLAUDE_CONFIG_DIR/ANTHROPIC_API_KEY).
 type AgentEntry struct {
 	Name    string            `json:"name"`              // registry key; matches the card "Agent" option
-	Kind    string            `json:"kind"`              // "claude" | "codex" | "antigravity" | "acp"
+	Kind    string            `json:"kind"`              // "claude" | "codex" | "antigravity" | "copilot" | "junie" | "acp"
 	BinPath string            `json:"binPath,omitempty"` // overrides binary discovery
 	Model   string            `json:"model,omitempty"`   // --model passed to the CLI
 	Prompt  string            `json:"prompt,omitempty"`  // per-agent system prompt prepended to the task
@@ -210,19 +210,39 @@ func spawnEnv(a AgentEntry, net NetworkSettings) (env []string, drop []string) {
 	return env, drop
 }
 
-// Agent kinds. claude/codex run through in-process bridges; antigravity and the
-// generic acp kind are ACP-native CLIs spawned over stdio (no bridge).
+// Agent kinds. claude/codex run through in-process bridges; the rest are
+// ACP-native CLIs spawned over stdio (no bridge).
 const (
 	AgentKindClaude      = "claude"
 	AgentKindCodex       = "codex"
 	AgentKindAntigravity = "antigravity"
+	AgentKindCopilot     = "copilot"
+	AgentKindJunie       = "junie"
 	AgentKindACP         = "acp"
 )
+
+// AgentKinds lists every accepted kind, in the order the UI offers them.
+var AgentKinds = []string{
+	AgentKindClaude, AgentKindCodex,
+	AgentKindAntigravity, AgentKindCopilot, AgentKindJunie,
+	AgentKindACP,
+}
+
+// acpNative describes an ACP-native CLI we know how to launch ourselves: the
+// binary to look for and the flag that puts it into ACP-over-stdio mode. All of
+// them also take `--model <name>`. The generic acp kind is deliberately absent —
+// it carries its own Command.
+var acpNative = map[string]struct{ bin, acpFlag string }{
+	AgentKindAntigravity: {"antigravity", "--acp"},
+	AgentKindCopilot:     {"copilot", "--acp"},    // github/copilot-cli, stdio is its default transport
+	AgentKindJunie:       {"junie", "--acp=true"}, // JetBrains Junie CLI takes a boolean value
+}
 
 // IsExternalACP reports whether the kind is an ACP-native external agent
 // (spawned over stdio and talked to in pure ACP, no bridge translation).
 func IsExternalACP(kind string) bool {
-	return kind == AgentKindAntigravity || kind == AgentKindACP
+	_, ok := acpNative[kind]
+	return ok || kind == AgentKindACP
 }
 
 // Config controls the agent integration. It is stored as JSON in the app data
