@@ -5,10 +5,9 @@
 	<meta charset="UTF-8">
     <meta name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0'>
 
-    <title><%= htmlWebpackPlugin.options.title %></title>
+    <title>Focalboard</title>
 
-    <script>window.baseURL = '{{.BaseURL}}'</script>
-    <link rel="icon" href="{{.BaseURL}}/static/favicon.svg?v=1" />
+    <link rel="icon" href="/static/favicon.svg?v=1" />
 </head>
 
 <body class="focalboard-body">
@@ -17,6 +16,8 @@
 
 	<div id="focalboard-root-portal">
 	</div>
+
+	<script type="module" src="/src/components/blocksEditor/devmain.tsx"></script>
 </body>
 
 </html>
