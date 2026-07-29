@@ -545,3 +545,62 @@ func TestConsoleAttachedAfterTriggerGetsPrompt(t *testing.T) {
 	// Attaching also turned it into a console session: it waits rather than ending.
 	waitStatus(t, s, StatusIdle)
 }
+
+// fakeClaudeSlowTurn keeps one turn running long enough to close the card
+// while the agent is still working.
+const fakeClaudeSlowTurn = `#!/bin/sh
+while read line; do
+  printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-slow-turn"}'
+  sleep 1
+  printf '%s\n' '{"type":"result","is_error":false,"result":"done"}'
+done
+`
+
+// Closing the card mid-turn detaches a console that cannot end the session yet,
+// because it is not idle. The session must still not park afterwards: it would
+// hold its repository for the whole idle timeout with nobody watching, and the
+// next card on that repo would be refused.
+func TestDetachDuringTurnDoesNotParkSession(t *testing.T) {
+	m, _, _, repo, _ := testManagerWithEmitter(t, fakeClaudeSlowTurn, nil)
+
+	s := liveSession(t, m, "cardBusy")
+	waitStatus(t, s, StatusRunning)
+	m.DetachSession(s.ID)
+
+	waitStatus(t, s, StatusDone)
+
+	// The repository is free again, so another card can take it.
+	waitFor(t, 5*time.Second, "repo to be released", func() bool {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		for _, other := range m.active {
+			if other.RepoPath == repo {
+				return false
+			}
+		}
+		return true
+	})
+}
+
+// Talking to a session must not claim a console slot: an unpaired increment
+// would keep it alive after the only console is gone.
+func TestPromptDoesNotLeakConsoleCount(t *testing.T) {
+	m, _, _, _, _ := testManagerWithEmitter(t, fakeClaudeMultiTurn, nil)
+
+	s := liveSession(t, m, "cardCount")
+	waitStatus(t, s, StatusIdle)
+
+	if err := m.PromptSession(s.ID, "again"); err != nil {
+		t.Fatalf("prompt: %v", err)
+	}
+	waitFor(t, 15*time.Second, "second turn", func() bool {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return s.turnNo >= 2
+	})
+	waitStatus(t, s, StatusIdle)
+
+	// One console opened it, so one detach must be enough to end it.
+	m.DetachSession(s.ID)
+	waitStatus(t, s, StatusDone)
+}

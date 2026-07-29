@@ -73,10 +73,20 @@ func (s *Session) isInteractive() bool {
 }
 
 // attach marks a console as watching; the session then survives its turns.
+// Every attach must be paired with a detach, or the session would outlive the
+// consoles and go on holding its repository.
 func (s *Session) attach() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.attached++
+	s.interactive = true
+}
+
+// markInteractive records that the session is being driven by a user without
+// claiming a console slot — talking to a session already implies one is open.
+func (s *Session) markInteractive() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.interactive = true
 }
 
@@ -270,6 +280,15 @@ func (m *Manager) commentFirstTurn(s *Session, finalText string, err error) {
 // waitForTurn parks an interactive session between turns. It reports false when
 // the session should end.
 func (m *Manager) waitForTurn(s *Session) (turnRequest, bool) {
+	// Parking is only justified while a console is watching. A card closed
+	// mid-turn detaches without being able to end the session — it was not idle
+	// yet — so the check belongs here, or the session would sit on its
+	// repository until the idle timeout with nobody looking at it.
+	if !s.hasConsole() {
+		m.finishSession(s, StatusDone, "")
+		return turnRequest{}, false
+	}
+
 	s.mu.Lock()
 	s.status = StatusIdle
 	s.mu.Unlock()

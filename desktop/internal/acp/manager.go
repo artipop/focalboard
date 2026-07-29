@@ -258,7 +258,10 @@ func (m *Manager) PromptSession(sessionID, text string) error {
 	if s == nil {
 		return fmt.Errorf("сессия %s не активна", sessionID)
 	}
-	s.attach() // typing into a session is what makes it interactive
+	// Typing into a session is what makes it interactive. It must not claim a
+	// console slot: the console attached when it opened, and an unpaired
+	// increment here would keep the session alive after that console left.
+	s.markInteractive()
 	s.appendEvent(m, "prompt", map[string]any{"text": text})
 	m.ui.Emit(EventPrompt, map[string]any{
 		"sessionId": s.ID, "cardId": s.CardID, "text": text,
