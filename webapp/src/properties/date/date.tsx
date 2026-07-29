@@ -17,6 +17,7 @@ import Button from '../../widgets/buttons/button'
 import Modal from '../../components/modal'
 import ModalWrapper from '../../components/modalWrapper'
 import {Utils} from '../../utils'
+import useMomentLocale from '../../hooks/momentLocale'
 
 import 'react-day-picker/lib/style.css'
 import './date.scss'
@@ -50,8 +51,6 @@ export function createDatePropertyFromString(initialValue: string): DateProperty
 function datePropertyToString(dateProperty: DateProperty): string {
     return dateProperty.from || dateProperty.to ? JSON.stringify(dateProperty) : ''
 }
-
-const loadedLocales: Record<string, moment.Locale> = {}
 
 function DateRange(props: PropertyProps): JSX.Element {
     const {propertyValue, propertyTemplate, showEmptyPlaceholder, readOnly, board, card} = props
@@ -96,10 +95,7 @@ function DateRange(props: PropertyProps): JSX.Element {
     const isRange = dateTo !== undefined
 
     const locale = intl.locale.toLowerCase()
-    if (locale && locale !== 'en' && !loadedLocales[locale]) {
-        // eslint-disable-next-line global-require
-        loadedLocales[locale] = require(`moment/locale/${locale}`)
-    }
+    useMomentLocale(locale)
 
     const handleDayClick = (day: Date) => {
         const range: DateProperty = {}

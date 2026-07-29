@@ -17,6 +17,7 @@ import {BoardView} from '../../blocks/boardView'
 import Modal from '../../components/modal'
 import ModalWrapper from '../../components/modalWrapper'
 import {Utils} from '../../utils'
+import useMomentLocale from '../../hooks/momentLocale'
 
 import 'react-day-picker/lib/style.css'
 import './dateFilter.scss'
@@ -35,8 +36,6 @@ type Props = {
     view: BoardView
     filter: FilterClause
 }
-
-const loadedLocales: Record<string, moment.Locale> = {}
 
 function DateFilter(props: Props): JSX.Element {
     const {filter, view} = props
@@ -91,10 +90,7 @@ function DateFilter(props: Props): JSX.Element {
     const [input, setInput] = useState<string>(getDisplayDate(offsetDate))
 
     const locale = intl.locale.toLowerCase()
-    if (locale && locale !== 'en' && !loadedLocales[locale]) {
-        // eslint-disable-next-line global-require
-        loadedLocales[locale] = require(`moment/locale/${locale}`)
-    }
+    useMomentLocale(locale)
 
     const handleTodayClick = (day: Date) => {
         day.setHours(12)

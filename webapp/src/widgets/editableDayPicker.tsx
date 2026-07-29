@@ -9,20 +9,12 @@ import {Utils} from '../utils'
 
 import 'react-day-picker/lib/style.css'
 import './editableDayPicker.scss'
+import useMomentLocale from '../hooks/momentLocale'
 
 type Props = {
     className: string
     value: string
     onChange: (value: string | undefined) => void
-}
-
-const loadedLocales: Record<string, moment.Locale> = {}
-
-const updateLocales = (locale: string) => {
-    if (locale && locale !== 'en' && !loadedLocales[locale]) {
-        // eslint-disable-next-line global-require
-        loadedLocales[locale] = require(`moment/locale/${locale}`)
-    }
 }
 
 const parseValue = (value: string): Date | undefined => {
@@ -45,7 +37,7 @@ function EditableDayPicker(props: Props): JSX.Element {
     const [dayPickerVisible, setDayPickerVisible] = useState(false)
 
     const locale = intl.locale.toLowerCase()
-    updateLocales(locale)
+    useMomentLocale(locale)
 
     const saveSelection = () => {
         onChange(value?.getTime().toString())
