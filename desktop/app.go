@@ -306,6 +306,21 @@ func (a *App) ListFlowTriggers() (string, error) {
 	return string(out), nil
 }
 
+// ListFlowTemplates returns the routes a fresh install is seeded with, rebuilt
+// from the current column names. An install whose registry predates them (or
+// whose routes were deleted) can add the ones it is missing from the editor
+// instead of retyping a graph.
+func (a *App) ListFlowTemplates() (string, error) {
+	if a.mgr == nil {
+		return "[]", nil
+	}
+	out, err := json.Marshal(a.mgr.FlowTemplates())
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
 // AddFlow registers a route from a JSON-encoded FlowEntry and returns it.
 func (a *App) AddFlow(entryJSON string) (string, error) {
 	if a.mgr == nil {

@@ -1,0 +1,82 @@
+// The route as a canvas. React Flow needs a sized container: without a height
+// the graph renders into nothing.
+.FlowDiagram {
+    height: 320px;
+    width: 100%;
+    margin: 4px 0 8px;
+    border: 1px solid rgba(var(--center-channel-color-rgb), 0.12);
+    border-radius: 4px;
+    background: rgba(var(--center-channel-color-rgb), 0.04);
+
+    .FlowDiagram__stage {
+        width: 190px;
+        height: 58px;
+        box-sizing: border-box;
+        padding: 8px 10px;
+        border: 1px solid rgba(var(--center-channel-color-rgb), 0.32);
+        border-left-width: 4px;
+        border-radius: 6px;
+        background: rgba(var(--center-channel-bg-rgb), 1);
+        overflow: hidden;
+    }
+
+    // The left edge says what happens in the stage, so a route can be read
+    // without reading every box.
+    .FlowDiagram__stage--agent {
+        border-left-color: rgba(var(--link-color-rgb), 1);
+    }
+
+    .FlowDiagram__stage--deploy {
+        border-left-color: rgba(var(--sidebar-text-active-border-rgb), 1);
+    }
+
+    .FlowDiagram__stage--test {
+        border-left-color: rgba(var(--online-indicator-rgb), 1);
+    }
+
+    .FlowDiagram__column {
+        font-size: 13px;
+        font-weight: 600;
+        color: rgba(var(--center-channel-color-rgb), 1);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .FlowDiagram__action {
+        font-size: 11px;
+        color: rgba(var(--center-channel-color-rgb), 0.56);
+    }
+
+    // React Flow's own chrome follows the board's theme rather than its
+    // built-in light one.
+    .react-flow__handle {
+        opacity: 0;
+    }
+
+    .react-flow__edge-textbg {
+        fill: rgba(var(--center-channel-bg-rgb), 1);
+    }
+
+    .react-flow__edge-text {
+        fill: rgba(var(--center-channel-color-rgb), 0.72);
+        font-size: 10px;
+    }
+
+    .react-flow__controls-button {
+        background: rgba(var(--center-channel-bg-rgb), 1);
+        border-bottom-color: rgba(var(--center-channel-color-rgb), 0.12);
+
+        svg {
+            fill: rgba(var(--center-channel-color-rgb), 0.72);
+        }
+    }
+
+    .react-flow__attribution {
+        background: transparent;
+
+        a {
+            color: rgba(var(--center-channel-color-rgb), 0.32);
+        }
+    }
+}

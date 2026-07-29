@@ -8,8 +8,12 @@ import '@testing-library/jest-dom'
 import {Board, IPropertyTemplate} from '../../blocks/board'
 import {TestBlockFactory} from '../../test/testBlockFactory'
 import {wrapIntl} from '../../testUtils'
+import {setupReactFlowEnvironment} from '../../test/reactFlowEnvironment'
 
 import WorkflowsDialog, {isWorkflowsAvailable, edgeTarget, setEdge, waitEdges, SUCCESS, FAILURE} from './workflowsDialog'
+
+// The editor draws the route on a React Flow canvas, which measures the page.
+setupReactFlowEnvironment()
 
 const anyWindow = window as any
 
@@ -47,10 +51,25 @@ const featureFlow = {
     edges: [{from: 'n1', to: 'n2', on: SUCCESS}],
 }
 
+// The routes the install ships with; the board template names the same ones.
+const shippedFlows = [
+    featureFlow,
+    {
+        name: 'Hotfix',
+        property: 'Status',
+        nodes: [
+            {id: 'agent', column: 'To Agent', action: 'agent'},
+            {id: 'deploy', column: 'Deploy', action: 'deploy'},
+        ],
+        edges: [{from: 'agent', to: 'deploy', on: SUCCESS}],
+    },
+]
+
 function stubBindings(overrides: Record<string, unknown> = {}) {
     const bindings = {
         ListFlows: jest.fn().mockResolvedValue(JSON.stringify([featureFlow])),
         ListFlowTriggers: jest.fn().mockResolvedValue(JSON.stringify(triggers)),
+        ListFlowTemplates: jest.fn().mockResolvedValue(JSON.stringify(shippedFlows)),
         AddFlow: jest.fn().mockResolvedValue('{}'),
         UpdateFlow: jest.fn().mockResolvedValue('{}'),
         RemoveFlow: jest.fn().mockResolvedValue(undefined),
@@ -136,6 +155,26 @@ describe('components/acp/workflowsDialog', () => {
         userEvent.click(screen.getByRole('button', {name: 'Save'}))
 
         await waitFor(() => expect(screen.getByText(/два перехода по событию/)).toBeInTheDocument())
+    })
+
+    test('offers the shipped routes the registry is missing, and only those', async () => {
+        stubBindings()
+        render(wrapIntl(
+            <WorkflowsDialog
+                board={boardWithColumns()}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByText('feature')).toBeInTheDocument())
+
+        // "feature" is already registered; only "Hotfix" is worth offering.
+        expect(screen.queryByRole('button', {name: 'feature'})).toBeNull()
+        userEvent.click(screen.getByRole('button', {name: 'Hotfix'}))
+
+        // It opens in the editor rather than being saved behind the user's
+        // back: the route is there to be looked at first.
+        await waitFor(() => expect(screen.getByDisplayValue('Hotfix')).toBeInTheDocument())
+        expect(screen.getAllByRole('button', {name: 'Remove stage'})).toHaveLength(2)
     })
 
     test('removing a route asks Go to forget it', async () => {

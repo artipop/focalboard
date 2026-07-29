@@ -521,7 +521,7 @@ func (c Config) TestTimeout() time.Duration {
 func LoadConfig(path, dataDir string) (Config, error) {
 	b, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		cfg := withDefaultFlow(DefaultConfig(dataDir))
+		cfg := withTemplateFlows(DefaultConfig(dataDir))
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return cfg, err
 		}
@@ -541,32 +541,30 @@ func LoadConfig(path, dataDir string) (Config, error) {
 	// An existing config keeps whatever it says, so the old default would live
 	// on forever in installs that never touched it. Only the abandoned default
 	// is rewritten; a column the user chose is left alone. It happens before the
-	// route is seeded, so the seeded stages name the column cards land in now.
+	// routes are seeded, so their stages name the column cards land in now.
 	if strings.EqualFold(strings.TrimSpace(cfg.TriggerColumn), legacyTriggerColumn) {
 		cfg.TriggerColumn = DefaultTriggerColumn
 	}
-	// Seed a route only when the file has no "flows" key at all. An empty list
-	// is a decision — the user deleted every route — and must survive restarts,
-	// which an emptiness check could not tell from a config written before
-	// flows existed.
+	// Seed the routes only when the file has no "flows" key at all. An empty
+	// list is a decision — the user deleted every route — and must survive
+	// restarts, which an emptiness check could not tell from a config written
+	// before flows existed.
 	var probe struct {
 		Flows *[]FlowEntry `json:"flows"`
 	}
 	if err := json.Unmarshal(b, &probe); err == nil && probe.Flows != nil {
 		return cfg, nil
 	}
-	return withDefaultFlow(cfg), nil
+	return withTemplateFlows(cfg), nil
 }
 
-// withDefaultFlow seeds the registry with a route built from the trigger
-// columns the config already names. It runs after unmarshalling so the flow
-// reflects the user's own column names rather than the defaults.
-func withDefaultFlow(cfg Config) Config {
-	f := DefaultFlow(cfg)
-	if len(f.Nodes) == 0 {
-		return cfg
+// withTemplateFlows seeds the registry with the template routes, built from the
+// trigger columns the config already names. It runs after unmarshalling so the
+// routes reflect the user's own column names rather than the defaults.
+func withTemplateFlows(cfg Config) Config {
+	if flows := TemplateFlows(cfg); len(flows) > 0 {
+		cfg.Flows = flows
 	}
-	cfg.Flows = []FlowEntry{f}
 	return cfg
 }
 

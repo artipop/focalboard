@@ -386,40 +386,6 @@ func (m *Manager) FlowByName(name string) (FlowEntry, bool) {
 	return FlowEntry{}, false
 }
 
-// DefaultFlow builds the route an install starts with, from the trigger columns
-// it already has. Only the transitions that exist today are wired — the test
-// verdict — so upgrading changes nothing by itself; connecting the agent and
-// deploy stages is a decision for the editor, not a surprise on restart.
-func DefaultFlow(cfg Config) FlowEntry {
-	f := FlowEntry{Name: "default", Property: cfg.TriggerProperty}
-	add := func(id, column, action string) string {
-		if strings.TrimSpace(column) == "" {
-			return ""
-		}
-		for _, n := range f.Nodes {
-			if strings.EqualFold(n.Column, column) {
-				return "" // two config keys naming one column: keep the first
-			}
-		}
-		f.Nodes = append(f.Nodes, FlowNode{ID: id, Column: column, Action: action})
-		return id
-	}
-	agent := add("agent", cfg.TriggerColumn, FlowActionAgent)
-	add("deploy", cfg.DeployColumn, FlowActionDeploy)
-	test := add("test", cfg.TestColumn, FlowActionTest)
-	passed := add("passed", cfg.TestPassColumn, FlowActionNone)
-	failed := add("failed", cfg.TestFailColumn, FlowActionNone)
-
-	if test != "" && passed != "" {
-		f.Edges = append(f.Edges, FlowEdge{From: test, To: passed, On: TriggerSuccess})
-	}
-	if test != "" && failed != "" {
-		f.Edges = append(f.Edges, FlowEdge{From: test, To: failed, On: TriggerFailure})
-	}
-	_ = agent
-	return f
-}
-
 func hasRepo(repos []RepoEntry, name string) bool {
 	for _, r := range repos {
 		if strings.EqualFold(r.Name, name) {

@@ -189,32 +189,58 @@ func TestTriggerMetadata(t *testing.T) {
 	}
 }
 
-func TestDefaultFlowMirrorsTheLegacyColumns(t *testing.T) {
+func TestTemplateFlowsUseTheConfigsOwnColumns(t *testing.T) {
 	cfg := DefaultConfig(t.TempDir())
 	cfg.TriggerColumn = "К агенту"
 	cfg.TestColumn = "На тест"
 	cfg.TestPassColumn = "Проверено"
 
-	f := DefaultFlow(cfg)
-	if f.Property != cfg.TriggerProperty {
-		t.Fatalf("property: %q", f.Property)
+	flows := TemplateFlows(cfg)
+	if len(flows) < 2 {
+		t.Fatalf("a template with one route offers no choice: %+v", flows)
 	}
-	if n, ok := f.NodeByColumn("К агенту"); !ok || n.Action != FlowActionAgent {
-		t.Fatalf("agent node: %+v", n)
-	}
-	// Only the transition that exists today is wired: upgrading must not start
-	// moving cards on its own.
-	if n, ok := f.Next("test", TriggerSuccess); !ok || n.Column != "Проверено" {
-		t.Fatalf("test success edge: %+v", n)
-	}
-	if _, ok := f.Next("agent", TriggerSuccess); ok {
-		t.Fatal("the agent stage must not be wired automatically")
+	// Every seeded route must be one the engine would accept from the editor.
+	for _, f := range flows {
+		if _, err := validateFlow(f, nil, nil, nil); err != nil {
+			t.Fatalf("template flow %q is invalid: %v", f.Name, err)
+		}
+		if f.Property != cfg.TriggerProperty {
+			t.Fatalf("%s: property %q", f.Name, f.Property)
+		}
 	}
 
-	// A column the config does not name produces no node.
+	feature := flows[0]
+	if feature.Name != TemplateFlowFeature {
+		t.Fatalf("the full route should come first: %q", feature.Name)
+	}
+	if n, ok := feature.NodeByColumn("К агенту"); !ok || n.Action != FlowActionAgent {
+		t.Fatalf("agent stage: %+v", n)
+	}
+	if n, ok := feature.Next("test", TriggerSuccess); !ok || n.Column != "Проверено" {
+		t.Fatalf("test success edge: %+v", n)
+	}
+	// A failed check goes back to the agent rather than to a person.
+	if n, ok := feature.Next("test", TriggerFailure); !ok || n.Column != "К агенту" {
+		t.Fatalf("test failure edge: %+v", n)
+	}
+	// Waiting for the merge needs no token: it is the local git watcher.
+	if !IsVCSTrigger(TriggerBranchMerged) || IsGitHubTrigger(TriggerBranchMerged) {
+		t.Fatal("the seeded routes must work without GitHub credentials")
+	}
+	if n, ok := feature.Next("review", TriggerBranchMerged); !ok || n.Column != cfg.DeployColumn {
+		t.Fatalf("review edge: %+v", n)
+	}
+
+	// A column the config does not name produces no stage, and the transitions
+	// that would have led there go with it.
 	cfg.DeployColumn = ""
-	if _, ok := DefaultFlow(cfg).NodeByColumn("Deploy"); ok {
-		t.Fatal("an empty deployColumn should not become a stage")
+	for _, f := range TemplateFlows(cfg) {
+		if _, ok := f.NodeByColumn("Deploy"); ok {
+			t.Fatalf("%s: an empty deployColumn should not become a stage", f.Name)
+		}
+		if _, err := validateFlow(f, nil, nil, nil); err != nil {
+			t.Fatalf("%s: dropping a column left a dangling edge: %v", f.Name, err)
+		}
 	}
 }
 
@@ -222,7 +248,7 @@ func TestLoadConfigSeedsAndRespectsAnEmptyRegistry(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.json")
 
-	// A config written before flows existed gets the default route.
+	// A config written before flows existed gets the template routes.
 	if err := os.WriteFile(path, []byte(`{"triggerColumn":"К агенту","testColumn":"На тест"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -230,11 +256,16 @@ func TestLoadConfigSeedsAndRespectsAnEmptyRegistry(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(cfg.Flows) != 1 {
-		t.Fatalf("no default flow seeded: %+v", cfg.Flows)
+	if len(cfg.Flows) != len(TemplateFlows(cfg)) || len(cfg.Flows) == 0 {
+		t.Fatalf("template flows not seeded: %+v", cfg.Flows)
 	}
 	if _, ok := cfg.Flows[0].NodeByColumn("К агенту"); !ok {
-		t.Fatalf("the seeded flow ignored the config's own columns: %+v", cfg.Flows[0])
+		t.Fatalf("the seeded flows ignored the config's own columns: %+v", cfg.Flows[0])
+	}
+	// Seeding several routes also means no card is silently adopted by one:
+	// resolveFlow's single-entry fallback only fires when there is exactly one.
+	if len(cfg.Flows) < 2 {
+		t.Fatalf("a single seeded route would adopt every card: %+v", cfg.Flows)
 	}
 
 	// Deleting every route is a decision and must survive a restart.

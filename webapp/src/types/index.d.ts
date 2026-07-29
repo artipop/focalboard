@@ -42,6 +42,7 @@ export interface IAppWindow extends Window {
                 RemoveDeployTarget(name: string): Promise<void>
                 ListFlows(): Promise<string>
                 ListFlowTriggers(): Promise<string>
+                ListFlowTemplates(): Promise<string>
                 AddFlow(entryJSON: string): Promise<string>
                 UpdateFlow(entryJSON: string): Promise<string>
                 RemoveFlow(name: string): Promise<void>

@@ -87,6 +87,7 @@ const WorkflowsDialog = (props: Props) => {
     const bindings = agentBindings()
 
     const [flows, setFlows] = useState<Flow[]>([])
+    const [templates, setTemplates] = useState<Flow[]>([])
     const [triggers, setTriggers] = useState<FlowTrigger[]>([])
     const [form, setForm] = useState<Flow | null>(null)
     const [editingName, setEditingName] = useState<string | null>(null)
@@ -113,6 +114,9 @@ const WorkflowsDialog = (props: Props) => {
             if (bindings.ListFlowTriggers) {
                 setTriggers(JSON.parse(await bindings.ListFlowTriggers()) || [])
             }
+            if (bindings.ListFlowTemplates) {
+                setTemplates(JSON.parse(await bindings.ListFlowTemplates()) || [])
+            }
         } catch (e) {
             setError(String(e))
         }
@@ -132,6 +136,14 @@ const WorkflowsDialog = (props: Props) => {
         setEditingName(null)
         setError('')
     }, [selectProperties])
+
+    // A route the install ships with, opened in the editor rather than saved
+    // behind the user's back: the graph is there to be looked at first.
+    const startFromTemplate = useCallback((flow: Flow) => {
+        setForm({...flow, nodes: [...(flow.nodes || [])], edges: [...(flow.edges || [])]})
+        setEditingName(null)
+        setError('')
+    }, [])
 
     const startEdit = useCallback((flow: Flow) => {
         setForm({...flow, nodes: [...(flow.nodes || [])], edges: [...(flow.edges || [])]})
@@ -207,6 +219,12 @@ const WorkflowsDialog = (props: Props) => {
     })
 
     const waitTriggers = triggers.filter((t) => t.source !== 'outcome')
+
+    // Only the shipped routes this registry does not already have: the point is
+    // to fill a gap, not to offer a duplicate the engine would refuse.
+    const missingTemplates = templates.filter(
+        (t) => !flows.some((f) => f.name.toLowerCase() === t.name.toLowerCase()),
+    )
 
     const nodeName = (id: string) => form?.nodes.find((n) => n.id === id)?.column || id
 
@@ -422,6 +440,19 @@ const WorkflowsDialog = (props: Props) => {
                             <div className='WorkflowsDialog__hint'>
                                 {intl.formatMessage({id: 'Workflows.pick-columns-hint', defaultMessage: 'Every stage needs a column.'})}
                             </div>}
+                    </div>}
+
+                {!form && missingTemplates.length > 0 &&
+                    <div className='WorkflowsDialog__templates'>
+                        <span className='WorkflowsDialog__hint'>
+                            {intl.formatMessage({id: 'Workflows.templates', defaultMessage: 'Ready-made routes, the ones the board template names:'})}
+                        </span>
+                        {missingTemplates.map((flow) => (
+                            <Button
+                                key={flow.name}
+                                onClick={() => startFromTemplate(flow)}
+                            >{flow.name}</Button>
+                        ))}
                     </div>}
 
                 {!form &&

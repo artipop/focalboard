@@ -81,7 +81,13 @@ runtime).
   `checks.*` call the GitHub API and want a token in `githubToken` (or
   `GITHUB_TOKEN`) — public repositories work without one, more slowly. The
   interval is `vcsPollSeconds` (default 60) and the remote is `gitRemote`
-  (default `origin`).
+  (default `origin`). A fresh config is seeded with three routes — `Feature`,
+  `Hotfix` and `Review only` — and the "My Project Tasks" board template ships
+  the columns they name plus a `Workflow` property to pick one with, so a new
+  board runs them without any setup. Picking a route stays optional: a card with
+  no `Workflow` option takes none, and the trigger columns work as they always
+  did. The editor draws the route as a graph and offers whichever shipped route
+  the registry is missing.
 
 ## Develop
 
