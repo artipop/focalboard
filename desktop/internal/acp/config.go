@@ -304,6 +304,7 @@ func DefaultConfig(dataDir string) Config {
 		MaxConcurrent:            3,
 		SessionTimeoutMinutes:    15,
 		SessionIdleMinutes:       30,
+		ShowThoughts:             true,
 		PermissionTimeoutMinutes: 5,
 		IdempotencyWindowSeconds: 10,
 		// Bash is on the list because a coding agent cannot do its job without a

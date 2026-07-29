@@ -9,6 +9,10 @@
 //	-mode raw: probe the `claude` binary's native stream-json stdio protocol
 //	           directly, to verify whether permission control requests
 //	           (can_use_tool) can be proxied — needed for the Phase-2 modal.
+//	-mode stream: measure how the agent's answer actually reaches the console —
+//	           chunk count, first-chunk latency and the largest gap between
+//	           chunks — through the production claudebridge. A single chunk
+//	           arriving at the end means streaming is broken somewhere.
 //	-mode multiturn: probe conversation continuity across two turns, which the
 //	           interactive session console needs (both bridges currently respawn
 //	           the CLI per turn, so turn 2 would start with an empty context).
@@ -44,7 +48,7 @@ import (
 )
 
 func main() {
-	mode := flag.String("mode", "lib", "lib | raw | bridge | multiturn")
+	mode := flag.String("mode", "lib", "lib | raw | bridge | multiturn | stream")
 	cwd := flag.String("cwd", "", "working directory for the session (default: temp dir)")
 	prompt := flag.String("prompt", "Create a file named hello.txt containing exactly 'hello from acp spike', then briefly summarize what you did.", "prompt to send")
 	timeout := flag.Duration("timeout", 5*time.Minute, "overall timeout")
@@ -82,6 +86,10 @@ func main() {
 	case "bridge":
 		if err := runBridge(ctx, abs, *prompt); err != nil {
 			log.Fatalf("bridge mode: %v", err)
+		}
+	case "stream":
+		if err := runStream(ctx, abs, *prompt); err != nil {
+			log.Fatalf("stream mode: %v", err)
 		}
 	case "multiturn":
 		if err := runMultiturn(ctx, abs, *agent, *strategy); err != nil {
@@ -771,4 +779,138 @@ func runCodex(ctx context.Context, bin, cwd string, argv ...string) (text, threa
 		return out.String(), threadID, err
 	}
 	return out.String(), threadID, cmd.Wait()
+}
+
+// ---- mode=stream: is the answer actually streamed? ----
+
+// streamPrompt asks for something long enough that arriving in one piece would
+// be obvious, and cheap enough not to need the repository.
+const streamPrompt = "Перечисли по пунктам 10 признаков хорошего кода, каждый с одним предложением пояснения. Не используй инструменты."
+
+// chunkClock records when each piece of the agent's answer arrives.
+type chunkClock struct {
+	mu       sync.Mutex
+	start    time.Time
+	arrivals []time.Duration
+	thoughts int
+	bytes    int
+}
+
+func (c *chunkClock) text(n int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.arrivals = append(c.arrivals, time.Since(c.start))
+	c.bytes += n
+}
+
+func (c *chunkClock) thought() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.thoughts++
+}
+
+func (c *chunkClock) report() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	fmt.Printf("\n\n== streaming ==\n")
+	fmt.Printf("text chunks : %d (%d bytes)\n", len(c.arrivals), c.bytes)
+	fmt.Printf("thought chunks: %d\n", c.thoughts)
+	if len(c.arrivals) == 0 {
+		fmt.Println("❌ nothing arrived")
+		return
+	}
+	var maxGap time.Duration
+	prev := time.Duration(0)
+	for _, at := range c.arrivals {
+		if gap := at - prev; gap > maxGap {
+			maxGap = gap
+		}
+		prev = at
+	}
+	fmt.Printf("first chunk : %s\n", c.arrivals[0].Round(time.Millisecond))
+	fmt.Printf("last chunk  : %s\n", c.arrivals[len(c.arrivals)-1].Round(time.Millisecond))
+	fmt.Printf("largest gap : %s\n", maxGap.Round(time.Millisecond))
+	switch {
+	case len(c.arrivals) == 1:
+		fmt.Println("❌ the whole answer arrived as ONE chunk — not streamed")
+	case c.arrivals[0] > 10*time.Second:
+		fmt.Println("⚠️  streamed, but the first chunk took a long time (thinking is invisible unless showThoughts is on)")
+	default:
+		fmt.Println("✅ streamed incrementally")
+	}
+}
+
+// streamClient counts chunks instead of printing a transcript.
+type streamClient struct {
+	spikeClient
+	clock *chunkClock
+}
+
+func (c *streamClient) SessionUpdate(ctx context.Context, params acp.SessionNotification) error {
+	u := params.Update
+	switch {
+	case u.AgentMessageChunk != nil:
+		if t := u.AgentMessageChunk.Content.Text; t != nil {
+			c.clock.text(len(t.Text))
+			fmt.Print(".")
+		}
+	case u.AgentThoughtChunk != nil:
+		c.clock.thought()
+		fmt.Print("~")
+	case u.ToolCall != nil:
+		fmt.Print("T")
+	}
+	return nil
+}
+
+// runStream drives the production bridge and measures the arrival of the answer.
+// Each "." is one text chunk as the console would receive it, "~" a thought.
+func runStream(ctx context.Context, cwd, prompt string) error {
+	if prompt == "" {
+		prompt = streamPrompt
+	}
+	claudeBin, err := exec.LookPath("claude")
+	if err != nil {
+		return fmt.Errorf("claude binary not found in PATH: %w", err)
+	}
+	bridge := claudebridge.New(claudebridge.Options{Launch: []string{claudeBin}})
+
+	clientIn, agentOut := io.Pipe()
+	agentIn, clientOut := io.Pipe()
+	agentConn := acp.NewAgentSideConnection(bridge, agentOut, agentIn)
+	bridge.SetConn(agentConn)
+	clock := &chunkClock{start: time.Now()}
+	conn := acp.NewClientSideConnection(&streamClient{clock: clock}, clientOut, clientIn)
+	defer bridge.KillAll(2 * time.Second)
+
+	if _, err := conn.Initialize(ctx, acp.InitializeRequest{
+		ProtocolVersion:    acp.ProtocolVersionNumber,
+		ClientCapabilities: acp.ClientCapabilities{Fs: acp.FileSystemCapabilities{ReadTextFile: true, WriteTextFile: true}},
+	}); err != nil {
+		return fmt.Errorf("initialize: %w", err)
+	}
+	sess, err := conn.NewSession(ctx, acp.NewSessionRequest{Cwd: cwd, McpServers: []acp.McpServer{}})
+	if err != nil {
+		return fmt.Errorf("session/new: %w", err)
+	}
+
+	// Two turns: the report is about the second, which is where it looked wrong.
+	for turn, text := range []string{"Привет. Ответь одним словом: готов?", prompt} {
+		fmt.Printf("\n-- turn %d --\n", turn+1)
+		clock.mu.Lock()
+		clock.start = time.Now()
+		clock.arrivals = nil
+		clock.thoughts = 0
+		clock.bytes = 0
+		clock.mu.Unlock()
+
+		if _, err := conn.Prompt(ctx, acp.PromptRequest{
+			SessionId: sess.SessionId,
+			Prompt:    []acp.ContentBlock{acp.TextBlock(text)},
+		}); err != nil {
+			return fmt.Errorf("turn %d: %w", turn+1, err)
+		}
+		clock.report()
+	}
+	return nil
 }

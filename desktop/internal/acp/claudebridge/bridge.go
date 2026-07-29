@@ -249,6 +249,12 @@ func (b *Bridge) ensureProc(ctx context.Context, s *session) (*procHandle, error
 		"--verbose",
 		"--include-partial-messages",
 		"--permission-prompt-tool", "stdio",
+		// AskUserQuestion opens the CLI's own interactive picker, which does not
+		// exist in stream-json mode: granting it lets the tool "complete" with
+		// no answers, and the agent then reports that its questions went
+		// unanswered. Taking it away makes it ask in the conversation, where the
+		// console can actually show the questions and take a reply.
+		"--disallowedTools", "AskUserQuestion",
 		"-p",
 	)
 	if resume {
