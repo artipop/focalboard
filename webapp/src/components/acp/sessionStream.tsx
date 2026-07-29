@@ -10,6 +10,7 @@
 /* eslint-disable new-cap */
 import React, {useEffect, useRef, useState} from 'react'
 
+import {Utils} from '../../utils'
 import Button from '../../widgets/buttons/button'
 
 import './sessionStream.scss'
@@ -225,10 +226,14 @@ export const ConsoleEntry = (props: EntryProps) => {
         return <div className='SessionConsole__entry SessionConsole__entry--failed'>{entry.text}</div>
     }
     if (entry.kind === 'text') {
+        // Agents answer in markdown — lists, code fences, links — so it is
+        // rendered the same way card comments are rather than shown as source.
+        // Partial markdown mid-stream is fine: marked renders what has arrived.
         return (
-            <div className={`SessionConsole__entry SessionConsole__entry--text${entry.thought ? ' is-thought' : ''}`}>
-                {entry.text}
-            </div>
+            <div
+                className={`SessionConsole__entry SessionConsole__entry--text${entry.thought ? ' is-thought' : ''}`}
+                dangerouslySetInnerHTML={{__html: Utils.htmlFromMarkdown(entry.text)}}
+            />
         )
     }
     if (entry.kind === 'tool') {

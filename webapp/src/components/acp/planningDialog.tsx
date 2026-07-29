@@ -108,8 +108,11 @@ const PlanningDialog = (props: Props) => {
                 setRepos(parsedRepos)
                 setAgents(parsedAgents)
 
-                // With a single entry there is nothing to choose.
-                if (parsedRepos.length === 1) {
+                // Default to a registered repository rather than to none:
+                // having registered one is a good sign the plan is about that
+                // code, and starting code-blind by accident is the worse
+                // surprise. Opting out is the explicit "—".
+                if (parsedRepos.length > 0) {
                     setRepoName(parsedRepos[0].name)
                 }
                 if (parsedAgents.length === 1) {
@@ -244,7 +247,7 @@ const PlanningDialog = (props: Props) => {
                                 value={repoName}
                                 onChange={(e) => setRepoName(e.target.value)}
                             >
-                                <option value=''>{intl.formatMessage({id: 'Planning.no-repository', defaultMessage: 'Without a repository'})}</option>
+                                <option value=''>{intl.formatMessage({id: 'Planning.no-repository', defaultMessage: '—'})}</option>
                                 {repos.map((r) => (
                                     <option
                                         key={r.name}

@@ -137,6 +137,21 @@ describe('components/acp/sessionConsole', () => {
         await waitFor(() => expect(bindings.DetachSession).toBeCalledWith('sess-late'))
     })
 
+    test('renders the agent answer as markdown, not as source', async () => {
+        const bindings = bindingsWith(
+            [{id: 'sess-md', status: 'done'}],
+            [{sessionId: 'sess-md', kind: 'chunk', payload: {text: 'Правим **store.ts**:\n\n- кеш\n- инвалидация\n'}}],
+        )
+        anyWindow.go = {main: {App: bindings}}
+
+        const {container} = render(wrapIntl(<SessionConsole cardId='card1'/>))
+
+        await waitFor(() => expect(container.querySelector('strong')).toBeInTheDocument())
+        expect(container.querySelector('strong')).toHaveTextContent('store.ts')
+        expect(container.querySelectorAll('li')).toHaveLength(2)
+        expect(screen.queryByText(/\*\*store\.ts\*\*/)).not.toBeInTheDocument()
+    })
+
     test('surfaces a failed follow-up turn', async () => {
         const bindings = bindingsWith([{id: 'sess-6', status: 'running'}])
         anyWindow.go = {main: {App: bindings}}

@@ -30,6 +30,12 @@ type AgentEntry struct {
 	Env     map[string]string `json:"env,omitempty"`     // per-process env (CODEX_HOME, OPENAI_API_KEY, …)
 	Args    []string          `json:"args,omitempty"`    // extra CLI args (sandbox/approval, etc.)
 
+	// AutoAllowTools overrides the global policy for this agent, so a trusted
+	// one can be let loose and a new one kept on a short leash without changing
+	// anything for the rest. Entries take the same form as autoAllowTools,
+	// including argument patterns such as "Bash(git *)".
+	AutoAllowTools []string `json:"autoAllowTools,omitempty"`
+
 	// Command is the launch argv. For the ACP-native kinds it is the whole
 	// agent command (required for "acp"). For claude/codex it replaces the
 	// binary the bridge builds its invocation on: the last element is the CLI
@@ -274,9 +280,12 @@ type Config struct {
 	PermissionTimeoutMinutes int      `json:"permissionTimeoutMinutes"`
 	IdempotencyWindowSeconds int      `json:"idempotencyWindowSeconds"`
 	AutoAllowTools           []string `json:"autoAllowTools"`
-	ShowThoughts             bool     `json:"showThoughts"`
-	WorktreeDir              string   `json:"worktreeDir"`
-	KeepFailedWorktrees      bool     `json:"keepFailedWorktrees"`
+	// PlanningTools is the policy for planning sessions; empty means the
+	// built-in read-only set.
+	PlanningTools       []string `json:"planningTools,omitempty"`
+	ShowThoughts        bool     `json:"showThoughts"`
+	WorktreeDir         string   `json:"worktreeDir"`
+	KeepFailedWorktrees bool     `json:"keepFailedWorktrees"`
 }
 
 // DefaultConfig returns the defaults written on first run. dataDir is the ACP
@@ -357,14 +366,22 @@ func (c Config) UseWorktrees() bool {
 	return c.WorktreeMode == "always"
 }
 
-// ToolAllowed reports whether toolName is on the auto-allow list.
-func (c Config) ToolAllowed(toolName string) bool {
-	for _, t := range c.AutoAllowTools {
-		if strings.EqualFold(t, toolName) {
-			return true
-		}
+// ToolAllowed reports whether the call runs without asking, under the global
+// policy. input is the tool's raw input, which entries carrying an argument
+// pattern are matched against; pass nil when it is not available.
+func (c Config) ToolAllowed(toolName string, input any) bool {
+	return ToolPolicy(c.AutoAllowTools).Allows(toolName, input)
+}
+
+// PlanningPolicy is what a planning session may do unasked. It is deliberately
+// separate from AutoAllowTools: planning reads a repository to argue about it,
+// so it needs to look around freely but must not be able to change anything,
+// whatever the global policy has been relaxed to.
+func (c Config) PlanningPolicy() ToolPolicy {
+	if len(c.PlanningTools) > 0 {
+		return ToolPolicy(c.PlanningTools)
 	}
-	return false
+	return ToolPolicy(defaultPlanningTools())
 }
 
 // SaveConfig writes cfg to path (used when the UI edits the repo registry).

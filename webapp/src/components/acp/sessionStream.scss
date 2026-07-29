@@ -19,8 +19,56 @@
 
 .SessionConsole__entry {
     font-size: 13px;
-    white-space: pre-wrap;
     word-break: break-word;
+}
+
+// Plain-text entries keep their line breaks; markdown entries lay themselves
+// out and would be double-spaced by pre-wrap.
+.SessionConsole__entry--prompt,
+.SessionConsole__entry--failed,
+.SessionConsole__entry--tool {
+    white-space: pre-wrap;
+}
+
+.SessionConsole__entry--text {
+    // marked wraps everything in blocks; without this each paragraph would
+    // carry the browser's default margin and the stream would look airy.
+    > :first-child {
+        margin-top: 0;
+    }
+
+    > :last-child {
+        margin-bottom: 0;
+    }
+
+    p {
+        margin: 0 0 6px;
+    }
+
+    ul,
+    ol {
+        margin: 0 0 6px;
+        padding-left: 20px;
+    }
+
+    pre {
+        overflow-x: auto;
+        margin: 0 0 6px;
+        padding: 8px;
+        border-radius: 4px;
+        background: rgba(var(--center-channel-color-rgb), 0.08);
+    }
+
+    code {
+        font-family: monospace;
+        font-size: 12px;
+    }
+
+    :not(pre) > code {
+        border-radius: 3px;
+        padding: 1px 4px;
+        background: rgba(var(--center-channel-color-rgb), 0.08);
+    }
 }
 
 .SessionConsole__entry--prompt {

@@ -676,17 +676,25 @@ func TestPlanningSessionIsReadOnly(t *testing.T) {
 		t.Fatalf("start planning session: %v", err)
 	}
 	for _, tool := range []string{"Read", "Grep", "Glob"} {
-		if !s.autoAllowed(tool, m.cfg) {
+		if !s.autoAllowed(tool, nil, m.cfg) {
 			t.Errorf("%s should run unasked while planning", tool)
 		}
 	}
-	for _, tool := range []string{"Write", "Edit", "Bash"} {
-		if s.autoAllowed(tool, m.cfg) {
+	// Looking around is allowed, changing things is not — even though the
+	// global policy permits both.
+	if !s.autoAllowed("Bash", bashInput("git status"), m.cfg) {
+		t.Error("planning should be able to inspect the repository with the shell")
+	}
+	for _, tool := range []string{"Write", "Edit"} {
+		if s.autoAllowed(tool, nil, m.cfg) {
 			t.Errorf("%s must not run unasked while planning", tool)
 		}
-		if !m.cfg.ToolAllowed(tool) {
+		if !m.cfg.ToolAllowed(tool, nil) {
 			t.Errorf("test premise broken: %s should be on the global allow list", tool)
 		}
+	}
+	if s.autoAllowed("Bash", bashInput("rm -rf build"), m.cfg) {
+		t.Error("planning must ask before a destructive command")
 	}
 }
 

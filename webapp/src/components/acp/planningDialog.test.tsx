@@ -83,7 +83,7 @@ describe('components/acp/planningDialog', () => {
         expect(container).toBeEmptyDOMElement()
     })
 
-    test('preselects the only repository and agent, then starts a session', async () => {
+    test('preselects a registered repository and agent, then starts a session', async () => {
         const bindings = planningBindings()
         anyWindow.go = {main: {App: bindings}}
         fakeRuntime()
@@ -98,7 +98,8 @@ describe('components/acp/planningDialog', () => {
             />,
         ))
 
-        // A single registry entry needs no choosing, so Start is live at once.
+        // A registered repository is selected by default, so Start is live at
+        // once and the session is not accidentally code-blind.
         const start = await screen.findByRole('button', {name: 'Start planning'})
         await waitFor(() => expect(start).toBeEnabled())
         userEvent.click(start)

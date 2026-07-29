@@ -243,7 +243,7 @@
   "Planning.confirm": "Create card",
   "Planning.create": "Create task",
   "Planning.hint": "Talk the task through with the agent. With a repository it reads the code but changes nothing; anything else asks first.",
-  "Planning.no-repository": "Without a repository",
+  "Planning.no-repository": "—",
   "Planning.placeholder": "Describe what you want — Enter to send, Shift+Enter for a new line",
   "Planning.repository": "Repository",
   "Planning.start": "Start planning",

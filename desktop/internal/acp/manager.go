@@ -165,6 +165,7 @@ func (m *Manager) startSession(ev CardMoved, interactive bool) (*Session, error)
 		Agent:       agent,
 		Net:         net,
 		PromptText:  composePrompt(ev, agent, systemPrompt, m.cfg.UseWorktrees()),
+		Policy:      agentPolicy(agent),
 		status:      StatusQueued,
 		allowTools:  make(map[string]bool),
 		interactive: interactive,
@@ -251,11 +252,6 @@ func (m *Manager) StartSessionForCard(cardID string) (*Session, error) {
 	return s, nil
 }
 
-// planningReadOnlyTools is what a planning session may run unasked. Anything
-// that writes goes through the permission prompt, so a conversation about a
-// task cannot quietly turn into an edit of it.
-var planningReadOnlyTools = []string{"Read", "Grep", "Glob"}
-
 // StartPlanningSession opens a card-less session for talking a task through
 // before it exists. An empty repoName plans without one — useful when the task
 // is not about existing code yet; agentName may be empty when the agent
@@ -294,7 +290,7 @@ func (m *Manager) StartPlanningSession(repoName, agentName string) (*Session, er
 		PromptText:  planningPrompt(systemPrompt, agent, repo),
 		Planning:    true,
 		scratchDir:  scratch,
-		AutoAllow:   planningReadOnlyTools,
+		Policy:      m.cfg.PlanningPolicy(),
 		status:      StatusQueued,
 		allowTools:  make(map[string]bool),
 		interactive: true,
@@ -726,8 +722,10 @@ func planningPrompt(systemPrompt string, agent AgentEntry, repo RepoEntry) strin
 		return string(b)
 	}
 	b = fmt.Appendf(b, "Мы планируем новую задачу по репозиторию `%s` (%s).\n", repo.Name, repo.Path)
-	b = fmt.Appendf(b, "Изучай код, задавай уточняющие вопросы и предлагай решение, но ничего не меняй: ")
-	b = fmt.Appendf(b, "ни файлов, ни команд, меняющих состояние. Это обсуждение, а не выполнение.\n\n")
+	b = fmt.Appendf(b, "Код у тебя есть — читай файлы, ищи по ним, смотри историю git: ")
+	b = fmt.Appendf(b, "чтение и безопасные команды осмотра разрешены, опирайся на код, а не на догадки.\n")
+	b = fmt.Appendf(b, "Не меняй ничего: ни файлов, ни состояния. Это обсуждение, а не выполнение. ")
+	b = fmt.Appendf(b, "Если для ответа всё же нужна команда, меняющая состояние, — попроси, у пользователя спросят подтверждение.\n\n")
 	b = fmt.Appendf(b, "Начни с короткого вопроса о том, что нужно сделать.")
 	return string(b)
 }

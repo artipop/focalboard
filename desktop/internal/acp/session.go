@@ -52,9 +52,10 @@ type Session struct {
 	// through a task before one is created. It reads the repository but never
 	// writes, so it neither takes the repo lock nor reports to a card.
 	Planning bool
-	// AutoAllow overrides the global autoAllowTools for this session; a
-	// planning session narrows it to the read-only tools.
-	AutoAllow []string
+	// Policy decides which tool calls run without asking. It is resolved once
+	// at start — planning is held read-only, an agent may carry its own list,
+	// otherwise the global one applies — so the rule cannot drift mid-session.
+	Policy ToolPolicy
 	// scratchDir is a throwaway working directory made for a session that has
 	// no repository, removed when the session ends.
 	scratchDir string
@@ -146,19 +147,14 @@ func (s *Session) toolAllowed(name string) bool {
 	return s.allowTools[name]
 }
 
-// autoAllowed reports whether the tool runs without asking. A session may carry
-// its own list — a planning session is held to read-only tools whatever the
-// global policy permits.
-func (s *Session) autoAllowed(name string, cfg Config) bool {
-	if s.AutoAllow == nil {
-		return cfg.ToolAllowed(name)
+// autoAllowed reports whether the call runs without asking, under the policy
+// resolved for this session. input is the tool's raw input, so entries that
+// narrow a tool by argument — "Bash(git log*)" — can be checked.
+func (s *Session) autoAllowed(name string, input any, cfg Config) bool {
+	if s.Policy == nil {
+		return cfg.ToolAllowed(name, input)
 	}
-	for _, t := range s.AutoAllow {
-		if strings.EqualFold(t, name) {
-			return true
-		}
-	}
-	return false
+	return s.Policy.Allows(name, input)
 }
 
 // appendEvent persists a session event with the next sequence number.
