@@ -140,7 +140,9 @@ func (m *Manager) startSession(ev CardMoved, interactive bool) (*Session, error)
 		m.mu.Lock()
 		var busyCard string
 		for _, other := range m.active {
-			if other.RepoPath == repoPath {
+			// A planning session only reads, so it neither claims the working
+			// copy nor keeps a card's session out of it.
+			if other.RepoPath == repoPath && !other.Planning {
 				busyCard = other.CardID
 				break
 			}
@@ -249,6 +251,150 @@ func (m *Manager) StartSessionForCard(cardID string) (*Session, error) {
 	return s, nil
 }
 
+// planningReadOnlyTools is what a planning session may run unasked. Anything
+// that writes goes through the permission prompt, so a conversation about a
+// task cannot quietly turn into an edit of it.
+var planningReadOnlyTools = []string{"Read", "Grep", "Glob"}
+
+// StartPlanningSession opens a card-less session for talking a task through
+// before it exists. repoName and agentName name registry entries; either may be
+// empty when the registry holds exactly one.
+func (m *Manager) StartPlanningSession(repoName, agentName string) (*Session, error) {
+	repo, err := m.planningRepo(repoName)
+	if err != nil {
+		return nil, err
+	}
+	agent, err := m.planningAgent(agentName)
+	if err != nil {
+		return nil, err
+	}
+	net, err := m.resolveNetwork(agent)
+	if err != nil {
+		return nil, err
+	}
+
+	m.cfgMu.RLock()
+	systemPrompt := m.cfg.SystemPrompt
+	m.cfgMu.RUnlock()
+
+	s := &Session{
+		ID:          uuid.NewString(),
+		RepoPath:    repo.Path,
+		Agent:       agent,
+		Net:         net,
+		PromptText:  planningPrompt(systemPrompt, agent, repo),
+		Planning:    true,
+		AutoAllow:   planningReadOnlyTools,
+		status:      StatusQueued,
+		allowTools:  make(map[string]bool),
+		interactive: true,
+		attached:    1,
+		turns:       make(chan turnRequest, 1),
+		closeCh:     make(chan struct{}),
+	}
+	rec := SessionRecord{
+		ID:        s.ID,
+		AgentKind: agent.Kind,
+		Status:    StatusQueued,
+		StartedAt: time.Now(),
+	}
+	if err := m.store.InsertSession(rec); err != nil {
+		return nil, fmt.Errorf("persist session: %w", err)
+	}
+
+	m.mu.Lock()
+	m.active[s.ID] = s
+	m.mu.Unlock()
+	m.emitSession(s, "")
+	m.log.Info("acp: planning session started", "session", s.ID, "repo", repo.Path, "agent", agent.Name)
+
+	m.wg.Add(1)
+	go m.runSession(s)
+	return s, nil
+}
+
+// planningRepo picks the registry entry to plan against.
+func (m *Manager) planningRepo(name string) (RepoEntry, error) {
+	repos := m.Repos()
+	if len(repos) == 0 {
+		return RepoEntry{}, fmt.Errorf("не зарегистрировано ни одного репозитория (меню доски → Agent repositories)")
+	}
+	if name == "" {
+		if len(repos) > 1 {
+			return RepoEntry{}, fmt.Errorf("укажи репозиторий: зарегистрировано несколько")
+		}
+		return repos[0], nil
+	}
+	for _, r := range repos {
+		if strings.EqualFold(r.Name, name) {
+			return r, nil
+		}
+	}
+	return RepoEntry{}, fmt.Errorf("репозиторий %q не найден в реестре", name)
+}
+
+// planningAgent picks the registry entry that will do the planning.
+func (m *Manager) planningAgent(name string) (AgentEntry, error) {
+	agents := m.Agents()
+	if len(agents) == 0 {
+		return AgentEntry{}, fmt.Errorf("не зарегистрировано ни одного агента (меню доски → Agents)")
+	}
+	if name == "" {
+		if len(agents) > 1 {
+			return AgentEntry{}, fmt.Errorf("укажи агента: зарегистрировано несколько")
+		}
+		return agents[0], nil
+	}
+	for _, a := range agents {
+		if strings.EqualFold(a.Name, name) {
+			return a, nil
+		}
+	}
+	return AgentEntry{}, fmt.Errorf("агент %q не найден в реестре", name)
+}
+
+// composeTaskPrompt asks for the conversation to be boiled down to a card. The
+// shape is fixed because the UI splits the answer on the first line.
+const composeTaskPrompt = `Оформи то, о чём мы договорились, как задачу для трекера.
+Ответь ровно в таком виде, без markdown-заголовков и без вступления:
+первая строка — краткий заголовок задачи (до 80 символов),
+далее с новой строки — описание: что нужно сделать, где в коде и как проверить.`
+
+// ComposeTask runs one more turn asking the agent to boil the conversation down
+// to a task, and returns its answer: first line the title, the rest the body.
+func (m *Manager) ComposeTask(sessionID string) (string, error) {
+	s := m.session(sessionID)
+	if s == nil {
+		return "", fmt.Errorf("сессия %s не активна", sessionID)
+	}
+	req := turnRequest{text: composeTaskPrompt, done: make(chan turnOutcome, 1)}
+	select {
+	case s.turns <- req:
+	case <-s.closeCh:
+		return "", fmt.Errorf("сессия закрывается")
+	default:
+		return "", fmt.Errorf("агент ещё занят предыдущим сообщением")
+	}
+
+	s.appendEvent(m, "prompt", map[string]any{"text": composeTaskPrompt})
+	m.ui.Emit(EventPrompt, map[string]any{
+		"sessionId": s.ID, "cardId": s.CardID, "text": composeTaskPrompt,
+	})
+
+	select {
+	case out := <-req.done:
+		if out.err != nil {
+			return "", out.err
+		}
+		if strings.TrimSpace(out.text) == "" {
+			return "", fmt.Errorf("агент вернул пустой ответ")
+		}
+		return out.text, nil
+	case <-m.rootCtx.Done():
+		return "", fmt.Errorf("приложение завершается")
+	}
+}
+
 // PromptSession queues a follow-up message onto a live session.
 func (m *Manager) PromptSession(sessionID, text string) error {
 	if strings.TrimSpace(text) == "" {
@@ -269,7 +415,7 @@ func (m *Manager) PromptSession(sessionID, text string) error {
 
 	// The queue holds one message, so typing while the agent is still working
 	// is fine: the turn loop picks it up as soon as it goes idle.
-	req := turnRequest{text: text, done: make(chan error, 1)}
+	req := turnRequest{text: text, done: make(chan turnOutcome, 1)}
 	select {
 	case s.turns <- req:
 		return nil
@@ -446,6 +592,9 @@ func (m *Manager) comment(s *Session, text string) {
 }
 
 func (m *Manager) commentCard(cardID, text string) {
+	if cardID == "" {
+		return // a planning session has no card to report to
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := m.writer.AddComment(ctx, cardID, text); err != nil {
@@ -552,6 +701,24 @@ func resolveArgv0(argv []string) []string {
 		out[0] = p
 	}
 	return out
+}
+
+// planningPrompt opens a planning conversation: the board/agent system prompts,
+// then what this session is for. It is deliberately explicit that nothing is to
+// be changed — the tool policy enforces it, but the agent should not try.
+func planningPrompt(systemPrompt string, agent AgentEntry, repo RepoEntry) string {
+	var b []byte
+	if p := strings.TrimSpace(systemPrompt); p != "" {
+		b = fmt.Appendf(b, "%s\n\n", p)
+	}
+	if p := strings.TrimSpace(agent.Prompt); p != "" {
+		b = fmt.Appendf(b, "%s\n\n", p)
+	}
+	b = fmt.Appendf(b, "Мы планируем новую задачу по репозиторию `%s` (%s).\n", repo.Name, repo.Path)
+	b = fmt.Appendf(b, "Изучай код, задавай уточняющие вопросы и предлагай решение, но ничего не меняй: ")
+	b = fmt.Appendf(b, "ни файлов, ни команд, меняющих состояние. Это обсуждение, а не выполнение.\n\n")
+	b = fmt.Appendf(b, "Начни с короткого вопроса о том, что нужно сделать.")
+	return string(b)
 }
 
 // composePrompt builds the agent task text from the card. The final prompt is

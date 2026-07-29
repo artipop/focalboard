@@ -42,6 +42,8 @@ export interface IAppWindow extends Window {
                 StartCardSession(cardId: string): Promise<string>
                 PromptSession(sessionId: string, text: string): Promise<void>
                 AnswerPermission(sessionId: string, requestId: string, optionId: string): Promise<void>
+                StartPlanningSession(repoName: string, agentName: string): Promise<string>
+                ComposeTask(sessionId: string): Promise<string>
                 AttachSession(sessionId: string): Promise<boolean>
                 DetachSession(sessionId: string): Promise<void>
                 CloseSession(sessionId: string): Promise<void>

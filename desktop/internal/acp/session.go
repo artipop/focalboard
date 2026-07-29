@@ -20,7 +20,14 @@ import (
 // turnRequest is one user message queued onto a live session.
 type turnRequest struct {
 	text string
-	done chan error // buffered(1); receives the turn's outcome
+	done chan turnOutcome // buffered(1); receives the turn's outcome
+}
+
+// turnOutcome is what a turn produced: the agent's final message and the error
+// that ended it, if any.
+type turnOutcome struct {
+	text string
+	err  error
 }
 
 // Session is one agent conversation bound to a card. A session triggered by a
@@ -39,6 +46,14 @@ type Session struct {
 
 	Worktree     WorktreeInfo
 	usedWorktree bool // a dedicated worktree was actually created
+
+	// Planning is a session with no card behind it: it exists only to talk
+	// through a task before one is created. It reads the repository but never
+	// writes, so it neither takes the repo lock nor reports to a card.
+	Planning bool
+	// AutoAllow overrides the global autoAllowTools for this session; a
+	// planning session narrows it to the read-only tools.
+	AutoAllow []string
 
 	mu          sync.Mutex
 	status      SessionStatus
@@ -127,6 +142,21 @@ func (s *Session) toolAllowed(name string) bool {
 	return s.allowTools[name]
 }
 
+// autoAllowed reports whether the tool runs without asking. A session may carry
+// its own list — a planning session is held to read-only tools whatever the
+// global policy permits.
+func (s *Session) autoAllowed(name string, cfg Config) bool {
+	if s.AutoAllow == nil {
+		return cfg.ToolAllowed(name)
+	}
+	for _, t := range s.AutoAllow {
+		if strings.EqualFold(t, name) {
+			return true
+		}
+	}
+	return false
+}
+
 // appendEvent persists a session event with the next sequence number.
 func (s *Session) appendEvent(m *Manager, kind string, payload any) {
 	if err := m.store.AppendEvent(s.ID, s.seq.Add(1), kind, payload); err != nil {
@@ -170,7 +200,10 @@ func (m *Manager) runSession(s *Session) {
 
 // prepareWorkdir sets up the session's working directory and announces it.
 func (m *Manager) prepareWorkdir(s *Session) error {
-	if m.cfg.UseWorktrees() {
+	// A planning session only reads, so it runs in the repository itself even
+	// under worktreeMode "always": a worktree would cost a checkout and leave
+	// a branch behind for a conversation that changes nothing.
+	if m.cfg.UseWorktrees() && !s.Planning {
 		wt, err := CreateWorktree(m.rootCtx, s.RepoPath, s.BaseBranch, s.CardID, s.ID, m.cfg.WorktreeDir)
 		if err != nil {
 			return fmt.Errorf("не удалось создать git worktree: %w", err)
@@ -210,7 +243,7 @@ func (m *Manager) turnLoop(s *Session, conn *acpsdk.ClientSideConnection, acpSes
 	for {
 		finalText, err := m.runTurn(s, conn, acpSessionID, req.text)
 		if req.done != nil {
-			req.done <- err
+			req.done <- turnOutcome{text: finalText, err: err}
 		}
 
 		s.mu.Lock()

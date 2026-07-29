@@ -1,0 +1,73 @@
+.PlanningDialog {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 0 24px 24px;
+    min-width: 560px;
+
+    .PlanningDialog__setup,
+    .PlanningDialog__review {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-weight: 600;
+        }
+
+        select,
+        input,
+        textarea {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+            background: rgba(var(--center-channel-color-rgb), 0.04);
+            color: rgb(var(--center-channel-color-rgb));
+            font-family: inherit;
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        textarea {
+            resize: vertical;
+        }
+    }
+
+    .PlanningDialog__hint {
+        color: rgba(var(--center-channel-color-rgb), 0.64);
+        font-size: 12px;
+    }
+
+    .PlanningDialog__footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+    }
+
+    // The transcript is styled in sessionStream.scss; only its size differs here.
+    .SessionConsole__transcript {
+        min-height: 220px;
+        max-height: 50vh;
+    }
+
+    .SessionConsole__composer {
+        display: flex;
+        gap: 8px;
+        align-items: flex-end;
+
+        textarea {
+            flex: 1;
+            resize: vertical;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+            background: rgba(var(--center-channel-color-rgb), 0.04);
+            color: rgb(var(--center-channel-color-rgb));
+            font-family: inherit;
+            font-size: 13px;
+        }
+    }
+}

@@ -239,6 +239,29 @@ func (a *App) StartCardSession(cardID string) (string, error) {
 	return s.ID, nil
 }
 
+// StartPlanningSession opens a card-less session for talking a task through
+// before it exists, and returns its session id. repoName/agentName may be empty
+// when the corresponding registry holds exactly one entry.
+func (a *App) StartPlanningSession(repoName, agentName string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	s, err := a.mgr.StartPlanningSession(repoName, agentName)
+	if err != nil {
+		return "", err
+	}
+	return s.ID, nil
+}
+
+// ComposeTask asks the agent to boil the conversation down to a task and
+// returns its answer: the first line is the title, the rest the description.
+func (a *App) ComposeTask(sessionID string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	return a.mgr.ComposeTask(sessionID)
+}
+
 // PromptSession sends a follow-up message to a live session.
 func (a *App) PromptSession(sessionID, text string) error {
 	if a.mgr == nil {

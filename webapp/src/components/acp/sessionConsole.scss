@@ -1,3 +1,5 @@
+// The transcript itself is styled in sessionStream.scss, which the planning
+// dialog shares; this file covers only the console around it.
 .SessionConsole {
     display: flex;
     flex-direction: column;
@@ -38,86 +40,6 @@
         display: flex;
         gap: 8px;
         margin-left: auto;
-    }
-
-    .SessionConsole__error {
-        color: rgb(var(--error-text-color-rgb));
-        font-size: 12px;
-    }
-
-    .SessionConsole__transcript {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        max-height: 420px;
-        overflow-y: auto;
-        padding: 12px;
-        border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
-        border-radius: 4px;
-        background: rgba(var(--center-channel-color-rgb), 0.04);
-    }
-
-    .SessionConsole__entry {
-        font-size: 13px;
-        white-space: pre-wrap;
-        word-break: break-word;
-    }
-
-    .SessionConsole__entry--prompt {
-        align-self: flex-end;
-        max-width: 80%;
-        border-radius: 8px;
-        padding: 6px 10px;
-        background: rgba(var(--button-bg-rgb), 0.14);
-    }
-
-    .SessionConsole__entry--failed {
-        color: rgb(var(--error-text-color-rgb));
-    }
-
-    .SessionConsole__entry--text.is-thought {
-        color: rgba(var(--center-channel-color-rgb), 0.56);
-        font-style: italic;
-    }
-
-    .SessionConsole__entry--tool {
-        display: flex;
-        gap: 8px;
-        align-items: baseline;
-        font-family: monospace;
-        font-size: 12px;
-        color: rgba(var(--center-channel-color-rgb), 0.72);
-
-        .SessionConsole__toolStatus {
-            font-size: 11px;
-            text-transform: uppercase;
-            opacity: 0.7;
-        }
-    }
-
-    .SessionConsole__entry--permission {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        border-radius: 4px;
-        padding: 8px;
-        border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
-
-        .SessionConsole__permissionTitle {
-            font-weight: 600;
-        }
-
-        .SessionConsole__permissionOptions {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .SessionConsole__permissionDecision {
-            font-size: 12px;
-            text-transform: uppercase;
-            color: rgba(var(--center-channel-color-rgb), 0.64);
-        }
     }
 
     .SessionConsole__composer {

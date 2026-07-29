@@ -604,3 +604,98 @@ func TestPromptDoesNotLeakConsoleCount(t *testing.T) {
 	m.DetachSession(s.ID)
 	waitStatus(t, s, StatusDone)
 }
+
+// fakeClaudeEcho answers every turn with a canned two-line "task", which is the
+// shape ComposeTask promises its caller.
+const fakeClaudeEcho = `#!/bin/sh
+while read line; do
+  printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-plan"}'
+  printf '%s\n' '{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Кэшировать список досок\nДобавить кеш в store и инвалидировать его на запись."}}}'
+  printf '%s\n' '{"type":"result","is_error":false,"result":"ok"}'
+done
+`
+
+// planningManager wires a manager whose registries hold one repo and one agent,
+// which is what a planning session resolves against.
+func planningManager(t *testing.T, script string) (*Manager, string) {
+	t.Helper()
+	m, _, _, repo, _ := testManagerWithEmitter(t, script, func(c *Config) {
+		c.Agents = []AgentEntry{{Name: "planner", Kind: AgentKindClaude}}
+	})
+	// The repo is created by the helper, so its path is only known now.
+	m.cfgMu.Lock()
+	m.cfg.Repos = []RepoEntry{{Name: "app", Path: repo}}
+	m.cfgMu.Unlock()
+	return m, repo
+}
+
+func TestPlanningSessionComposesTask(t *testing.T) {
+	m, _ := planningManager(t, fakeClaudeEcho)
+
+	s, err := m.StartPlanningSession("app", "planner")
+	if err != nil {
+		t.Fatalf("start planning session: %v", err)
+	}
+	if s.CardID != "" {
+		t.Errorf("a planning session must not be bound to a card, got %q", s.CardID)
+	}
+	waitStatus(t, s, StatusIdle)
+
+	text, err := m.ComposeTask(s.ID)
+	if err != nil {
+		t.Fatalf("compose task: %v", err)
+	}
+	title, _, found := strings.Cut(text, "\n")
+	if !found || !strings.Contains(title, "Кэшировать") {
+		t.Errorf("expected a title on the first line, got %q", text)
+	}
+	waitStatus(t, s, StatusIdle)
+}
+
+// Planning only reads, so it must not take the working copy away from cards.
+func TestPlanningSessionDoesNotHoldRepo(t *testing.T) {
+	m, repo := planningManager(t, fakeClaudeEcho)
+
+	s, err := m.StartPlanningSession("app", "planner")
+	if err != nil {
+		t.Fatalf("start planning session: %v", err)
+	}
+	waitStatus(t, s, StatusIdle)
+
+	if _, err := m.StartSessionForEvent(moveEvent("cardWhilePlanning", repo, "opt-backlog", "opt-agent")); err != nil {
+		t.Fatalf("a card session was refused while planning: %v", err)
+	}
+}
+
+// Whatever the global policy allows, planning is held to read-only tools.
+func TestPlanningSessionIsReadOnly(t *testing.T) {
+	m, _ := planningManager(t, fakeClaudeEcho)
+
+	s, err := m.StartPlanningSession("app", "planner")
+	if err != nil {
+		t.Fatalf("start planning session: %v", err)
+	}
+	for _, tool := range []string{"Read", "Grep", "Glob"} {
+		if !s.autoAllowed(tool, m.cfg) {
+			t.Errorf("%s should run unasked while planning", tool)
+		}
+	}
+	for _, tool := range []string{"Write", "Edit", "Bash"} {
+		if s.autoAllowed(tool, m.cfg) {
+			t.Errorf("%s must not run unasked while planning", tool)
+		}
+		if !m.cfg.ToolAllowed(tool) {
+			t.Errorf("test premise broken: %s should be on the global allow list", tool)
+		}
+	}
+}
+
+func TestPlanningSessionNeedsRegistryEntries(t *testing.T) {
+	m, _, _, _, _ := testManagerWithEmitter(t, fakeClaudeEcho, nil)
+
+	if _, err := m.StartPlanningSession("", ""); err == nil {
+		t.Fatal("expected an error when no repository is registered")
+	} else if !strings.Contains(err.Error(), "репозитори") {
+		t.Errorf("error should name the missing registry, got %v", err)
+	}
+}
