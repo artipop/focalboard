@@ -106,6 +106,31 @@ describe('components/acp/planningDialog', () => {
         await waitFor(() => expect(bindings.StartPlanningSession).toBeCalledWith('app', 'planner'))
     })
 
+    test('plans without a repository when one is not chosen', async () => {
+        const bindings = planningBindings()
+        anyWindow.go = {main: {App: bindings}}
+        fakeRuntime()
+
+        const {board, view} = boardAndView()
+        render(wrapIntl(
+            <PlanningDialog
+                board={board}
+                activeView={view}
+                onClose={jest.fn()}
+            />,
+        ))
+
+        // The lone repository is preselected, so opting out has to be explicit.
+        const repoSelect = await screen.findByDisplayValue('app')
+        userEvent.selectOptions(repoSelect, '')
+
+        const start = screen.getByRole('button', {name: 'Start planning'})
+        expect(start).toBeEnabled()
+        userEvent.click(start)
+
+        await waitFor(() => expect(bindings.StartPlanningSession).toBeCalledWith('', 'planner'))
+    })
+
     test('composes a task, lets it be edited, and creates the card in the first column', async () => {
         const bindings = planningBindings()
         anyWindow.go = {main: {App: bindings}}

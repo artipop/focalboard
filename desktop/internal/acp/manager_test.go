@@ -690,12 +690,52 @@ func TestPlanningSessionIsReadOnly(t *testing.T) {
 	}
 }
 
-func TestPlanningSessionNeedsRegistryEntries(t *testing.T) {
+func TestPlanningSessionNeedsAnAgent(t *testing.T) {
 	m, _, _, _, _ := testManagerWithEmitter(t, fakeClaudeEcho, nil)
 
+	// A repository is optional; an agent is not.
 	if _, err := m.StartPlanningSession("", ""); err == nil {
-		t.Fatal("expected an error when no repository is registered")
-	} else if !strings.Contains(err.Error(), "репозитори") {
+		t.Fatal("expected an error when no agent is registered")
+	} else if !strings.Contains(err.Error(), "агент") {
 		t.Errorf("error should name the missing registry, got %v", err)
+	}
+}
+
+// Planning is useful before there is any code to point at, so a session must
+// start with no repository and run in a scratch directory of its own.
+func TestPlanningSessionWithoutRepository(t *testing.T) {
+	m, repo := planningManager(t, fakeClaudeEcho)
+
+	s, err := m.StartPlanningSession("", "planner")
+	if err != nil {
+		t.Fatalf("start repo-less planning session: %v", err)
+	}
+	if s.RepoPath == repo {
+		t.Fatal("session should not have picked the registered repository")
+	}
+	if s.scratchDir == "" || s.RepoPath != s.scratchDir {
+		t.Fatalf("expected a scratch working directory, got %q", s.RepoPath)
+	}
+	if _, err := os.Stat(s.scratchDir); err != nil {
+		t.Fatalf("scratch directory should exist while the session runs: %v", err)
+	}
+	waitStatus(t, s, StatusIdle)
+
+	// It goes away with the session rather than piling up in the temp dir.
+	if err := m.CloseSession(s.ID); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	waitStatus(t, s, StatusDone)
+	waitFor(t, 5*time.Second, "scratch dir to be removed", func() bool {
+		_, err := os.Stat(s.scratchDir)
+		return os.IsNotExist(err)
+	})
+}
+
+func TestPlanningSessionRejectsUnknownRepository(t *testing.T) {
+	m, _ := planningManager(t, fakeClaudeEcho)
+
+	if _, err := m.StartPlanningSession("nope", "planner"); err == nil {
+		t.Fatal("expected an error for a repository that is not registered")
 	}
 }

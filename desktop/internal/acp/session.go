@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -54,6 +55,9 @@ type Session struct {
 	// AutoAllow overrides the global autoAllowTools for this session; a
 	// planning session narrows it to the read-only tools.
 	AutoAllow []string
+	// scratchDir is a throwaway working directory made for a session that has
+	// no repository, removed when the session ends.
+	scratchDir string
 
 	mu          sync.Mutex
 	status      SessionStatus
@@ -225,6 +229,11 @@ func (m *Manager) prepareWorkdir(s *Session) error {
 }
 
 func (m *Manager) cleanupWorktree(s *Session) {
+	if s.scratchDir != "" {
+		if err := os.RemoveAll(s.scratchDir); err != nil {
+			m.log.Warn("acp: failed to remove planning scratch dir", "session", s.ID, "err", err)
+		}
+	}
 	if !s.usedWorktree || s.Status() == StatusDone || m.cfg.KeepFailedWorktrees {
 		return
 	}

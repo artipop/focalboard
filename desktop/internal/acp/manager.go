@@ -257,8 +257,9 @@ func (m *Manager) StartSessionForCard(cardID string) (*Session, error) {
 var planningReadOnlyTools = []string{"Read", "Grep", "Glob"}
 
 // StartPlanningSession opens a card-less session for talking a task through
-// before it exists. repoName and agentName name registry entries; either may be
-// empty when the registry holds exactly one.
+// before it exists. An empty repoName plans without one — useful when the task
+// is not about existing code yet; agentName may be empty when the agent
+// registry holds exactly one entry.
 func (m *Manager) StartPlanningSession(repoName, agentName string) (*Session, error) {
 	repo, err := m.planningRepo(repoName)
 	if err != nil {
@@ -267,6 +268,14 @@ func (m *Manager) StartPlanningSession(repoName, agentName string) (*Session, er
 	agent, err := m.planningAgent(agentName)
 	if err != nil {
 		return nil, err
+	}
+	// Without a repository the agent still needs somewhere to run; a scratch
+	// directory keeps it away from anything of the user's.
+	scratch := ""
+	if repo.Path == "" {
+		if scratch, err = os.MkdirTemp("", "focalboard-planning-*"); err != nil {
+			return nil, fmt.Errorf("не удалось создать каталог для сессии: %w", err)
+		}
 	}
 	net, err := m.resolveNetwork(agent)
 	if err != nil {
@@ -279,11 +288,12 @@ func (m *Manager) StartPlanningSession(repoName, agentName string) (*Session, er
 
 	s := &Session{
 		ID:          uuid.NewString(),
-		RepoPath:    repo.Path,
+		RepoPath:    firstNonEmpty(repo.Path, scratch),
 		Agent:       agent,
 		Net:         net,
 		PromptText:  planningPrompt(systemPrompt, agent, repo),
 		Planning:    true,
+		scratchDir:  scratch,
 		AutoAllow:   planningReadOnlyTools,
 		status:      StatusQueued,
 		allowTools:  make(map[string]bool),
@@ -313,19 +323,14 @@ func (m *Manager) StartPlanningSession(repoName, agentName string) (*Session, er
 	return s, nil
 }
 
-// planningRepo picks the registry entry to plan against.
+// planningRepo picks the registry entry to plan against. An empty name means
+// planning without a repository, which is a valid choice rather than a default:
+// the dialog preselects a lone entry, so nothing here has to guess.
 func (m *Manager) planningRepo(name string) (RepoEntry, error) {
-	repos := m.Repos()
-	if len(repos) == 0 {
-		return RepoEntry{}, fmt.Errorf("не зарегистрировано ни одного репозитория (меню доски → Agent repositories)")
-	}
 	if name == "" {
-		if len(repos) > 1 {
-			return RepoEntry{}, fmt.Errorf("укажи репозиторий: зарегистрировано несколько")
-		}
-		return repos[0], nil
+		return RepoEntry{}, nil
 	}
-	for _, r := range repos {
+	for _, r := range m.Repos() {
 		if strings.EqualFold(r.Name, name) {
 			return r, nil
 		}
@@ -713,6 +718,12 @@ func planningPrompt(systemPrompt string, agent AgentEntry, repo RepoEntry) strin
 	}
 	if p := strings.TrimSpace(agent.Prompt); p != "" {
 		b = fmt.Appendf(b, "%s\n\n", p)
+	}
+	if repo.Path == "" {
+		b = fmt.Appendf(b, "Мы планируем новую задачу. Репозиторий не выбран, кода под рукой нет — ")
+		b = fmt.Appendf(b, "опирайся на то, что расскажет пользователь, и не пытайся ничего искать в файлах.\n\n")
+		b = fmt.Appendf(b, "Начни с короткого вопроса о том, что нужно сделать.")
+		return string(b)
 	}
 	b = fmt.Appendf(b, "Мы планируем новую задачу по репозиторию `%s` (%s).\n", repo.Name, repo.Path)
 	b = fmt.Appendf(b, "Изучай код, задавай уточняющие вопросы и предлагай решение, но ничего не меняй: ")

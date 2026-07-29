@@ -235,7 +235,7 @@ const PlanningDialog = (props: Props) => {
                         <div className='PlanningDialog__hint'>
                             {intl.formatMessage({
                                 id: 'Planning.hint',
-                                defaultMessage: 'Talk the task through with the agent. It reads the repository but changes nothing; anything else asks first.',
+                                defaultMessage: 'Talk the task through with the agent. With a repository it reads the code but changes nothing; anything else asks first.',
                             })}
                         </div>
                         <label>
@@ -244,7 +244,7 @@ const PlanningDialog = (props: Props) => {
                                 value={repoName}
                                 onChange={(e) => setRepoName(e.target.value)}
                             >
-                                <option value=''>{intl.formatMessage({id: 'Planning.choose', defaultMessage: 'Choose…'})}</option>
+                                <option value=''>{intl.formatMessage({id: 'Planning.no-repository', defaultMessage: 'Without a repository'})}</option>
                                 {repos.map((r) => (
                                     <option
                                         key={r.name}
@@ -271,7 +271,7 @@ const PlanningDialog = (props: Props) => {
                         <Button
                             filled={true}
                             onClick={start}
-                            disabled={busy || !repoName || !agentName}
+                            disabled={busy || !agentName}
                         >
                             {intl.formatMessage({id: 'Planning.start', defaultMessage: 'Start planning'})}
                         </Button>
