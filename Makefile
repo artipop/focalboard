@@ -189,9 +189,18 @@ wails-precheck:
 # which keeps rebuilding webapp/pack; -reloaddirs makes the webview reload when it
 # changes. The page is still served by the in-process Go server through proxy.go,
 # so nothing has to be told the port or the session token.
-dev-wails: wails-precheck ## Run the desktop app in dev mode (wails dev + vite build --watch).
+#
+# desktop/pack is cleared first. `wails dev` builds without the `frontend` tag, so
+# the server picks the webapp off disk (diskWebPath), and it looks for "pack"
+# before "../webapp/pack" — with cwd desktop/, a copy left behind by an earlier
+# release build shadows the bundle the watcher is rebuilding and the window
+# silently serves a stale frontend. Release targets recreate it via desktop-pack.
+# Building the webapp up front then guarantees there is something to serve before
+# the watcher's first pass.
+dev-wails: wails-precheck webapp ## Run the desktop app in dev mode (wails dev + vite build --watch).
 	@echo "==> wails dev; frontend edits rebuild webapp/pack and reload the window, Go edits rebuild the app."
 	@echo "    (needs webapp deps — run 'make prebuild' once if webapp/node_modules is missing)"
+	rm -rf desktop/pack
 	cd desktop && wails dev -tags "json1 sqlite3" -reloaddirs ../webapp/pack
 
 # The Wails desktop app lives in desktop/ (its own Go module). The webapp is built

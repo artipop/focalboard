@@ -124,7 +124,11 @@ func diskWebPath() string {
 			return next
 		}
 	}
-	for _, cand := range []string{"pack", filepath.Join("..", "webapp", "pack")} {
+	// ../webapp/pack exists only in a source checkout, and there it is the
+	// bundle the dev watcher keeps rebuilding — so it wins over ./pack, which
+	// in that layout is desktop/pack: a copy staged by an earlier release build
+	// that would otherwise shadow it and serve a stale frontend for good.
+	for _, cand := range []string{filepath.Join("..", "webapp", "pack"), "pack"} {
 		if dirExists(cand) {
 			return cand
 		}
