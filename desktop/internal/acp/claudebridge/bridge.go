@@ -46,7 +46,33 @@ type Options struct {
 	Env     []string
 	DropEnv []string
 	Logger  *slog.Logger
+
+	// AskUser presents the agent's questions to a human and returns their
+	// answers. Without it the tool is refused with an explanation, since its
+	// own picker cannot render in stream-json mode.
+	AskUser AskUserFunc
 }
+
+// AskUserFunc shows questions to the user and returns the answers as the text
+// the model will read.
+type AskUserFunc func(ctx context.Context, questions []Question) (string, error)
+
+// Question is one question of an AskUserQuestion call, as the CLI phrases it.
+type Question struct {
+	Question    string           `json:"question"`
+	Header      string           `json:"header"`
+	MultiSelect bool             `json:"multiSelect"`
+	Options     []QuestionOption `json:"options"`
+}
+
+// QuestionOption is one offered answer.
+type QuestionOption struct {
+	Label       string `json:"label"`
+	Description string `json:"description"`
+}
+
+// askUserQuestionTool is the CLI's built-in "ask the human" tool.
+const askUserQuestionTool = "AskUserQuestion"
 
 // Bridge implements acp.Agent by driving one claude subprocess per session.
 type Bridge struct {
@@ -249,12 +275,6 @@ func (b *Bridge) ensureProc(ctx context.Context, s *session) (*procHandle, error
 		"--verbose",
 		"--include-partial-messages",
 		"--permission-prompt-tool", "stdio",
-		// AskUserQuestion opens the CLI's own interactive picker, which does not
-		// exist in stream-json mode: granting it lets the tool "complete" with
-		// no answers, and the agent then reports that its questions went
-		// unanswered. Taking it away makes it ask in the conversation, where the
-		// console can actually show the questions and take a reply.
-		"--disallowedTools", "AskUserQuestion",
 		"-p",
 	)
 	if resume {
@@ -541,7 +561,58 @@ const (
 	optReject      = "reject"
 )
 
+// respondControl sends one control_response. request_id must be nested inside
+// "response" (see package doc).
+func (b *Bridge) respondControl(reqID any, payload map[string]any, writeLine func(any) error) {
+	out := map[string]any{
+		"type": "control_response",
+		"response": map[string]any{
+			"subtype":    "success",
+			"request_id": reqID,
+			"response":   payload,
+		},
+	}
+	if err := writeLine(out); err != nil {
+		b.opts.Logger.Warn("claudebridge: failed to answer control request", "err", err)
+	}
+}
+
+// answerQuestion handles AskUserQuestion, which is not a permission at all: the
+// agent is addressing the user. Its own picker cannot render in stream-json
+// mode, so the questions are shown by the client and the answers are handed
+// back through the deny message — the only field of this channel that carries
+// text to the model. Verified against claude 2.1.220: answers delivered this
+// way are used, while "allow" runs the tool with no way to reach anyone and the
+// model falls back to guessing (see cmd/acpspike/NOTES.md).
+func (b *Bridge) answerQuestion(ctx context.Context, reqID any, req permRequest, writeLine func(any) error) {
+	deny := func(message string) {
+		b.respondControl(reqID, map[string]any{"behavior": "deny", "message": message}, writeLine)
+	}
+	if b.opts.AskUser == nil {
+		deny("Спросить пользователя через этот инструмент нельзя. Задай вопросы обычным текстом в ответе.")
+		return
+	}
+	var payload struct {
+		Questions []Question `json:"questions"`
+	}
+	if err := json.Unmarshal(req.Input, &payload); err != nil || len(payload.Questions) == 0 {
+		deny("Не удалось разобрать вопросы. Задай их обычным текстом в ответе.")
+		return
+	}
+	answers, err := b.opts.AskUser(ctx, payload.Questions)
+	if err != nil {
+		b.opts.Logger.Info("claudebridge: question not answered", "err", err)
+		deny(fmt.Sprintf("Ответа от пользователя нет (%s). Задай вопросы обычным текстом или продолжай, обозначив допущения.", err))
+		return
+	}
+	deny(answers)
+}
+
 func (b *Bridge) answerPermission(ctx context.Context, s *session, reqID any, req permRequest, writeLine func(any) error) {
+	if req.ToolName == askUserQuestionTool {
+		b.answerQuestion(ctx, reqID, req, writeLine)
+		return
+	}
 	var input any
 	_ = json.Unmarshal(req.Input, &input)
 	title := req.ToolName
@@ -576,18 +647,7 @@ func (b *Bridge) answerPermission(ctx context.Context, s *session, reqID any, re
 	} else {
 		payload = map[string]any{"behavior": "deny", "message": "Permission denied by Focalboard agent policy"}
 	}
-	// request_id must be nested inside "response" (see package doc).
-	out := map[string]any{
-		"type": "control_response",
-		"response": map[string]any{
-			"subtype":    "success",
-			"request_id": reqID,
-			"response":   payload,
-		},
-	}
-	if err := writeLine(out); err != nil {
-		b.opts.Logger.Warn("claudebridge: failed to answer permission", "err", err)
-	}
+	b.respondControl(reqID, payload, writeLine)
 }
 
 func truncate(s string, n int) string {

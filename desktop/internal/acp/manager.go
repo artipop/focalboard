@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/mattermost/focalboard/desktop/internal/acp/claudebridge"
 )
 
 // Manager owns all agent sessions: it consumes board events, enforces limits
@@ -486,6 +488,54 @@ func (m *Manager) forgetPermission(requestID string) {
 	m.permMu.Lock()
 	delete(m.perms, requestID)
 	m.permMu.Unlock()
+}
+
+// askUser shows the agent's questions on the console and waits for answers. It
+// fails rather than blocks when nobody is watching: an unattended session must
+// not sit on a question for the whole permission timeout.
+func (m *Manager) askUser(ctx context.Context, s *Session, questions []claudebridge.Question) (string, error) {
+	if !s.hasConsole() {
+		return "", fmt.Errorf("консоль не открыта")
+	}
+	requestID := uuid.NewString()
+	answer := m.registerPermission(requestID, s.ID)
+	defer m.forgetPermission(requestID)
+
+	payload := map[string]any{
+		"sessionId": s.ID,
+		"cardId":    s.CardID,
+		"requestId": requestID,
+		"questions": questions,
+	}
+	s.appendEvent(m, "question", payload)
+	m.setStatus(s, StatusWaitingPermission)
+	m.ui.Emit(EventQuestion, payload)
+	defer m.setStatus(s, StatusRunning)
+
+	timeout := time.NewTimer(m.cfg.PermissionTimeout())
+	defer timeout.Stop()
+
+	select {
+	case answers := <-answer:
+		s.appendEvent(m, "answer", map[string]any{"requestId": requestID, "text": answers})
+		m.ui.Emit(EventAnswer, map[string]any{
+			"sessionId": s.ID, "cardId": s.CardID, "requestId": requestID, "text": answers,
+		})
+		return answers, nil
+	case <-timeout.C:
+		return "", fmt.Errorf("пользователь не ответил за %s", m.cfg.PermissionTimeout())
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+}
+
+// AnswerQuestion delivers the user's answers to a pending question. The text is
+// what the model will read, so the UI composes it from the picker.
+func (m *Manager) AnswerQuestion(sessionID, requestID, answers string) error {
+	if strings.TrimSpace(answers) == "" {
+		return fmt.Errorf("пустой ответ")
+	}
+	return m.AnswerPermission(sessionID, requestID, answers)
 }
 
 // AnswerPermission delivers the user's choice for a pending permission prompt.

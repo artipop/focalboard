@@ -2,6 +2,7 @@ package acp
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -62,6 +63,21 @@ func (e *fakeEmitter) pendingPermissionID() string {
 			continue
 		}
 		if id, ok := p["requestId"].(string); ok {
+			return id
+		}
+	}
+	return ""
+}
+
+// pendingQuestionID returns the request id of a question awaiting an answer.
+func (e *fakeEmitter) pendingQuestionID() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for i, name := range e.events {
+		if name != EventQuestion {
+			continue
+		}
+		if id, ok := e.payloads[i]["requestId"].(string); ok {
 			return id
 		}
 	}
@@ -746,4 +762,80 @@ func TestPlanningSessionRejectsUnknownRepository(t *testing.T) {
 	if _, err := m.StartPlanningSession("nope", "planner"); err == nil {
 		t.Fatal("expected an error for a repository that is not registered")
 	}
+}
+
+// fakeClaudeAsksQuestion drives the AskUserQuestion path: the CLI announces the
+// tool as a can_use_tool control request, then reports whether the answer came
+// back to it — which is the whole point, since the answers travel in the deny
+// message of that same control response.
+const fakeClaudeAsksQuestion = `#!/bin/sh
+read line
+printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-ask"}'
+printf '%s\n' '{"type":"control_request","request_id":"q1","request":{"subtype":"can_use_tool","tool_name":"AskUserQuestion","tool_use_id":"tu1","input":{"questions":[{"question":"Что рефакторим?","header":"Цель","multiSelect":false,"options":[{"label":"Читаемость","description":"структура"},{"label":"Скорость","description":"перф"}]}]}}}'
+read response
+case "$response" in
+  *behavior*deny*Читаемость*) seen=ANSWER_REACHED_AGENT ;;
+  *) seen=NO_ANSWER ;;
+esac
+printf '{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"%s"}}}\n' "$seen"
+printf '%s\n' '{"type":"result","is_error":false,"result":"done"}'
+`
+
+// The agent's questions must reach the console and the answers must come back
+// to the model — the tool's own picker cannot render in stream-json mode.
+func TestQuestionReachesConsoleAndAnswersComeBack(t *testing.T) {
+	m, _, _, _, emitter := testManagerWithEmitter(t, fakeClaudeAsksQuestion, nil)
+
+	s := liveSession(t, m, "cardAsk")
+
+	waitStatus(t, s, StatusWaitingPermission)
+	var requestID string
+	waitFor(t, 5*time.Second, "question on the console", func() bool {
+		requestID = emitter.pendingQuestionID()
+		return requestID != ""
+	})
+
+	if err := m.AnswerQuestion(s.ID, requestID, "Цель: Читаемость"); err != nil {
+		t.Fatalf("answer question: %v", err)
+	}
+	waitStatus(t, s, StatusIdle)
+
+	// The fake reports back whether the answer actually arrived at the CLI.
+	if got := lastAgentText(t, m, s); !strings.Contains(got, "ANSWER_REACHED_AGENT") {
+		t.Errorf("the answer should have reached the agent, got %q", got)
+	}
+}
+
+// An unattended session must not sit on a question: nobody can answer it.
+func TestQuestionWithoutConsoleIsRefusedAtOnce(t *testing.T) {
+	m, _, events, repo, emitter := testManagerWithEmitter(t, fakeClaudeAsksQuestion, nil)
+
+	events.ch <- moveEvent("cardAskAuto", repo, "opt-backlog", "opt-agent")
+	waitFor(t, 15*time.Second, "session to finish", func() bool {
+		sessions, _, err := m.store.SessionsForCard("cardAskAuto")
+		return err == nil && len(sessions) == 1 && sessions[0].Status.Terminal()
+	})
+	if id := emitter.pendingQuestionID(); id != "" {
+		t.Errorf("an unattended session should not have asked, got request %s", id)
+	}
+}
+
+// lastAgentText returns what the agent finally said, as stored in the log.
+func lastAgentText(t *testing.T, m *Manager, s *Session) string {
+	t.Helper()
+	_, events, err := m.store.SessionsForCard(s.CardID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	for _, ev := range events {
+		if ev.Kind == "chunk" {
+			var p struct {
+				Text string `json:"text"`
+			}
+			_ = json.Unmarshal(ev.Payload, &p)
+			b.WriteString(p.Text)
+		}
+	}
+	return b.String()
 }

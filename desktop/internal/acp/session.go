@@ -521,6 +521,9 @@ func (m *Manager) connectClaude(ctx context.Context, s *Session) (*acpsdk.Client
 		Env:       env,
 		DropEnv:   drop,
 		Logger:    m.log,
+		AskUser: func(ctx context.Context, questions []claudebridge.Question) (string, error) {
+			return m.askUser(ctx, s, questions)
+		},
 	})
 
 	clientIn, agentOut := io.Pipe() // agent writes → client reads

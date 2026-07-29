@@ -87,4 +87,8 @@ const (
 	// EventPrompt echoes a user turn back to every attached console, so a
 	// second console shows what was typed into the first one.
 	EventPrompt = "acp:prompt"
+	// EventQuestion carries the agent's own questions to the console, which
+	// renders them as a picker; EventAnswer reports what was chosen.
+	EventQuestion = "acp:question"
+	EventAnswer   = "acp:answer"
 )

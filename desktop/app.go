@@ -278,6 +278,15 @@ func (a *App) AnswerPermission(sessionID, requestID, optionID string) error {
 	return a.mgr.AnswerPermission(sessionID, requestID, optionID)
 }
 
+// AnswerQuestion delivers the user's answers to the agent's questions. text is
+// what the model will read, composed by the console from the picker.
+func (a *App) AnswerQuestion(sessionID, requestID, text string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	return a.mgr.AnswerQuestion(sessionID, requestID, text)
+}
+
 // AttachSession marks the console as watching a session, keeping it alive
 // between turns. Returns false when the session is no longer live.
 func (a *App) AttachSession(sessionID string) bool {

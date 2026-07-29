@@ -91,6 +91,10 @@ func main() {
 		if err := runStream(ctx, abs, *prompt); err != nil {
 			log.Fatalf("stream mode: %v", err)
 		}
+	case "ask":
+		if err := runAsk(ctx, abs, *strategy); err != nil {
+			log.Fatalf("ask mode: %v", err)
+		}
 	case "multiturn":
 		if err := runMultiturn(ctx, abs, *agent, *strategy); err != nil {
 			log.Fatalf("multiturn mode: %v", err)
@@ -913,4 +917,118 @@ func runStream(ctx context.Context, cwd, prompt string) error {
 		clock.report()
 	}
 	return nil
+}
+
+// ---- mode=ask: can AskUserQuestion answers be fed back? ----
+
+// The can_use_tool channel only carries allow/deny, so the question is whether
+// either can smuggle the user's answers to the model: "allow" runs the tool
+// (which has no TTY in this mode), "deny" hands back a message.
+func runAsk(ctx context.Context, cwd, behavior string) error {
+	claudeBin, err := exec.LookPath("claude")
+	if err != nil {
+		return fmt.Errorf("claude binary not found in PATH: %w", err)
+	}
+	cmd := exec.CommandContext(ctx, claudeBin,
+		"--input-format", "stream-json", "--output-format", "stream-json",
+		"--verbose", "--include-partial-messages",
+		"--permission-prompt-tool", "stdio", "-p",
+	)
+	cmd.Dir = cwd
+	cmd.Env = append(os.Environ(), "CLAUDECODE=")
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	cmd.Stderr = os.Stderr
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	defer func() {
+		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		_, _ = cmd.Process.Wait()
+	}()
+
+	// What a user would have picked in the native picker.
+	const answers = "Пользователь ответил на вопросы:\n" +
+		"1. Цель — «Тестируемость»: код трудно покрыть тестами из-за жёстких зависимостей.\n" +
+		"2. Подход — «Сначала тесты, потом рефакторинг»."
+
+	done := make(chan error, 1)
+	go func() {
+		scanner := bufio.NewScanner(stdout)
+		scanner.Buffer(make([]byte, 0, 1024*1024), 32*1024*1024)
+		for scanner.Scan() {
+			var msg struct {
+				Type      string `json:"type"`
+				RequestID any    `json:"request_id"`
+				Result    string `json:"result"`
+				Request   struct {
+					Subtype  string          `json:"subtype"`
+					ToolName string          `json:"tool_name"`
+					Input    json.RawMessage `json:"input"`
+				} `json:"request"`
+				Event *struct {
+					Delta *struct {
+						Text string `json:"text"`
+					} `json:"delta"`
+				} `json:"event"`
+			}
+			if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
+				continue
+			}
+			switch msg.Type {
+			case "stream_event":
+				if msg.Event != nil && msg.Event.Delta != nil {
+					fmt.Print(msg.Event.Delta.Text)
+				}
+			case "control_request":
+				if msg.Request.Subtype != "can_use_tool" {
+					continue
+				}
+				fmt.Printf("\n\n🔐 %s → отвечаем %q\n", msg.Request.ToolName, behavior)
+				var payload map[string]any
+				if behavior == "allow" {
+					// Try to smuggle the answers in as updated input.
+					var input map[string]any
+					_ = json.Unmarshal(msg.Request.Input, &input)
+					input["answers"] = answers
+					payload = map[string]any{"behavior": "allow", "updatedInput": input}
+				} else {
+					payload = map[string]any{"behavior": "deny", "message": answers}
+				}
+				out, _ := json.Marshal(map[string]any{
+					"type": "control_response",
+					"response": map[string]any{
+						"subtype": "success", "request_id": msg.RequestID, "response": payload,
+					},
+				})
+				_, _ = stdin.Write(append(out, '\n'))
+			case "result":
+				fmt.Printf("\n\n== result ==\n%s\n", msg.Result)
+				done <- nil
+				return
+			}
+		}
+		done <- scanner.Err()
+	}()
+
+	user := map[string]any{"type": "user", "message": map[string]any{"role": "user", "content": []map[string]any{
+		{"type": "text", "text": "Спланируй рефакторинг. Сначала задай мне 2 уточняющих вопроса через AskUserQuestion, потом коротко предложи план с учётом ответов."},
+	}}}
+	b, _ := json.Marshal(user)
+	if _, err := stdin.Write(append(b, '\n')); err != nil {
+		return err
+	}
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }

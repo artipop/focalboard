@@ -25,6 +25,14 @@ export function isLive(status?: SessionStatus): boolean {
     return Boolean(status && liveStatuses.includes(status))
 }
 
+// One question the agent is asking, mirroring claude's AskUserQuestion input.
+export type Question = {
+    question: string
+    header?: string
+    multiSelect?: boolean
+    options?: Array<{label: string, description?: string}>
+}
+
 export type PermissionOption = {
     optionId: string
     name: string
@@ -38,6 +46,7 @@ export type Entry =
     | {kind: 'error', text: string}
     | {kind: 'tool', toolCallId: string, title?: string, status?: string}
     | {kind: 'permission', requestId?: string, tool?: string, title?: string, options?: PermissionOption[], decision?: string}
+    | {kind: 'question', requestId?: string, questions: Question[], answer?: string}
 
 export type SessionRecord = {
     id: string
@@ -81,6 +90,15 @@ export function entriesFromStored(events: StoredEvent[]): Entry[] {
             break
         case 'error':
             entries = appendEntry(entries, {kind: 'error', text: p.text || ''})
+            break
+        case 'question':
+            entries = appendEntry(entries, {kind: 'question', requestId: p.requestId, questions: p.questions || []})
+            break
+        case 'answer':
+            // Replay shows the question already answered, not still open.
+            entries = entries.map((e) => (
+                e.kind === 'question' && e.requestId === p.requestId ?
+                    {...e, requestId: undefined, answer: p.text} : e))
             break
         case 'tool_call':
             entries = appendEntry(entries, {kind: 'tool', toolCallId: p.toolCallId, title: p.title, status: p.status})
@@ -170,6 +188,22 @@ export function useSessionStream(match: StreamMatch, onSession?: (payload: any) 
                     setEntries((prev) => appendEntry(prev, {kind: 'prompt', text: payload.text}))
                 }
             }),
+            runtime.EventsOn('acp:question', (payload: any) => {
+                if (mine(payload)) {
+                    setEntries((prev) => appendEntry(prev, {
+                        kind: 'question',
+                        requestId: payload.requestId,
+                        questions: payload.questions || [],
+                    }))
+                }
+            }),
+            runtime.EventsOn('acp:answer', (payload: any) => {
+                if (mine(payload)) {
+                    setEntries((prev) => prev.map((e) => (
+                        e.kind === 'question' && e.requestId === payload.requestId ?
+                            {...e, requestId: undefined, answer: payload.text} : e)))
+                }
+            }),
             runtime.EventsOn('acp:tool', (payload: any) => {
                 if (mine(payload)) {
                     setEntries((prev) => appendEntry(prev, {
@@ -214,6 +248,7 @@ export function useSessionStream(match: StreamMatch, onSession?: (payload: any) 
 type EntryProps = {
     entry: Entry
     onAnswer: (requestId: string, optionId: string) => void
+    onAnswerQuestion?: (requestId: string, text: string) => void
 }
 
 export const ConsoleEntry = (props: EntryProps) => {
@@ -221,6 +256,14 @@ export const ConsoleEntry = (props: EntryProps) => {
 
     if (entry.kind === 'prompt') {
         return <div className='SessionConsole__entry SessionConsole__entry--prompt'>{entry.text}</div>
+    }
+    if (entry.kind === 'question') {
+        return (
+            <QuestionEntry
+                entry={entry}
+                onSubmit={props.onAnswerQuestion}
+            />
+        )
     }
     if (entry.kind === 'error') {
         return <div className='SessionConsole__entry SessionConsole__entry--failed'>{entry.text}</div>
@@ -266,8 +309,105 @@ export const ConsoleEntry = (props: EntryProps) => {
     )
 }
 
+// QuestionEntry renders the agent's own questions as a picker. Answers are
+// composed into the text the model reads — the transport back to it is a single
+// string, so the shape has to be readable rather than structured.
+const QuestionEntry = (props: {
+    entry: Extract<Entry, {kind: 'question'}>
+    onSubmit?: (requestId: string, text: string) => void
+}) => {
+    const {entry, onSubmit} = props
+    const [picked, setPicked] = useState<{[index: number]: string[]}>({})
+    const [notes, setNotes] = useState<{[index: number]: string}>({})
+
+    const toggle = (qi: number, label: string, multi: boolean) => {
+        setPicked((prev) => {
+            const current = prev[qi] || []
+            if (!multi) {
+                return {...prev, [qi]: current.includes(label) ? [] : [label]}
+            }
+            return {
+                ...prev,
+                [qi]: current.includes(label) ? current.filter((l) => l !== label) : [...current, label],
+            }
+        })
+    }
+
+    const answered = entry.questions.every((_, qi) => (picked[qi]?.length || notes[qi]?.trim()))
+
+    const submit = () => {
+        if (!entry.requestId || !onSubmit) {
+            return
+        }
+        const lines = entry.questions.map((q, qi) => {
+            const parts = [...(picked[qi] || [])]
+            if (notes[qi]?.trim()) {
+                parts.push(notes[qi].trim())
+            }
+            return `${qi + 1}. ${q.header || q.question}: ${parts.join('; ') || '—'}`
+        })
+        onSubmit(entry.requestId, `Ответы пользователя:\n${lines.join('\n')}`)
+    }
+
+    if (!entry.requestId) {
+        return (
+            <div className='SessionConsole__entry SessionConsole__entry--question is-answered'>
+                {entry.questions.map((q, qi) => (
+                    <div
+                        key={qi}
+                        className='SessionConsole__questionText'
+                    >{q.question}</div>
+                ))}
+                {entry.answer && <div className='SessionConsole__questionAnswer'>{entry.answer}</div>}
+            </div>
+        )
+    }
+
+    return (
+        <div className='SessionConsole__entry SessionConsole__entry--question'>
+            {entry.questions.map((q, qi) => (
+                <div
+                    key={qi}
+                    className='SessionConsole__question'
+                >
+                    <div className='SessionConsole__questionText'>{q.question}</div>
+                    <div className='SessionConsole__questionOptions'>
+                        {(q.options || []).map((opt) => (
+                            <button
+                                key={opt.label}
+                                type='button'
+                                className={`SessionConsole__option${(picked[qi] || []).includes(opt.label) ? ' is-picked' : ''}`}
+                                onClick={() => toggle(qi, opt.label, Boolean(q.multiSelect))}
+                            >
+                                <span className='SessionConsole__optionLabel'>{opt.label}</span>
+                                {opt.description && <span className='SessionConsole__optionDescription'>{opt.description}</span>}
+                            </button>
+                        ))}
+                    </div>
+                    <input
+                        type='text'
+                        className='SessionConsole__questionNote'
+                        value={notes[qi] || ''}
+                        placeholder='Свой ответ'
+                        onChange={(e) => setNotes((prev) => ({...prev, [qi]: e.target.value}))}
+                    />
+                </div>
+            ))}
+            <Button
+                filled={true}
+                onClick={submit}
+                disabled={!answered}
+            >{'Ответить'}</Button>
+        </div>
+    )
+}
+
 // Transcript renders the whole conversation and follows the stream.
-export const Transcript = (props: {entries: Entry[], onAnswer: (requestId: string, optionId: string) => void}) => {
+export const Transcript = (props: {
+    entries: Entry[]
+    onAnswer: (requestId: string, optionId: string) => void
+    onAnswerQuestion?: (requestId: string, text: string) => void
+}) => {
     const scrollRef = React.useRef<HTMLDivElement>(null)
 
     // Assigning scrollTop rather than calling scrollTo keeps this working under
@@ -289,6 +429,7 @@ export const Transcript = (props: {entries: Entry[], onAnswer: (requestId: strin
                     key={i}
                     entry={entry}
                     onAnswer={props.onAnswer}
+                    onAnswerQuestion={props.onAnswerQuestion}
                 />
             ))}
         </div>

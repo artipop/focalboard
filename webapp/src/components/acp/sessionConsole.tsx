@@ -148,6 +148,18 @@ const SessionConsole = (props: Props) => {
         }
     }, [bindings, session, setError])
 
+    const answerQuestion = useCallback(async (requestId: string, text: string) => {
+        if (!session || !bindings?.AnswerQuestion) {
+            return
+        }
+        setError('')
+        try {
+            await bindings.AnswerQuestion(session.id, requestId, text)
+        } catch (e) {
+            setError(String(e))
+        }
+    }, [bindings, session, setError])
+
     const cancel = useCallback(async () => {
         if (!bindings?.CancelSession) {
             return
@@ -216,6 +228,7 @@ const SessionConsole = (props: Props) => {
                 <Transcript
                     entries={entries}
                     onAnswer={answer}
+                    onAnswerQuestion={answerQuestion}
                 />}
 
             {live &&
