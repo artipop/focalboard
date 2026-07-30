@@ -217,17 +217,24 @@ func TestTriggerRunsSessionToDone(t *testing.T) {
 		t.Fatalf("expected start + result comments, got %v", comments)
 	}
 	last := comments[len(comments)-1]
-	if !strings.Contains(last, "fake work done") || !strings.Contains(last, repo) {
-		t.Errorf("final comment lacks agent output or repo path: %q", last)
+	if !strings.Contains(last, "fake work done") {
+		t.Errorf("final comment lacks agent output: %q", last)
 	}
 
-	// Default mode runs in the repo itself: no worktree is created.
+	// The default gives the card its own worktree, on a branch named after the
+	// card — which is what the card displays and what its deploy publishes.
 	sessions, _, _ := m.store.SessionsForCard("card1")
-	if sessions[0].Cwd != repo {
-		t.Errorf("expected session cwd %q, got %q", repo, sessions[0].Cwd)
+	if sessions[0].WorktreePath == "" {
+		t.Error("expected a worktree in the default mode")
 	}
-	if sessions[0].WorktreePath != "" {
-		t.Errorf("no worktree expected in default mode, got %q", sessions[0].WorktreePath)
+	if sessions[0].Cwd != sessions[0].WorktreePath {
+		t.Errorf("session ran in %q, not in its worktree %q", sessions[0].Cwd, sessions[0].WorktreePath)
+	}
+	if branch := sessions[0].Branch; !strings.HasPrefix(branch, "acp/test-task-") {
+		t.Errorf("branch %q is not named after the card", branch)
+	}
+	if !strings.Contains(last, sessions[0].WorktreePath) {
+		t.Errorf("final comment lacks the worktree: %q", last)
 	}
 }
 
@@ -255,7 +262,11 @@ func TestWorktreeModeAlways(t *testing.T) {
 }
 
 func TestRepoBusyRejectedWithoutWorktrees(t *testing.T) {
-	m, writer, events, repo := testManager(t, fakeClaudeHang, nil)
+	// Worktrees are the default now, so this rule only applies to an install
+	// that has turned them off.
+	m, writer, events, repo := testManager(t, fakeClaudeHang, func(c *Config) {
+		c.WorktreeMode = "never"
+	})
 
 	events.ch <- moveEvent("cardA", repo, "opt-backlog", "opt-agent")
 	waitFor(t, 10*time.Second, "first session running", func() bool {

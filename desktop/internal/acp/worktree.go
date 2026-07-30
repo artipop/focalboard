@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/mattermost/focalboard/desktop/internal/dokku"
 )
 
 // WorktreeInfo describes a session's dedicated git worktree.
@@ -36,8 +38,8 @@ func gitCmd(ctx context.Context, repo string, args ...string) (string, error) {
 }
 
 // CreateWorktree adds a new worktree for the session off baseBranch (or HEAD
-// when empty), on a fresh branch acp/<cardID8>-<sessID8>.
-func CreateWorktree(ctx context.Context, repo, baseBranch, cardID, sessionID, worktreeRoot string) (WorktreeInfo, error) {
+// when empty), on a fresh branch named after the card (see WorktreeBranch).
+func CreateWorktree(ctx context.Context, repo, baseBranch, title, cardID, sessionID, worktreeRoot string) (WorktreeInfo, error) {
 	mu := repoLock(repo)
 	mu.Lock()
 	defer mu.Unlock()
@@ -53,7 +55,7 @@ func CreateWorktree(ctx context.Context, repo, baseBranch, cardID, sessionID, wo
 		return WorktreeInfo{}, fmt.Errorf("base branch %q not found in %s", baseRef, repo)
 	}
 
-	branch := fmt.Sprintf("acp/%s-%s", shortID(cardID), shortID(sessionID))
+	branch := WorktreeBranch(title, cardID, sessionID)
 	path := filepath.Join(worktreeRoot, fmt.Sprintf("%s-%s", filepath.Base(repo), shortID(sessionID)))
 	if err := os.MkdirAll(worktreeRoot, 0o755); err != nil {
 		return WorktreeInfo{}, err
@@ -95,6 +97,26 @@ func PruneStale(ctx context.Context, repos []string) {
 	for _, repo := range repos {
 		_, _ = gitCmd(ctx, repo, "worktree", "prune")
 	}
+}
+
+// WorktreeBranch names a session's branch after the card it works on:
+// "Login via SSO" → acp/login-via-sso-1a2b. The branch is what the card shows
+// and what a deploy publishes, so it ends up in a preview hostname — hence the
+// same folding a Dokku app name gets (dokku.AppSlug: lowercase, [a-z0-9-], cut
+// with a hash), and a blank title falls back to the card id. A title with no
+// ASCII in it keeps only what folding leaves, which for a fully non-Latin title
+// is AppSlug's hash: unreadable, but valid and unique.
+//
+// The tail is the session id's own short form, because two sessions on one card
+// — or two cards sharing a title — would otherwise collide on
+// `git worktree add -b`, and a shorter tail collides for real (four sessions
+// named sess{a,b,c,d} all begin with "sess").
+func WorktreeBranch(title, cardID, sessionID string) string {
+	slug := dokku.AppSlug(title)
+	if strings.TrimSpace(title) == "" {
+		slug = shortID(cardID)
+	}
+	return fmt.Sprintf("acp/%s-%s", slug, shortID(sessionID))
 }
 
 func shortID(id string) string {

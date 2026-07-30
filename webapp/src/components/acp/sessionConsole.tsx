@@ -36,6 +36,10 @@ const SessionConsole = (props: Props) => {
     const [draft, setDraft] = useState('')
     const [busy, setBusy] = useState(false)
 
+    // The deploy a card starts for itself is a session of its own: it reports
+    // here in one line, and its transcript stays in the card's comments.
+    const [deployStatus, setDeployStatus] = useState('')
+
     // Offered only after the card turns out not to say which repository it is
     // about — the common case is a tagged card and one click.
     const [repos, setRepos] = useState<Array<{name: string}>>([])
@@ -69,6 +73,9 @@ const SessionConsole = (props: Props) => {
         useCallback((payload: any) => {
             attachTo(isLive(payload.status) ? payload.sessionId : null)
         }, [attachTo]),
+        useCallback((payload: any) => {
+            setDeployStatus(payload.status || '')
+        }, []),
     )
 
     const hydrate = useCallback(async () => {
@@ -195,6 +202,23 @@ const SessionConsole = (props: Props) => {
         }
     }, [bindings, session, setError])
 
+    // deploy publishes the branch the card is working on — the worktree branch
+    // the agent commits to — without dragging the card into the deploy column.
+    const deploy = useCallback(async () => {
+        if (!bindings?.StartCardDeploy || !session?.branch) {
+            return
+        }
+        setError('')
+        setBusy(true)
+        try {
+            await bindings.StartCardDeploy(cardId, session.branch)
+        } catch (e) {
+            setError(String(e))
+        } finally {
+            setBusy(false)
+        }
+    }, [bindings, cardId, session, setError])
+
     const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault()
@@ -237,6 +261,26 @@ const SessionConsole = (props: Props) => {
                         </Button>}
                 </div>
             </div>
+
+            {session?.branch &&
+                <div className='SessionConsole__branch'>
+                    <span
+                        className='SessionConsole__branchName'
+                        title={session.worktreePath || undefined}
+                    >
+                        {session.branch}
+                    </span>
+                    {deployStatus &&
+                        <span className='SessionConsole__deployStatus'>
+                            {intl.formatMessage({id: 'SessionConsole.deploy-status', defaultMessage: 'deploy: {status}'}, {status: deployStatus})}
+                        </span>}
+                    <Button
+                        onClick={deploy}
+                        disabled={busy || !bindings.StartCardDeploy}
+                    >
+                        {intl.formatMessage({id: 'SessionConsole.deploy', defaultMessage: 'Deploy'})}
+                    </Button>
+                </div>}
 
             {error && <div className='SessionConsole__error'>{error}</div>}
 

@@ -31,12 +31,38 @@ func initTestRepo(t *testing.T) string {
 	return repo
 }
 
+func TestWorktreeBranchNamesTheCard(t *testing.T) {
+	// The readable case: the branch (and so the preview address) says what the
+	// card is about.
+	got := WorktreeBranch("Login via SSO", "card-1234abcd", "sess-5678efgh")
+	if !strings.HasPrefix(got, "acp/login-via-sso-") {
+		t.Errorf("branch %q, want it named after the title", got)
+	}
+
+	// Two cards with the same title must not share a branch.
+	if WorktreeBranch("Same", "card-a", "sess-a") == WorktreeBranch("Same", "card-b", "sess-b") {
+		t.Error("two cards with one title collided on a branch")
+	}
+	// Nor two sessions of one card, which is what the tail is for.
+	if WorktreeBranch("Same", "card-a", "sess-1") == WorktreeBranch("Same", "card-a", "sess-2") {
+		t.Error("two sessions of one card collided on a branch")
+	}
+
+	// A blank title falls back to the card, a non-Latin one to whatever folding
+	// leaves; both must still be a valid ref of the same shape.
+	for _, name := range []string{WorktreeBranch("", "card-1234abcd", "sess-1"), WorktreeBranch("Задача", "card-1234abcd", "sess-1")} {
+		if !strings.HasPrefix(name, "acp/") || strings.ContainsAny(name, " ~^:?*[\\") {
+			t.Errorf("branch %q is not a usable ref", name)
+		}
+	}
+}
+
 func TestCreateWorktreeNamingAndBase(t *testing.T) {
 	repo := initTestRepo(t)
 	root := t.TempDir()
 	ctx := context.Background()
 
-	wt, err := CreateWorktree(ctx, repo, "", "card-1234abcd", "sess-5678efgh", root)
+	wt, err := CreateWorktree(ctx, repo, "", "Логин через SSO", "card-1234abcd", "sess-5678efgh", root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +79,7 @@ func TestCreateWorktreeNamingAndBase(t *testing.T) {
 
 func TestCreateWorktreeBadBase(t *testing.T) {
 	repo := initTestRepo(t)
-	if _, err := CreateWorktree(context.Background(), repo, "no-such-branch", "c", "s", t.TempDir()); err == nil {
+	if _, err := CreateWorktree(context.Background(), repo, "no-such-branch", "title", "c", "s", t.TempDir()); err == nil {
 		t.Fatal("expected error for missing base branch")
 	}
 }
@@ -62,7 +88,7 @@ func TestRemoveWorktreeCleanVsDirty(t *testing.T) {
 	repo := initTestRepo(t)
 	ctx := context.Background()
 
-	clean, err := CreateWorktree(ctx, repo, "", "card1", "sessclean", t.TempDir())
+	clean, err := CreateWorktree(ctx, repo, "", "clean card", "card1", "sessclean", t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +97,7 @@ func TestRemoveWorktreeCleanVsDirty(t *testing.T) {
 		t.Fatalf("clean worktree should be removed: removed=%v err=%v", removed, err)
 	}
 
-	dirty, err := CreateWorktree(ctx, repo, "", "card2", "sessdirty", t.TempDir())
+	dirty, err := CreateWorktree(ctx, repo, "", "dirty card", "card2", "sessdirty", t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +125,7 @@ func TestConcurrentWorktreeCreation(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			_, errs[i] = CreateWorktree(context.Background(), repo, "", "card", "sess"+string(rune('a'+i)), root)
+			_, errs[i] = CreateWorktree(context.Background(), repo, "", "card", "card", "sess"+string(rune('a'+i)), root)
 		}(i)
 	}
 	wg.Wait()

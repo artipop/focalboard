@@ -27,7 +27,9 @@ func (m *Manager) handleEvent(ev CardMoved) {
 	switch {
 	case m.isTriggerColumn(ev.ToColumn):
 		m.handleEnter(ev)
-	case m.isTriggerColumn(ev.FromColumn):
+	case m.isDeployColumn(ev.ToColumn):
+		m.handleDeployEnter(ev)
+	case m.isTriggerColumn(ev.FromColumn), m.isDeployColumn(ev.FromColumn):
 		if m.CancelSessionForCard(ev.CardID, "карточка убрана из триггерной колонки") {
 			m.log.Info("acp: session cancelled by card move", "card", ev.CardID)
 		}
@@ -35,26 +37,9 @@ func (m *Manager) handleEvent(ev CardMoved) {
 }
 
 func (m *Manager) handleEnter(ev CardMoved) {
-	// A drag-and-drop can produce a burst of patches: one move = one session.
-	key := fmt.Sprintf("%s|%s|%s", ev.CardID, ev.FromColumn.OptionID, ev.ToColumn.OptionID)
-	fresh, err := m.store.ClaimIdempotency(key, "", m.cfg.IdempotencyWindow())
-	if err != nil {
-		m.log.Error("acp: idempotency check failed", "err", err)
+	if !m.claimMove(ev, "agent") {
 		return
 	}
-	if !fresh {
-		m.log.Debug("acp: duplicate move suppressed", "card", ev.CardID)
-		return
-	}
-
-	m.mu.Lock()
-	_, live := m.byCard[ev.CardID]
-	m.mu.Unlock()
-	if live {
-		m.log.Info("acp: card already has a live session, skipping", "card", ev.CardID)
-		return
-	}
-
 	s, err := m.StartSessionForEvent(ev)
 	if err != nil {
 		m.log.Warn("acp: session not started", "card", ev.CardID, "err", err)
@@ -64,9 +49,63 @@ func (m *Manager) handleEnter(ev CardMoved) {
 	m.log.Info("acp: session started", "session", s.ID, "card", ev.CardID, "repo", s.RepoPath)
 }
 
+// handleDeployEnter is handleEnter for the deploy column: same guards, a session
+// pointed at publishing the card's branch instead of working on the card.
+func (m *Manager) handleDeployEnter(ev CardMoved) {
+	if !m.claimMove(ev, "deploy") {
+		return
+	}
+	s, err := m.StartDeploySessionForEvent(ev)
+	if err != nil {
+		m.log.Warn("acp: deploy session not started", "card", ev.CardID, "err", err)
+		m.commentCard(ev.CardID, fmt.Sprintf("⚠️ Деплой не запущен: %v", err))
+		return
+	}
+	m.log.Info("acp: deploy session started", "session", s.ID, "card", ev.CardID, "repo", s.RepoPath, "branch", s.DeployBranch)
+}
+
+// claimMove applies the guards every trigger column shares: one move is one
+// session (a drag-and-drop produces a burst of patches), and a card with a live
+// session is left alone. kind namespaces the idempotency key, so the agent and
+// deploy columns cannot suppress each other's events.
+func (m *Manager) claimMove(ev CardMoved, kind string) bool {
+	key := fmt.Sprintf("%s|%s|%s|%s", kind, ev.CardID, ev.FromColumn.OptionID, ev.ToColumn.OptionID)
+	fresh, err := m.store.ClaimIdempotency(key, "", m.cfg.IdempotencyWindow())
+	if err != nil {
+		m.log.Error("acp: idempotency check failed", "err", err)
+		return false
+	}
+	if !fresh {
+		m.log.Debug("acp: duplicate move suppressed", "card", ev.CardID, "kind", kind)
+		return false
+	}
+
+	m.mu.Lock()
+	_, live := m.byCard[ev.CardID]
+	m.mu.Unlock()
+	if live {
+		m.log.Info("acp: card already has a live session, skipping", "card", ev.CardID, "kind", kind)
+		return false
+	}
+	return true
+}
+
 // isTriggerColumn matches the configured trigger property/option by name,
 // case-insensitively.
 func (m *Manager) isTriggerColumn(c Column) bool {
 	return strings.EqualFold(c.PropertyName, m.cfg.TriggerProperty) &&
 		strings.EqualFold(c.Name, m.cfg.TriggerColumn)
+}
+
+// isDeployColumn matches the deploy column on the same property. An empty
+// deployColumn disables the trigger rather than matching every unnamed column.
+func (m *Manager) isDeployColumn(c Column) bool {
+	m.cfgMu.RLock()
+	property, column := m.cfg.TriggerProperty, m.cfg.DeployColumn
+	m.cfgMu.RUnlock()
+	if strings.TrimSpace(column) == "" {
+		return false
+	}
+	return strings.EqualFold(c.PropertyName, property) &&
+		strings.EqualFold(c.Name, column)
 }

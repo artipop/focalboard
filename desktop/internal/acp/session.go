@@ -15,6 +15,7 @@ import (
 
 	"github.com/mattermost/focalboard/desktop/internal/acp/claudebridge"
 	"github.com/mattermost/focalboard/desktop/internal/acp/codexbridge"
+	"github.com/mattermost/focalboard/desktop/internal/dokku"
 	"github.com/mattermost/focalboard/desktop/internal/procgroup"
 )
 
@@ -36,14 +37,27 @@ type turnOutcome struct {
 // console is attached to stays alive between turns so the user can keep
 // talking to the agent.
 type Session struct {
-	ID         string
-	CardID     string
+	ID     string
+	CardID string
+	// Title is the card's own title, which is what the session's worktree
+	// branch is named after — and therefore what a preview address reads like.
+	Title      string
 	BoardID    string
 	RepoPath   string
 	BaseBranch string
 	PromptText string
 	Agent      AgentEntry      // resolved agent (kind/bin/model/env/prompt)
 	Net        NetworkSettings // resolved proxy configuration (Agent.ProxyName)
+
+	// Deploy is set only for a session started by the deploy column: it is the
+	// Dokku destination the session's MCP server is configured from, and its
+	// presence is what turns those tools on.
+	Deploy       *DeployEntry
+	DeployBranch string
+	// mcpConfigured records that we handed this session an MCP server of our
+	// own, which is what makes the agent's "may I launch MCP?" prompt ours to
+	// answer rather than the user's.
+	mcpConfigured bool
 
 	Worktree     WorktreeInfo
 	usedWorktree bool // a dedicated worktree was actually created
@@ -126,6 +140,16 @@ func (s *Session) requestClose() {
 	s.closeOnce.Do(func() { close(s.closeCh) })
 }
 
+// recordedBranch is the branch the session is filed under: the worktree it
+// created, or — for a deploy session, which works in the repo itself — the
+// branch it publishes.
+func (s *Session) recordedBranch() string {
+	if s.Worktree.Branch != "" {
+		return s.Worktree.Branch
+	}
+	return s.DeployBranch
+}
+
 // hasConsole reports whether a human is watching and could answer a prompt.
 // Unattended sessions must never block on one.
 func (s *Session) hasConsole() bool {
@@ -134,10 +158,27 @@ func (s *Session) hasConsole() bool {
 	return s.attached > 0
 }
 
+// markMCPConfigured records that this session was started with an MCP server we
+// configured ourselves.
+func (s *Session) markMCPConfigured() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.mcpConfigured = true
+}
+
+func (s *Session) usesOurMCP() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.mcpConfigured
+}
+
 // allowToolAlways remembers a tool the user approved for the rest of the session.
 func (s *Session) allowToolAlways(name string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.allowTools == nil {
+		s.allowTools = make(map[string]bool)
+	}
 	s.allowTools[name] = true
 }
 
@@ -200,11 +241,13 @@ func (m *Manager) runSession(s *Session) {
 
 // prepareWorkdir sets up the session's working directory and announces it.
 func (m *Manager) prepareWorkdir(s *Session) error {
-	// A planning session only reads, so it runs in the repository itself even
-	// under worktreeMode "always": a worktree would cost a checkout and leave
-	// a branch behind for a conversation that changes nothing.
-	if m.cfg.UseWorktrees() && !s.Planning {
-		wt, err := CreateWorktree(m.rootCtx, s.RepoPath, s.BaseBranch, s.CardID, s.ID, m.cfg.WorktreeDir)
+	// Two kinds of session run in the repository itself even under worktreeMode
+	// "always": a planning session only reads, so a worktree would cost a
+	// checkout and leave a branch behind for a conversation that changes
+	// nothing, and a deploy session publishes an existing branch rather than
+	// writing code, so a throwaway branch is not the one anybody deploys.
+	if m.cfg.UseWorktrees() && !s.Planning && s.Deploy == nil {
+		wt, err := CreateWorktree(m.rootCtx, s.RepoPath, s.BaseBranch, s.Title, s.CardID, s.ID, m.cfg.WorktreeDir)
 		if err != nil {
 			return fmt.Errorf("не удалось создать git worktree: %w", err)
 		}
@@ -214,11 +257,19 @@ func (m *Manager) prepareWorkdir(s *Session) error {
 			m.log.Warn("acp: failed to persist worktree info", "session", s.ID, "err", err)
 		}
 		m.comment(s, fmt.Sprintf("Агент запущен.\nWorktree: `%s`\nВетка: `%s` (от `%s`)", wt.Path, wt.Branch, wt.BaseRef))
+		// The card shows the branch and offers to deploy it, and this is the
+		// first moment it exists.
+		m.emitSession(s, "")
 		return nil
 	}
 	s.Worktree = WorktreeInfo{Path: s.RepoPath, BaseRef: "HEAD"}
-	if err := m.store.UpdateSession(s.ID, StatusRunning, "", s.RepoPath, "", "", "", nil); err != nil {
+	if err := m.store.UpdateSession(s.ID, StatusRunning, "", s.RepoPath, "", s.recordedBranch(), "", nil); err != nil {
 		m.log.Warn("acp: failed to persist session cwd", "session", s.ID, "err", err)
+	}
+	if s.Deploy != nil {
+		m.comment(s, fmt.Sprintf("Деплой ветки `%s` → `%s`\nОжидаемый адрес: %s",
+			s.DeployBranch, s.Deploy.Name, s.Deploy.URL(dokku.AppSlug(s.DeployBranch))))
+		return nil
 	}
 	m.comment(s, fmt.Sprintf("Агент запущен прямо в репозитории `%s`.", s.RepoPath))
 	return nil
@@ -367,16 +418,19 @@ func connectionLost(conn *acpsdk.ClientSideConnection) bool {
 // session. The connection is held for the session's whole life, so every turn
 // runs against the same agent process and keeps the conversation.
 func (m *Manager) openConnection(ctx context.Context, s *Session) (*acpsdk.ClientSideConnection, acpsdk.SessionId, func(), error) {
+	specs, err := sessionMCPServers(s)
+	if err != nil {
+		return nil, "", nil, err
+	}
 	var (
 		conn    *acpsdk.ClientSideConnection
 		cleanup func()
-		err     error
 	)
 	switch {
 	case s.Agent.Kind == AgentKindCodex:
-		conn, cleanup, err = m.connectCodex(ctx, s)
+		conn, cleanup, err = m.connectCodex(ctx, s, specs)
 	case s.Agent.Kind == AgentKindClaude:
-		conn, cleanup, err = m.connectClaude(ctx, s)
+		conn, cleanup, err = m.connectClaude(ctx, s, specs)
 	case IsExternalACP(s.Agent.Kind):
 		var argv []string
 		if argv, err = m.externalACPCommand(s.Agent); err == nil {
@@ -400,7 +454,14 @@ func (m *Manager) openConnection(ctx context.Context, s *Session) (*acpsdk.Clien
 		return nil, "", nil, fmt.Errorf("initialize: %w", err)
 	}
 
-	sess, err := conn.NewSession(ctx, acpsdk.NewSessionRequest{Cwd: s.Worktree.Path, McpServers: []acpsdk.McpServer{}})
+	// Only an ACP-native agent is told about MCP servers here: the claude and
+	// codex bridges translate ACP into their CLI's own protocol and pass their
+	// servers on the command line instead.
+	mcpServers := []acpsdk.McpServer{}
+	if IsExternalACP(s.Agent.Kind) {
+		mcpServers = acpMCPServers(specs)
+	}
+	sess, err := conn.NewSession(ctx, acpsdk.NewSessionRequest{Cwd: s.Worktree.Path, McpServers: mcpServers})
 	if err != nil {
 		cleanup()
 		return nil, "", nil, fmt.Errorf("session/new: %w", err)
@@ -409,7 +470,7 @@ func (m *Manager) openConnection(ctx context.Context, s *Session) (*acpsdk.Clien
 	if s.usedWorktree {
 		worktreePath = s.Worktree.Path
 	}
-	if err := m.store.UpdateSession(s.ID, StatusRunning, string(sess.SessionId), s.Worktree.Path, worktreePath, s.Worktree.Branch, "", nil); err != nil {
+	if err := m.store.UpdateSession(s.ID, StatusRunning, string(sess.SessionId), s.Worktree.Path, worktreePath, s.recordedBranch(), "", nil); err != nil {
 		m.log.Warn("acp: failed to persist acp session id", "session", s.ID, "err", err)
 	}
 	return conn, sess.SessionId, cleanup, nil
@@ -504,7 +565,7 @@ func (h *minLevelHandler) WithGroup(name string) slog.Handler {
 }
 
 // connectClaude wires the in-process claude bridge over io.Pipe.
-func (m *Manager) connectClaude(ctx context.Context, s *Session) (*acpsdk.ClientSideConnection, func(), error) {
+func (m *Manager) connectClaude(ctx context.Context, s *Session, mcpSpecs []mcpServerSpec) (*acpsdk.ClientSideConnection, func(), error) {
 	launch, err := agentLaunchArgv(s.Agent, m.resolveClaudeBin)
 	if err != nil {
 		return nil, nil, err
@@ -513,6 +574,11 @@ func (m *Manager) connectClaude(ctx context.Context, s *Session) (*acpsdk.Client
 	if s.Agent.Model != "" {
 		extraArgs = append(extraArgs, "--model", s.Agent.Model)
 	}
+	mcpArgs, err := claudeMCPArgs(mcpSpecs)
+	if err != nil {
+		return nil, nil, err
+	}
+	extraArgs = append(extraArgs, mcpArgs...)
 	extraArgs = append(extraArgs, s.Agent.Args...)
 	env, drop := spawnEnv(s.Agent, s.Net)
 	bridge := claudebridge.New(claudebridge.Options{
@@ -549,7 +615,7 @@ func (m *Manager) connectClaude(ctx context.Context, s *Session) (*acpsdk.Client
 // connectCodex wires the in-process codex bridge over io.Pipe. The codex CLI
 // has no ACP mode, so the bridge drives `codex exec --json` and translates its
 // event stream; per-agent env (CODEX_HOME/OPENAI_API_KEY) is injected at spawn.
-func (m *Manager) connectCodex(ctx context.Context, s *Session) (*acpsdk.ClientSideConnection, func(), error) {
+func (m *Manager) connectCodex(ctx context.Context, s *Session, mcpSpecs []mcpServerSpec) (*acpsdk.ClientSideConnection, func(), error) {
 	launch, err := agentLaunchArgv(s.Agent, m.resolveCodexBin)
 	if err != nil {
 		return nil, nil, err
@@ -558,7 +624,7 @@ func (m *Manager) connectCodex(ctx context.Context, s *Session) (*acpsdk.ClientS
 	bridge := codexbridge.New(codexbridge.Options{
 		Launch:    launch,
 		Model:     s.Agent.Model,
-		ExtraArgs: s.Agent.Args,
+		ExtraArgs: append(codexMCPArgs(mcpSpecs), s.Agent.Args...),
 		Env:       env,
 		DropEnv:   drop,
 		Logger:    m.log,
@@ -651,10 +717,23 @@ func (s *Session) wasCancelled() bool {
 
 func doneComment(s *Session, finalText string) string {
 	var b strings.Builder
-	b.WriteString("Агент завершил работу.\n\n")
+	if s.Deploy != nil {
+		// "Finished" is not "succeeded" — whether the app is up is in the
+		// agent's own text below, so the header stays neutral.
+		b.WriteString("Сессия деплоя завершена.\n\n")
+	} else {
+		b.WriteString("Агент завершил работу.\n\n")
+	}
 	if t := strings.TrimSpace(finalText); t != "" {
 		b.WriteString(truncateRunes(t, 4000))
 		b.WriteString("\n\n")
+	}
+	if s.Deploy != nil {
+		slug := dokku.AppSlug(s.DeployBranch)
+		fmt.Fprintf(&b, "Ветка: `%s`\nПриложение Dokku: `%s`\nАдрес: %s\n",
+			s.DeployBranch, s.Deploy.AppName(slug), s.Deploy.URL(slug))
+		fmt.Fprintf(&b, "Если агент правил файлы, изменения не закоммичены: `git -C %s diff`", s.RepoPath)
+		return b.String()
 	}
 	if s.usedWorktree {
 		fmt.Fprintf(&b, "Worktree: `%s`\nВетка: `%s`\n", s.Worktree.Path, s.Worktree.Branch)

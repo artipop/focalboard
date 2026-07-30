@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/mattermost/focalboard/desktop/internal/acp/claudebridge"
+	"github.com/mattermost/focalboard/desktop/internal/dokku"
 )
 
 // Manager owns all agent sessions: it consumes board events, enforces limits
@@ -126,21 +127,43 @@ func (m *Manager) recover() {
 	}
 }
 
+// startOptions are the ways a session can differ from a plain card task.
+type startOptions struct {
+	// interactive keeps the session alive between turns (a console is open).
+	interactive bool
+	// deploy makes this a deploy session: it resolves a Dokku target, is given
+	// the dokku MCP tools and gets the deploy prompt instead of the card task.
+	deploy bool
+	// repoName picks a repository explicitly, for a console opened on a card
+	// that does not say which one it is about.
+	repoName string
+}
+
 // StartSessionForEvent creates and launches a session for a validated trigger
 // event. Callers must have passed idempotency/liveness checks.
 func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
-	return m.startSession(ev, false, "")
+	return m.startSession(ev, startOptions{})
+}
+
+// StartDeploySessionForEvent launches the session behind the deploy column: the
+// same machinery as a card task, pointed at publishing the card's branch.
+func (m *Manager) StartDeploySessionForEvent(ev CardMoved) (*Session, error) {
+	return m.startSession(ev, startOptions{deploy: true})
 }
 
 // startSession is the shared launch path. An interactive session survives its
 // turns and waits for the user; a triggered one runs the card task and ends.
-func (m *Manager) startSession(ev CardMoved, interactive bool, repoName string) (*Session, error) {
+func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error) {
 	repoPath, err := m.resolveRepo(ev)
-	if repoName != "" {
+	if opts.repoName != "" {
 		// An explicit choice wins: the console offers one exactly when the card
 		// itself does not say which repository it is about.
-		repoPath, err = m.resolveNamedRepo(repoName)
+		repoPath, err = m.resolveNamedRepo(opts.repoName)
 	}
+	if err != nil {
+		return nil, err
+	}
+	deploy, deployBranch, err := m.resolveDeploy(ev, repoPath, opts.deploy)
 	if err != nil {
 		return nil, err
 	}
@@ -153,8 +176,10 @@ func (m *Manager) startSession(ev CardMoved, interactive bool, repoName string) 
 		return nil, err
 	}
 	// Without worktrees, two agents must never share one working tree
-	// (spec §7): reject while another live session uses the same repo.
-	if !m.cfg.UseWorktrees() {
+	// (spec §7): reject while another live session uses the same repo. A deploy
+	// session is exempt for the same reason a planning one is — it only pushes
+	// an existing branch and never touches the checkout.
+	if !m.cfg.UseWorktrees() && !opts.deploy {
 		m.mu.Lock()
 		var busyCard string
 		for _, other := range m.active {
@@ -174,23 +199,33 @@ func (m *Manager) startSession(ev CardMoved, interactive bool, repoName string) 
 	m.cfgMu.RLock()
 	systemPrompt := m.cfg.SystemPrompt
 	m.cfgMu.RUnlock()
-	s := &Session{
-		ID:          uuid.NewString(),
-		CardID:      ev.CardID,
-		BoardID:     ev.BoardID,
-		RepoPath:    repoPath,
-		BaseBranch:  ev.Props["branch"],
-		Agent:       agent,
-		Net:         net,
-		PromptText:  composePrompt(ev, agent, systemPrompt, m.cfg.UseWorktrees()),
-		Policy:      agentPolicy(agent),
-		status:      StatusQueued,
-		allowTools:  make(map[string]bool),
-		interactive: interactive,
-		turns:       make(chan turnRequest, 1),
-		closeCh:     make(chan struct{}),
+	prompt := composePrompt(ev, agent, systemPrompt, m.cfg.UseWorktrees())
+	if deploy != nil {
+		m.cfgMu.RLock()
+		deployPrompt := m.cfg.DeployPrompt
+		m.cfgMu.RUnlock()
+		prompt = composeDeployPrompt(ev, agent, systemPrompt, deployPrompt, *deploy, deployBranch)
 	}
-	if interactive {
+	s := &Session{
+		ID:           uuid.NewString(),
+		CardID:       ev.CardID,
+		Title:        ev.Title,
+		BoardID:      ev.BoardID,
+		RepoPath:     repoPath,
+		BaseBranch:   ev.Props["branch"],
+		Agent:        agent,
+		Net:          net,
+		Deploy:       deploy,
+		DeployBranch: deployBranch,
+		PromptText:   prompt,
+		Policy:       agentPolicy(agent),
+		status:       StatusQueued,
+		allowTools:   make(map[string]bool),
+		interactive:  opts.interactive,
+		turns:        make(chan turnRequest, 1),
+		closeCh:      make(chan struct{}),
+	}
+	if opts.interactive {
 		s.attached = 1
 	}
 	rec := SessionRecord{
@@ -207,7 +242,12 @@ func (m *Manager) startSession(ev CardMoved, interactive bool, repoName string) 
 
 	m.mu.Lock()
 	m.active[s.ID] = s
-	m.byCard[s.CardID] = s
+	// byCard is the card's *own* session — the one its console talks to and the
+	// one leaving the column cancels. A deploy started from the card while that
+	// session is alive must not take its place.
+	if live := m.byCard[s.CardID]; live == nil || !opts.deploy {
+		m.byCard[s.CardID] = s
+	}
 	m.mu.Unlock()
 	m.emitSession(s, "")
 
@@ -263,11 +303,39 @@ func (m *Manager) StartSessionForCard(cardID, repoName string) (*Session, error)
 	if err != nil {
 		return nil, fmt.Errorf("не удалось прочитать карточку: %w", err)
 	}
-	s, err := m.startSession(ev, true, repoName)
+	s, err := m.startSession(ev, startOptions{interactive: true, repoName: repoName})
 	if err != nil {
 		return nil, err
 	}
 	return s, nil
+}
+
+// StartDeployForCard publishes a card's branch without moving the card into the
+// deploy column — the "Deploy" button next to the branch the card is working on.
+// branch overrides the card's own "branch" property, which is how the session's
+// worktree branch (the one the agent is actually committing to) gets deployed;
+// empty falls back to the card property and then to the checked-out branch.
+//
+// The branch lives in the repository's shared object store even when it was
+// created in a worktree, so pushing it from the repository itself — which is
+// where a deploy session always runs — reaches it.
+func (m *Manager) StartDeployForCard(cardID, branch string) (*Session, error) {
+	if m.reader == nil {
+		return nil, fmt.Errorf("чтение карточек недоступно")
+	}
+	ctx, cancel := context.WithTimeout(m.rootCtx, 10*time.Second)
+	defer cancel()
+	ev, err := m.reader.CardByID(ctx, cardID)
+	if err != nil {
+		return nil, fmt.Errorf("не удалось прочитать карточку: %w", err)
+	}
+	if b := strings.TrimSpace(branch); b != "" {
+		if ev.Props == nil {
+			ev.Props = map[string]string{}
+		}
+		ev.Props["branch"] = b
+	}
+	return m.startSession(ev, startOptions{deploy: true})
 }
 
 // StartPlanningSession opens a card-less session for talking a task through
@@ -657,12 +725,18 @@ func (m *Manager) emitSession(s *Session, errText string) {
 	status, interactive, turn := s.status, s.interactive, s.turnNo
 	s.mu.Unlock()
 	m.ui.Emit(EventSession, map[string]any{
-		"sessionId":   s.ID,
-		"cardId":      s.CardID,
-		"status":      string(status),
-		"error":       errText,
-		"interactive": interactive,
-		"turn":        turn,
+		"sessionId": s.ID,
+		"cardId":    s.CardID,
+		"status":    string(status),
+		"error":     errText,
+		// The branch is what the card displays and what its deploy button
+		// publishes; deploy tells a card's own session apart from the deploy
+		// it started, which shares the card id but not the console.
+		"branch":       s.recordedBranch(),
+		"worktreePath": s.Worktree.Path,
+		"deploy":       s.Deploy != nil,
+		"interactive":  interactive,
+		"turn":         turn,
 	})
 }
 
@@ -827,6 +901,31 @@ func composePrompt(ev CardMoved, agent AgentEntry, systemPrompt string, useWorkt
 		b = fmt.Appendf(b, "\nРаботай в текущем каталоге — это отдельный git worktree, созданный специально для этой задачи. Можешь делать локальные коммиты. Не выполняй git push.")
 	} else {
 		b = fmt.Appendf(b, "\nРаботай в текущем каталоге — это рабочая копия репозитория пользователя. Не переключай ветки, не делай коммитов и git push: оставь изменения незакоммиченными для ревью.")
+	}
+	return string(b)
+}
+
+// composeDeployPrompt builds the task text of a deploy session: the same system
+// prompts an ordinary task gets, then the deploy instructions, then the concrete
+// facts — which branch goes where, and what the resulting address should be.
+func composeDeployPrompt(ev CardMoved, agent AgentEntry, systemPrompt, deployPrompt string, target DeployEntry, branch string) string {
+	var b []byte
+	if p := strings.TrimSpace(systemPrompt); p != "" {
+		b = fmt.Appendf(b, "%s\n\n", p)
+	}
+	if p := strings.TrimSpace(agent.Prompt); p != "" {
+		b = fmt.Appendf(b, "%s\n\n", p)
+	}
+	if p := strings.TrimSpace(deployPrompt); p != "" {
+		b = fmt.Appendf(b, "%s\n\n", p)
+	} else {
+		b = fmt.Appendf(b, "%s\n\n", DefaultDeployPrompt)
+	}
+	slug := dokku.AppSlug(branch)
+	b = fmt.Appendf(b, "Карточка: %s\nВетка: %s\nЦель: %s\nПриложение Dokku: %s\nОжидаемый адрес: %s\n",
+		ev.Title, branch, target.Name, target.AppName(slug), target.URL(slug))
+	if ev.Body != "" {
+		b = fmt.Appendf(b, "\nОписание карточки:\n%s\n", ev.Body)
 	}
 	return string(b)
 }

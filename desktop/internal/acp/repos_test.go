@@ -132,9 +132,11 @@ func TestTriggerSessionViaTag(t *testing.T) {
 		sessions, _, err := m.store.SessionsForCard("card10")
 		return err == nil && len(sessions) == 1 && sessions[0].Status == StatusDone
 	})
+	// The tag picked the repository; the session runs in that repository's
+	// worktree, which is named after it.
 	sessions, _, _ := m.store.SessionsForCard("card10")
-	if sessions[0].Cwd != repo {
-		t.Errorf("expected session cwd %q, got %q", repo, sessions[0].Cwd)
+	if wt := sessions[0].WorktreePath; !strings.Contains(filepath.Base(wt), filepath.Base(repo)) {
+		t.Errorf("expected a worktree of %q, got %q", repo, wt)
 	}
 	if got := writer.cardComments("card10"); len(got) < 2 {
 		t.Errorf("expected comments, got %v", got)

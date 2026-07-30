@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/mattermost/focalboard/desktop/internal/dokku"
 )
 
 // RepoEntry is one named local repository in the registry.
@@ -122,6 +124,22 @@ func (n NetworkSettings) redactProxySecret(text string) string {
 type ProxyEntry struct {
 	Name string `json:"name"` // registry key; matches AgentEntry.ProxyName
 	NetworkSettings
+}
+
+// DeployEntry is one named Dokku destination in the registry: where the branch
+// of a card moved into the deploy column is published. A card is mapped to an
+// entry by a select option carrying its name, by the repository it resolved to,
+// or — with a single entry registered — by default.
+//
+// The Dokku half is dokku.Target verbatim, because that is exactly what the MCP
+// subprocess is handed at session start.
+type DeployEntry struct {
+	Name string `json:"name"` // registry key; matches the card "Deploy target" option
+
+	// An entry is the host and the domain, nothing else: what a preview needs
+	// beyond that — environment, TLS, how long a build may take — is a property
+	// of the repository being deployed, not of the machine it lands on.
+	dokku.Target
 }
 
 // IsZero reports whether nothing is configured.
@@ -262,6 +280,11 @@ type Config struct {
 	TriggerProperty string `json:"triggerProperty"`
 	TriggerColumn   string `json:"triggerColumn"`
 
+	// DeployColumn is the second trigger on the same property: a card dragged
+	// into it starts a session whose job is to publish the card's branch to the
+	// Dokku target it resolves to. Empty disables the deploy trigger.
+	DeployColumn string `json:"deployColumn"`
+
 	// RepoWhitelist lists directory roots a card's repo_path must be under.
 	// Empty means every repo_path is rejected (explicit opt-in).
 	RepoWhitelist []string `json:"repoWhitelist"`
@@ -281,14 +304,23 @@ type Config struct {
 	// by name (AgentEntry.ProxyName), so a proxy is described once and shared.
 	Proxies []ProxyEntry `json:"proxies"`
 
+	// Deploys is the registry of named Dokku destinations used by the deploy
+	// column. The matching target is handed to the session's dokku MCP server.
+	Deploys []DeployEntry `json:"deploys"`
+
 	// SystemPrompt is the board/column-level instruction prepended to every
 	// triggered session's prompt (before the agent's own system prompt and the
 	// card task). One trigger column today; may become a per-column map later.
 	SystemPrompt string `json:"systemPrompt"`
 
-	// WorktreeMode controls where sessions run: "never" (default) — directly
-	// in the repository working tree, with concurrent sessions per repo
-	// rejected; "always" — a dedicated git worktree per session. A smarter
+	// DeployPrompt is what a deploy session is told to do; the concrete facts
+	// (repository, branch, target, expected URL) are appended to it.
+	DeployPrompt string `json:"deployPrompt"`
+
+	// WorktreeMode controls where sessions run: "always" (default) — a
+	// dedicated git worktree per session, which is what gives a card its own
+	// branch to show and to deploy; "never" — directly in the repository
+	// working tree, with concurrent sessions per repo rejected. A smarter
 	// "auto" (escalate to a worktree when the repo is busy/dirty) may come later.
 	WorktreeMode string `json:"worktreeMode"`
 
@@ -329,11 +361,14 @@ func DefaultConfig(dataDir string) Config {
 		AgentMode:                "claude",
 		TriggerProperty:          "Status",
 		TriggerColumn:            DefaultTriggerColumn,
+		DeployColumn:             "Deploy",
 		RepoWhitelist:            []string{},
 		Repos:                    []RepoEntry{},
 		Agents:                   []AgentEntry{},
 		Proxies:                  []ProxyEntry{},
-		WorktreeMode:             "never",
+		Deploys:                  []DeployEntry{},
+		DeployPrompt:             DefaultDeployPrompt,
+		WorktreeMode:             "always",
 		MaxConcurrent:            3,
 		SessionTimeoutMinutes:    15,
 		SessionIdleMinutes:       30,
@@ -344,10 +379,31 @@ func DefaultConfig(dataDir string) Config {
 		// shell (tests, git, build), and a session with no console open has
 		// nobody to ask — every prompt would simply be rejected. Edit/Write are
 		// already allowed, so withholding the shell bought little in practice.
-		AutoAllowTools: []string{"Read", "Grep", "Glob", "Edit", "Write", "MultiEdit", "NotebookEdit", "TodoWrite", "Bash", "Skill"},
-		WorktreeDir:    filepath.Join(dataDir, "worktrees"),
+		// The dokku tools are on the list for the same reason: a deploy started
+		// by a card move usually has no console watching, and asking nobody
+		// means rejecting. destroy_deployment is deliberately absent — deleting
+		// an environment is always worth a human answer.
+		AutoAllowTools: []string{
+			"Read", "Grep", "Glob", "Edit", "Write", "MultiEdit", "NotebookEdit", "TodoWrite", "Bash", "Skill",
+			"mcp__dokku__deploy_branch", "mcp__dokku__app_logs",
+			"mcp__dokku__deployment_status", "mcp__dokku__list_deployments",
+		},
+		WorktreeDir: filepath.Join(dataDir, "worktrees"),
 	}
 }
+
+// DefaultDeployPrompt is the task text a deploy session starts with.
+const DefaultDeployPrompt = `Задача: опубликовать ветку этой карточки на Dokku.
+
+Делай это только инструментами mcp__dokku__*: deploy_branch публикует ветку,
+app_logs показывает логи сборки и приложения, deployment_status — состояние
+процессов. Не запускай ssh и git push руками и не переключай ветки.
+
+Если сборка упала: прочитай логи, назови причину и почини её, только если
+исправление очевидно и относится к деплою (Procfile, переменные окружения,
+конфиг сборки). Не переписывай логику приложения — вместо этого опиши проблему.
+
+В конце ответа дай URL превью.`
 
 // LoadConfig reads path, creating it with defaults when absent.
 func LoadConfig(path, dataDir string) (Config, error) {

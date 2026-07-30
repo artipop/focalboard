@@ -21,6 +21,16 @@ func (m *Manager) Repos() []RepoEntry {
 
 // AddRepo registers a local git repository under name (defaults to the
 // directory basename) and persists the config.
+//
+// TODO: validate the name as a hostname label. A deploy target names its apps
+// and its subdomain after the repository (dokku.AppLabel), so a name that is not
+// a valid DNS label is folded there silently, and two names that fold together
+// would share one subdomain. The check belongs here, where the name is typed.
+//
+// TODO: this entry is also where a preview's own settings belong — config
+// variables for the branch app, whether to request a Let's Encrypt certificate,
+// how long a build may take. They were on the deploy target, which is wrong: a
+// target is a machine, and those describe the thing being deployed.
 func (m *Manager) AddRepo(name, path string) (RepoEntry, error) {
 	if !filepath.IsAbs(path) {
 		return RepoEntry{}, fmt.Errorf("путь должен быть абсолютным: %s", path)
