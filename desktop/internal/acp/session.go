@@ -590,20 +590,21 @@ func (m *Manager) connectExternal(ctx context.Context, s *Session) (*acpsdk.Clie
 	return m.connectACPAgent(ctx, s, m.cfg.AgentCommand)
 }
 
-// externalACPCommand builds the argv for an ACP-native external agent
-// (antigravity or the generic acp kind). Command overrides everything; kind
-// "antigravity" defaults to `<bin> --acp`. Args are appended in both cases.
+// externalACPCommand builds the argv for an ACP-native external agent (the
+// kinds in acpNative, or the generic acp kind). Command overrides everything;
+// a known kind defaults to `<bin> <acp flag>` plus `--model` when set. Args are
+// appended in both cases.
 func (m *Manager) externalACPCommand(a AgentEntry) ([]string, error) {
 	var argv []string
-	switch {
+	switch def, known := acpNative[a.Kind]; {
 	case len(a.Command) > 0:
 		argv = append(argv, a.Command...)
-	case a.Kind == AgentKindAntigravity:
-		bin, err := lookupBin(firstNonEmpty(a.BinPath, "antigravity"), "antigravity binary not found (set binPath or command on the agent)")
+	case known:
+		bin, err := lookupBin(firstNonEmpty(a.BinPath, def.bin), fmt.Sprintf("%s binary not found (set binPath or command on the agent)", def.bin))
 		if err != nil {
 			return nil, err
 		}
-		argv = append(argv, bin, "--acp")
+		argv = append(argv, bin, def.acpFlag)
 		if a.Model != "" {
 			argv = append(argv, "--model", a.Model)
 		}

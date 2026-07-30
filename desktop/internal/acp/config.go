@@ -23,7 +23,7 @@ type RepoEntry struct {
 // each its own CODEX_HOME/OPENAI_API_KEY (or CLAUDE_CONFIG_DIR/ANTHROPIC_API_KEY).
 type AgentEntry struct {
 	Name    string            `json:"name"`              // registry key; matches the card "Agent" option
-	Kind    string            `json:"kind"`              // "claude" | "codex" | "antigravity" | "acp"
+	Kind    string            `json:"kind"`              // "claude" | "codex" | "antigravity" | "copilot" | "junie" | "acp"
 	BinPath string            `json:"binPath,omitempty"` // overrides binary discovery
 	Model   string            `json:"model,omitempty"`   // --model passed to the CLI
 	Prompt  string            `json:"prompt,omitempty"`  // per-agent system prompt prepended to the task
@@ -210,19 +210,39 @@ func spawnEnv(a AgentEntry, net NetworkSettings) (env []string, drop []string) {
 	return env, drop
 }
 
-// Agent kinds. claude/codex run through in-process bridges; antigravity and the
-// generic acp kind are ACP-native CLIs spawned over stdio (no bridge).
+// Agent kinds. claude/codex run through in-process bridges; the rest are
+// ACP-native CLIs spawned over stdio (no bridge).
 const (
 	AgentKindClaude      = "claude"
 	AgentKindCodex       = "codex"
 	AgentKindAntigravity = "antigravity"
+	AgentKindCopilot     = "copilot"
+	AgentKindJunie       = "junie"
 	AgentKindACP         = "acp"
 )
+
+// AgentKinds lists every accepted kind, in the order the UI offers them.
+var AgentKinds = []string{
+	AgentKindClaude, AgentKindCodex,
+	AgentKindAntigravity, AgentKindCopilot, AgentKindJunie,
+	AgentKindACP,
+}
+
+// acpNative describes an ACP-native CLI we know how to launch ourselves: the
+// binary to look for and the flag that puts it into ACP-over-stdio mode. All of
+// them also take `--model <name>`. The generic acp kind is deliberately absent —
+// it carries its own Command.
+var acpNative = map[string]struct{ bin, acpFlag string }{
+	AgentKindAntigravity: {"antigravity", "--acp"},
+	AgentKindCopilot:     {"copilot", "--acp"},    // github/copilot-cli, stdio is its default transport
+	AgentKindJunie:       {"junie", "--acp=true"}, // JetBrains Junie CLI takes a boolean value
+}
 
 // IsExternalACP reports whether the kind is an ACP-native external agent
 // (spawned over stdio and talked to in pure ACP, no bridge translation).
 func IsExternalACP(kind string) bool {
-	return kind == AgentKindAntigravity || kind == AgentKindACP
+	_, ok := acpNative[kind]
+	return ok || kind == AgentKindACP
 }
 
 // Config controls the agent integration. It is stored as JSON in the app data
@@ -292,6 +312,15 @@ type Config struct {
 	KeepFailedWorktrees bool   `json:"keepFailedWorktrees"`
 }
 
+// The column a card is dropped into to hand it to an agent. Work starts where
+// work normally starts on a board, rather than in a lane invented for agents.
+const (
+	DefaultTriggerColumn = "In Progress"
+	// legacyTriggerColumn is the column earlier versions triggered on; configs
+	// still carrying it are migrated on load.
+	legacyTriggerColumn = "To Agent"
+)
+
 // DefaultConfig returns the defaults written on first run. dataDir is the ACP
 // data directory (worktrees live under it).
 func DefaultConfig(dataDir string) Config {
@@ -299,7 +328,7 @@ func DefaultConfig(dataDir string) Config {
 		Enabled:                  true,
 		AgentMode:                "claude",
 		TriggerProperty:          "Status",
-		TriggerColumn:            "To Agent",
+		TriggerColumn:            DefaultTriggerColumn,
 		RepoWhitelist:            []string{},
 		Repos:                    []RepoEntry{},
 		Agents:                   []AgentEntry{},
@@ -340,6 +369,12 @@ func LoadConfig(path, dataDir string) (Config, error) {
 	cfg := DefaultConfig(dataDir)
 	if err := json.Unmarshal(b, &cfg); err != nil {
 		return Config{}, fmt.Errorf("parse %s: %w", path, err)
+	}
+	// An existing config keeps whatever it says, so the old default would live
+	// on forever in installs that never touched it. Only the abandoned default
+	// is rewritten; a column the user chose is left alone.
+	if strings.EqualFold(strings.TrimSpace(cfg.TriggerColumn), legacyTriggerColumn) {
+		cfg.TriggerColumn = DefaultTriggerColumn
 	}
 	return cfg, nil
 }

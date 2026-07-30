@@ -64,6 +64,9 @@ func (a *App) GetUser(id string) (*model.User, error) {
 	return user, nil
 }
 
+// GetUsersList returns the users with the given ids. When some ids have no
+// user, the ones that do are returned together with a not-found error, so the
+// caller can decide whether a partial answer is good enough.
 func (a *App) GetUsersList(userIDs []string) ([]*model.User, error) {
 	if len(userIDs) == 0 {
 		return nil, errors.New("No User IDs")
@@ -71,9 +74,29 @@ func (a *App) GetUsersList(userIDs []string) ([]*model.User, error) {
 
 	users, err := a.store.GetUsersList(userIDs, a.config.ShowEmailAddress, a.config.ShowFullName)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to find users")
+		if !model.IsErrNotFound(err) {
+			return nil, errors.Wrap(err, "unable to find users")
+		}
+		return users, err
 	}
 	return users, nil
+}
+
+// GetUserByUsername returns the user with the given username, or nil when there
+// is none. Used to look an account up before creating it.
+func (a *App) GetUserByUsername(username string) (*model.User, error) {
+	if username == "" {
+		return nil, errors.New("no username")
+	}
+
+	user, err := a.store.GetUserByUsername(username)
+	if err != nil {
+		if model.IsErrNotFound(err) {
+			return nil, nil
+		}
+		return nil, errors.Wrap(err, "unable to find user by username")
+	}
+	return user, nil
 }
 
 // Login create a new user session if the authentication data is valid.

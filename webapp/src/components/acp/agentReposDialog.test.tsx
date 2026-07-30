@@ -75,7 +75,8 @@ describe('components/acp/agentReposDialog', () => {
         ))
         await waitFor(() => expect(screen.getByText('alpha')).toBeInTheDocument())
 
-        userEvent.click(screen.getByRole('button', {name: 'Sync to board'}))
+        // No button to press: opening the dialog is what puts the registry into
+        // the board's field.
         await waitFor(() => expect(mockedMutator.updateBoardCardProperties).toBeCalledTimes(1))
 
         const newProps = mockedMutator.updateBoardCardProperties.mock.calls[0][2]
@@ -112,13 +113,40 @@ describe('components/acp/agentReposDialog', () => {
             />,
         ))
         await waitFor(() => expect(screen.getByText('beta')).toBeInTheDocument())
-
-        userEvent.click(screen.getByRole('button', {name: 'Sync to board'}))
         await waitFor(() => expect(mockedMutator.updateBoardCardProperties).toBeCalledTimes(1))
 
         const newProps = mockedMutator.updateBoardCardProperties.mock.calls[0][2]
         const repoProps = newProps.filter((p) => p.name === 'Repositories')
         expect(repoProps).toHaveLength(1) // reused, not duplicated
         expect(repoProps[0].options.map((o) => o.value)).toEqual(['alpha', 'beta'])
+    })
+
+    test('leaves the board alone when its field already lists every repository', async () => {
+        const boardWithRepos = TestBlockFactory.createBoard()
+        boardWithRepos.cardProperties.push({
+            id: 'repoprop',
+            name: 'Repositories',
+            type: 'multiSelect',
+            options: [{id: 'o1', value: 'alpha', color: 'propColorDefault'}],
+        })
+        const bindings = {
+            ListAgentRepos: jest.fn().mockResolvedValue(JSON.stringify([{name: 'alpha', path: '/tmp/alpha'}])),
+            PickDirectory: jest.fn(),
+            AddAgentRepo: jest.fn(),
+            RemoveAgentRepo: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentReposDialog
+                board={boardWithRepos}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByText('alpha')).toBeInTheDocument())
+
+        // Nothing to add: the board is not patched, so the undo history and the
+        // websocket stay quiet every time the dialog is opened.
+        expect(mockedMutator.updateBoardCardProperties).not.toBeCalled()
     })
 })

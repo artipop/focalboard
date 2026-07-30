@@ -70,7 +70,20 @@ func (a *API) handleGetUsersList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if userIDs[0] == model.SingleUser {
+	// The single-user id has no row in the users table, so it is synthesized
+	// here. The rest of the requested ids are looked up as usual: a single-user
+	// install can still hold real accounts (the desktop app provisions one per
+	// coding agent), and they have to come back alongside it.
+	realIDs := make([]string, 0, len(userIDs))
+	singleUserRequested := false
+	for _, id := range userIDs {
+		if id == model.SingleUser {
+			singleUserRequested = true
+			continue
+		}
+		realIDs = append(realIDs, id)
+	}
+	if singleUserRequested {
 		ws, _ := a.app.GetRootTeam()
 		now := utils.GetMillis()
 		user := &model.User{
@@ -81,12 +94,20 @@ func (a *API) handleGetUsersList(w http.ResponseWriter, r *http.Request) {
 			UpdateAt: now,
 		}
 		users = append(users, user)
-	} else {
-		users, error = a.app.GetUsersList(userIDs)
+	}
+	if len(realIDs) > 0 {
+		var found []*model.User
+		found, error = a.app.GetUsersList(realIDs)
 		if error != nil {
-			a.errorResponse(w, r, error)
-			return
+			// A card can outlive the account it names; reporting the users that
+			// do exist beats failing the whole board.
+			if !model.IsErrNotFound(error) {
+				a.errorResponse(w, r, error)
+				return
+			}
+			a.logger.Debug("getUsersList: some of the requested users no longer exist")
 		}
+		users = append(users, found...)
 	}
 
 	ctx := r.Context()

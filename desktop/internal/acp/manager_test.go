@@ -185,7 +185,7 @@ func moveEvent(cardID, repo, from, to string) CardMoved {
 
 func columnName(optionID string) string {
 	if optionID == "opt-agent" {
-		return "To Agent"
+		return DefaultTriggerColumn
 	}
 	return "Backlog"
 }

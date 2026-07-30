@@ -29,6 +29,10 @@ type CardMoved struct {
 	Body        string            // card description text, if any
 	Props       map[string]string // lowercased property name → display value
 	OptionNames []string          // display names of every selected select/multiSelect option (tags included)
+	// PersonNames are the usernames behind every person/multiPerson value on the
+	// card — the "Assignee" route to an agent, which works because a registered
+	// agent is provisioned as a board user (see BoardUsers).
+	PersonNames []string
 	FromColumn  Column
 	ToColumn    Column
 	At          time.Time
@@ -50,6 +54,28 @@ type BoardWriter interface {
 // returned event carries no columns — nothing was moved.
 type BoardReader interface {
 	CardByID(ctx context.Context, cardID string) (CardMoved, error)
+}
+
+// AgentUser is a registry entry seen as a board account: the user an agent is
+// assigned as. Username is derived from Name (see AgentUsername); UserID and
+// Created are filled in by BoardUsers.
+type AgentUser struct {
+	Name     string `json:"name"`
+	Username string `json:"username"`
+	UserID   string `json:"userId,omitempty"`
+	Created  bool   `json:"created,omitempty"`
+}
+
+// BoardUsers keeps the board-side accounts in step with the agent registry, so
+// an agent can be picked in a person property ("Assignee") like any other
+// member — and stops being offered once it is unregistered. Optional: without
+// it the "Agent" select field remains the only routing mechanism.
+type BoardUsers interface {
+	EnsureAgentUsers(ctx context.Context, boardID string, agents []AgentUser) ([]AgentUser, error)
+	// RetireAgentUser drops the account's board memberships and reports how
+	// many were removed. The account itself stays: cards may still name it, and
+	// re-registering the agent should give it its identity back.
+	RetireAgentUser(ctx context.Context, agent AgentUser) (int, error)
 }
 
 // UIEmitter pushes events to the desktop UI. Implementations must be safe to

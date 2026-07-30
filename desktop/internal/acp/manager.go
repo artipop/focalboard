@@ -25,6 +25,7 @@ type Manager struct {
 	store   *Store
 	writer  BoardWriter
 	reader  BoardReader // optional; enables opening a console on a card
+	users   BoardUsers  // optional; enables assigning cards to an agent
 	ui      UIEmitter
 	log     *slog.Logger
 	tr      *Tracer
@@ -51,6 +52,10 @@ type pendingPermission struct {
 // SetBoardReader supplies on-demand card reads, which the "open a console on
 // this card" path needs. Optional: without it, sessions start only on a move.
 func (m *Manager) SetBoardReader(r BoardReader) { m.reader = r }
+
+// SetBoardUsers supplies account provisioning, which "assign a card to an
+// agent" needs. Optional: without it only the "Agent" field routes cards.
+func (m *Manager) SetBoardUsers(u BoardUsers) { m.users = u }
 
 // NewManager wires the manager. cfgPath is where repo-registry edits are
 // persisted (may be empty in tests). Call Start to begin consuming events.

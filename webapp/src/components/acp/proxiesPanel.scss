@@ -1,28 +1,32 @@
-.ProxiesDialog {
-    .ProxiesDialog__content {
+.ProxiesPanel {
+    .ProxiesPanel__content {
         display: flex;
         flex-direction: column;
         gap: 8px;
-        padding: 0 24px 24px;
-        min-width: 520px;
+        padding: 4px 0 8px;
     }
 
-    .ProxiesDialog__empty {
+    .ProxiesPanel__subtitle {
+        color: rgba(var(--center-channel-color-rgb), 0.64);
+        font-size: 12px;
+    }
+
+    .ProxiesPanel__empty {
         color: rgba(var(--center-channel-color-rgb), 0.64);
         padding: 8px 0;
     }
 
-    .ProxiesDialog__row {
+    .ProxiesPanel__row {
         display: flex;
         align-items: center;
         gap: 12px;
 
-        .ProxiesDialog__name {
+        .ProxiesPanel__name {
             font-weight: 600;
             white-space: nowrap;
         }
 
-        .ProxiesDialog__proxy {
+        .ProxiesPanel__proxy {
             flex: 1;
             color: rgba(var(--center-channel-color-rgb), 0.64);
             font-size: 12px;
@@ -32,7 +36,7 @@
         }
     }
 
-    .ProxiesDialog__form {
+    .ProxiesPanel__form {
         display: flex;
         flex-direction: column;
         gap: 10px;
@@ -59,14 +63,14 @@
         }
     }
 
-    .ProxiesDialog__formActions,
-    .ProxiesDialog__actions {
+    .ProxiesPanel__formActions,
+    .ProxiesPanel__actions {
         display: flex;
         gap: 8px;
         padding-top: 4px;
     }
 
-    .ProxiesDialog__error {
+    .ProxiesPanel__error {
         color: rgb(var(--error-text-color-rgb, 210, 75, 78));
         padding-top: 8px;
     }

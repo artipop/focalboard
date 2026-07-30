@@ -7,11 +7,11 @@ import '@testing-library/jest-dom'
 
 import {wrapIntl} from '../../testUtils'
 
-import ProxiesDialog, {isProxiesAvailable} from './proxiesDialog'
+import ProxiesPanel, {isProxiesAvailable} from './proxiesPanel'
 
 const anyWindow = window as any
 
-describe('components/acp/proxiesDialog', () => {
+describe('components/acp/proxiesPanel', () => {
     afterEach(() => {
         delete anyWindow.go
         jest.clearAllMocks()
@@ -33,7 +33,7 @@ describe('components/acp/proxiesDialog', () => {
         anyWindow.go = {main: {App: bindings}}
         expect(isProxiesAvailable()).toBe(true)
 
-        render(wrapIntl(<ProxiesDialog onClose={jest.fn()}/>))
+        render(wrapIntl(<ProxiesPanel/>))
         await waitFor(() => expect(screen.getByText('office')).toBeInTheDocument())
         expect(screen.getByText('http://proxy.example.com:8080')).toBeInTheDocument()
 
@@ -64,7 +64,7 @@ describe('components/acp/proxiesDialog', () => {
         }
         anyWindow.go = {main: {App: bindings}}
 
-        render(wrapIntl(<ProxiesDialog onClose={jest.fn()}/>))
+        render(wrapIntl(<ProxiesPanel/>))
         await waitFor(() => expect(screen.getByText('office')).toBeInTheDocument())
 
         userEvent.click(screen.getByRole('button', {name: 'Remove'}))

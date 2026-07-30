@@ -18,7 +18,6 @@ import ModalWrapper from '../modalWrapper'
 import {sendFlashMessage} from '../flashMessages'
 import AgentReposDialog, {isAgentReposAvailable} from '../acp/agentReposDialog'
 import AgentsDialog, {isAgentsAvailable} from '../acp/agentsDialog'
-import ProxiesDialog, {isProxiesAvailable} from '../acp/proxiesDialog'
 import PlanningDialog, {isPlanningAvailable} from '../acp/planningDialog'
 
 type Props = {
@@ -103,7 +102,6 @@ const ViewHeaderActionsMenu = (props: Props) => {
     const intl = useIntl()
     const [showAgentRepos, setShowAgentRepos] = useState(false)
     const [showAgents, setShowAgents] = useState(false)
-    const [showProxies, setShowProxies] = useState(false)
     const [showPlanning, setShowPlanning] = useState(false)
 
     return (
@@ -135,7 +133,7 @@ const ViewHeaderActionsMenu = (props: Props) => {
                         <Menu.Text
                             key='agentRepos'
                             id='agentRepos'
-                            name={intl.formatMessage({id: 'ViewHeader.agent-repos', defaultMessage: 'Agent repositories…'})}
+                            name={intl.formatMessage({id: 'ViewHeader.agent-repos', defaultMessage: 'Repositories…'})}
                             onClick={() => setShowAgentRepos(true)}
                         />,
                     ] : []}
@@ -145,14 +143,6 @@ const ViewHeaderActionsMenu = (props: Props) => {
                             id='agents'
                             name={intl.formatMessage({id: 'ViewHeader.agents', defaultMessage: 'Agents…'})}
                             onClick={() => setShowAgents(true)}
-                        />,
-                    ] : []}
-                    {isProxiesAvailable() ? [
-                        <Menu.Text
-                            key='proxies'
-                            id='proxies'
-                            name={intl.formatMessage({id: 'ViewHeader.proxies', defaultMessage: 'Proxy configurations…'})}
-                            onClick={() => setShowProxies(true)}
                         />,
                     ] : []}
                     {/*
@@ -190,10 +180,6 @@ const ViewHeaderActionsMenu = (props: Props) => {
                 <AgentsDialog
                     board={board}
                     onClose={() => setShowAgents(false)}
-                />}
-            {showProxies &&
-                <ProxiesDialog
-                    onClose={() => setShowProxies(false)}
                 />}
             {showPlanning &&
                 <PlanningDialog

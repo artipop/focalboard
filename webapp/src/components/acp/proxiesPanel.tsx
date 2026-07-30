@@ -7,11 +7,10 @@ import React, {useCallback, useEffect, useState} from 'react'
 import {useIntl} from 'react-intl'
 
 import Button from '../../widgets/buttons/button'
-import Dialog from '../dialog'
 
 import {agentBindings} from './agentReposDialog'
 
-import './proxiesDialog.scss'
+import './proxiesPanel.scss'
 
 // A named network configuration. Agents reference one by name (their proxyName
 // field) instead of carrying their own settings, so one proxy serves several
@@ -40,12 +39,14 @@ export function isProxiesAvailable(): boolean {
 
 const emptyForm: ProxyEntry = {name: ''}
 
+// onChange fires after the registry is edited, so the agent form's proxy list —
+// the only place these entries are used — updates with it.
 type Props = {
-    onClose: () => void
+    onChange?: () => void
 }
 
-const ProxiesDialog = (props: Props) => {
-    const {onClose} = props
+const ProxiesPanel = (props: Props) => {
+    const {onChange} = props
     const intl = useIntl()
     const bindings = agentBindings()
 
@@ -95,10 +96,11 @@ const ProxiesDialog = (props: Props) => {
             }
             setForm(null)
             await refresh()
+            onChange?.()
         } catch (e) {
             setError(String(e))
         }
-    }, [bindings, form, editingName, refresh])
+    }, [bindings, form, editingName, refresh, onChange])
 
     // Removal is refused by the backend while agents still reference the entry,
     // so the error surfaces which agents to switch over first.
@@ -110,33 +112,33 @@ const ProxiesDialog = (props: Props) => {
         try {
             await bindings.RemoveProxy(name)
             await refresh()
+            onChange?.()
         } catch (e) {
             setError(String(e))
         }
-    }, [bindings, refresh])
+    }, [bindings, refresh, onChange])
 
     const updateForm = (patch: Partial<ProxyEntry>) => setForm((f) => (f ? {...f, ...patch} : f))
 
     return (
-        <Dialog
-            className='ProxiesDialog'
-            title={<span>{intl.formatMessage({id: 'Proxies.title', defaultMessage: 'Proxy configurations'})}</span>}
-            subtitle={<span>{intl.formatMessage({id: 'Proxies.subtitle', defaultMessage: 'Named network configurations. Each agent picks one in the Agents dialog, so several agents can share a proxy.'})}</span>}
-            onClose={onClose}
-        >
-            <div className='ProxiesDialog__content'>
+        <div className='ProxiesPanel'>
+            <div className='ProxiesPanel__content'>
+                <div className='ProxiesPanel__subtitle'>
+                    {intl.formatMessage({id: 'Proxies.subtitle', defaultMessage: 'Named network configurations an agent picks from its "Proxy configuration" field above, so several agents can share one.'})}
+                </div>
+
                 {proxies.length === 0 && !form &&
-                    <div className='ProxiesDialog__empty'>
+                    <div className='ProxiesPanel__empty'>
                         {intl.formatMessage({id: 'Proxies.empty', defaultMessage: 'No proxy configurations yet.'})}
                     </div>}
 
                 {proxies.map((entry) => (
                     <div
-                        className='ProxiesDialog__row'
+                        className='ProxiesPanel__row'
                         key={entry.name}
                     >
-                        <span className='ProxiesDialog__name'>{entry.name}</span>
-                        <span className='ProxiesDialog__proxy'>{displayProxy(entry.proxy)}</span>
+                        <span className='ProxiesPanel__name'>{entry.name}</span>
+                        <span className='ProxiesPanel__proxy'>{displayProxy(entry.proxy)}</span>
                         <Button onClick={() => startEdit(entry)}>
                             {intl.formatMessage({id: 'Proxies.edit', defaultMessage: 'Edit'})}
                         </Button>
@@ -147,7 +149,7 @@ const ProxiesDialog = (props: Props) => {
                 ))}
 
                 {form &&
-                    <div className='ProxiesDialog__form'>
+                    <div className='ProxiesPanel__form'>
                         <label>
                             {intl.formatMessage({id: 'Proxies.name', defaultMessage: 'Name'})}
                             <input
@@ -198,7 +200,7 @@ const ProxiesDialog = (props: Props) => {
                                 onChange={(e) => updateForm({caCert: e.target.value})}
                             />
                         </label>
-                        <div className='ProxiesDialog__formActions'>
+                        <div className='ProxiesPanel__formActions'>
                             <Button
                                 emphasis='primary'
                                 onClick={saveForm}
@@ -212,7 +214,7 @@ const ProxiesDialog = (props: Props) => {
                     </div>}
 
                 {!form &&
-                    <div className='ProxiesDialog__actions'>
+                    <div className='ProxiesPanel__actions'>
                         <Button
                             emphasis='primary'
                             onClick={startAdd}
@@ -222,10 +224,10 @@ const ProxiesDialog = (props: Props) => {
                     </div>}
 
                 {error &&
-                    <div className='ProxiesDialog__error'>{error}</div>}
+                    <div className='ProxiesPanel__error'>{error}</div>}
             </div>
-        </Dialog>
+        </div>
     )
 }
 
-export default React.memo(ProxiesDialog)
+export default React.memo(ProxiesPanel)

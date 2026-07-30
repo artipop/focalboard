@@ -1,6 +1,9 @@
 package acp
 
 import (
+	"context"
+	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -69,9 +72,12 @@ func TestAddUpdateRemoveAgentPersists(t *testing.T) {
 func TestAgentKindValidation(t *testing.T) {
 	m := agentManager(t, "")
 
-	// antigravity needs no command; the generic acp kind does.
-	if _, err := m.AddAgent(AgentEntry{Name: "grav", Kind: "antigravity"}); err != nil {
-		t.Errorf("antigravity without command should be valid: %v", err)
+	// The ACP-native kinds we know how to launch need no command; the generic
+	// acp kind does.
+	for _, kind := range []string{"antigravity", "copilot", "junie"} {
+		if _, err := m.AddAgent(AgentEntry{Name: kind, Kind: kind}); err != nil {
+			t.Errorf("%s without command should be valid: %v", kind, err)
+		}
 	}
 	if _, err := m.AddAgent(AgentEntry{Name: "gen", Kind: "acp"}); err == nil {
 		t.Error("acp kind without command should be rejected")
@@ -93,19 +99,27 @@ func TestExternalACPCommand(t *testing.T) {
 		t.Errorf("acp command argv = %q", got)
 	}
 
-	// antigravity with an explicit binPath defaults to `<bin> --acp` + model.
+	// A known ACP-native kind with an explicit binPath defaults to
+	// `<bin> <acp flag>` + model. Junie's flag takes a boolean value.
 	bin := writeFakeClaude(t, "#!/bin/sh\n") // any existing executable
-	argv, err = m.externalACPCommand(AgentEntry{Name: "g", Kind: "antigravity", BinPath: bin, Model: "gemini-3-pro"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := strings.Join(argv, " "); got != bin+" --acp --model gemini-3-pro" {
-		t.Errorf("antigravity argv = %q", got)
-	}
+	for kind, want := range map[string]string{
+		"antigravity": bin + " --acp --model m1",
+		"copilot":     bin + " --acp --model m1",
+		"junie":       bin + " --acp=true --model m1",
+	} {
+		argv, err = m.externalACPCommand(AgentEntry{Name: "g", Kind: kind, BinPath: bin, Model: "m1"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := strings.Join(argv, " "); got != want {
+			t.Errorf("%s argv = %q, want %q", kind, got, want)
+		}
 
-	// antigravity with a missing binary errors clearly.
-	if _, err := m.externalACPCommand(AgentEntry{Name: "g", Kind: "antigravity", BinPath: "/no/such/antigravity"}); err == nil {
-		t.Error("missing antigravity binary should error")
+		// A missing binary errors clearly, naming the CLI.
+		_, err = m.externalACPCommand(AgentEntry{Name: "g", Kind: kind, BinPath: "/no/such/" + kind})
+		if err == nil {
+			t.Errorf("missing %s binary should error", kind)
+		}
 	}
 }
 
@@ -234,6 +248,163 @@ func TestResolveAgentByOption(t *testing.T) {
 	}
 }
 
+func TestResolveAgentByAssignee(t *testing.T) {
+	m := agentManager(t, "",
+		AgentEntry{Name: "claude", Kind: "claude"},
+		AgentEntry{Name: "Codex Acct1", Kind: "codex"},
+	)
+
+	// The assignee's username routes the card; the account carries the folded
+	// form of the registry name.
+	got, err := m.resolveAgent(CardMoved{PersonNames: []string{"artem", "codex-acct1"}, Props: map[string]string{}})
+	if err != nil || got.Name != "Codex Acct1" {
+		t.Fatalf("assignee match failed: got=%+v err=%v", got, err)
+	}
+
+	// An assignee outranks a tag: it is the more deliberate choice.
+	got, err = m.resolveAgent(CardMoved{
+		PersonNames: []string{"claude"},
+		OptionNames: []string{"Codex Acct1"},
+		Props:       map[string]string{},
+	})
+	if err != nil || got.Name != "claude" {
+		t.Fatalf("assignee should win over the option: got=%+v err=%v", got, err)
+	}
+
+	// The explicit property still wins over both.
+	got, err = m.resolveAgent(CardMoved{
+		PersonNames: []string{"claude"},
+		Props:       map[string]string{"agent": "codex-acct1"},
+	})
+	if err != nil || got.Name != "Codex Acct1" {
+		t.Fatalf("explicit agent property should win: got=%+v err=%v", got, err)
+	}
+
+	// A human assignee is simply not an agent.
+	if _, err := m.resolveAgent(CardMoved{PersonNames: []string{"artem"}, Props: map[string]string{}}); err == nil {
+		t.Error("a non-agent assignee should not resolve an agent")
+	}
+}
+
+func TestAgentUsername(t *testing.T) {
+	for in, want := range map[string]string{
+		"claude":       "claude",
+		"Codex Acct1":  "codex-acct1",
+		"  My Agent  ": "my-agent",
+		"claude/main":  "claude-main",
+		"agent.two_3":  "agent.two_3",
+		"---":          "",
+		"":             "",
+	} {
+		if got := AgentUsername(in); got != want {
+			t.Errorf("AgentUsername(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// fakeBoardUsers records what the manager asked to provision and retire.
+type fakeBoardUsers struct {
+	boardID  string
+	agents   []AgentUser
+	retired  []AgentUser
+	err      error
+	retryErr error
+}
+
+func (f *fakeBoardUsers) RetireAgentUser(_ context.Context, agent AgentUser) (int, error) {
+	if f.retryErr != nil {
+		return 0, f.retryErr
+	}
+	f.retired = append(f.retired, agent)
+	return 1, nil
+}
+
+func (f *fakeBoardUsers) EnsureAgentUsers(_ context.Context, boardID string, agents []AgentUser) ([]AgentUser, error) {
+	f.boardID = boardID
+	f.agents = agents
+	if f.err != nil {
+		return nil, f.err
+	}
+	out := make([]AgentUser, 0, len(agents))
+	for i, a := range agents {
+		a.UserID = fmt.Sprintf("uid-%d", i)
+		a.Created = true
+		out = append(out, a)
+	}
+	return out, nil
+}
+
+func TestSyncAgentUsers(t *testing.T) {
+	m := agentManager(t, "", AgentEntry{Name: "Codex Acct1", Kind: "codex"}, AgentEntry{Name: "claude", Kind: "claude"})
+
+	// Without a board-users implementation the feature is simply unavailable.
+	if _, err := m.SyncAgentUsers(context.Background(), "board1"); err == nil {
+		t.Error("expected an error without a BoardUsers implementation")
+	}
+
+	users := &fakeBoardUsers{}
+	m.SetBoardUsers(users)
+	got, err := m.SyncAgentUsers(context.Background(), "board1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if users.boardID != "board1" || len(got) != 2 {
+		t.Fatalf("sync passed board=%q agents=%+v", users.boardID, got)
+	}
+	if got[0].Name != "Codex Acct1" || got[0].Username != "codex-acct1" {
+		t.Errorf("first account = %+v, want the folded username", got[0])
+	}
+	if got[0].UserID == "" || !got[0].Created {
+		t.Errorf("provisioning result not returned: %+v", got[0])
+	}
+
+	// An empty registry is a no-op, not an error: the UI syncs on every change,
+	// including the ones that leave nothing to provision.
+	empty := agentManager(t, "")
+	empty.SetBoardUsers(&fakeBoardUsers{})
+	synced, err := empty.SyncAgentUsers(context.Background(), "board1")
+	if err != nil || len(synced) != 0 {
+		t.Errorf("empty registry sync = %+v, err = %v", synced, err)
+	}
+}
+
+func TestRemoveAgentRetiresItsAccount(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "config.json")
+	users := &fakeBoardUsers{}
+	m := agentManager(t, cfgPath, AgentEntry{Name: "Codex Acct1", Kind: "codex"})
+	m.SetBoardUsers(users)
+
+	if err := m.RemoveAgent("codex acct1"); err != nil { // name match is loose
+		t.Fatal(err)
+	}
+	if len(m.Agents()) != 0 {
+		t.Errorf("entry not removed: %+v", m.Agents())
+	}
+	if len(users.retired) != 1 || users.retired[0].Username != "codex-acct1" {
+		t.Fatalf("account not retired: %+v", users.retired)
+	}
+
+	// A retirement that fails is reported, but the entry stays removed — the
+	// registry is the source of truth and it has already been written.
+	m2 := agentManager(t, cfgPath, AgentEntry{Name: "claude", Kind: "claude"})
+	m2.SetBoardUsers(&fakeBoardUsers{retryErr: fmt.Errorf("board app is not ready")})
+	err := m2.RemoveAgent("claude")
+	if err == nil || !strings.Contains(err.Error(), "board app is not ready") {
+		t.Errorf("expected the retirement failure to surface, got %v", err)
+	}
+	if len(m2.Agents()) != 0 {
+		t.Errorf("entry should still be removed: %+v", m2.Agents())
+	}
+
+	// Removing an unknown agent is still an error, and touches no account.
+	if err := m.RemoveAgent("nope"); err == nil {
+		t.Error("removing a missing agent should fail")
+	}
+	if len(users.retired) != 1 {
+		t.Errorf("a failed removal must not retire anything: %+v", users.retired)
+	}
+}
+
 func TestResolveAgentSingleAndFallback(t *testing.T) {
 	// Exactly one agent → used without a card selection.
 	m := agentManager(t, "", AgentEntry{Name: "only", Kind: "codex"})
@@ -255,5 +426,33 @@ func TestResolveAgentSingleAndFallback(t *testing.T) {
 	got, _ = m3.resolveAgent(CardMoved{Props: map[string]string{}})
 	if got.Kind != "acp-command" {
 		t.Fatalf("expected acp-command fallback, got %+v", got)
+	}
+}
+
+func TestLoadConfigMigratesLegacyTriggerColumn(t *testing.T) {
+	dir := t.TempDir()
+	write := func(triggerColumn string) Config {
+		t.Helper()
+		path := filepath.Join(t.TempDir(), "config.json")
+		if err := os.WriteFile(path, []byte(`{"triggerColumn":"`+triggerColumn+`"}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := LoadConfig(path, dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cfg
+	}
+
+	// The abandoned default is rewritten, whatever its case…
+	if got := write("To Agent").TriggerColumn; got != DefaultTriggerColumn {
+		t.Errorf("legacy column = %q, want %q", got, DefaultTriggerColumn)
+	}
+	if got := write("to agent").TriggerColumn; got != DefaultTriggerColumn {
+		t.Errorf("legacy column (lowercase) = %q, want %q", got, DefaultTriggerColumn)
+	}
+	// …but a column the user picked is theirs.
+	if got := write("Ready for agent").TriggerColumn; got != "Ready for agent" {
+		t.Errorf("custom column was rewritten to %q", got)
 	}
 }

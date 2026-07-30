@@ -14,7 +14,7 @@ import Dialog from '../dialog'
 import {sendFlashMessage} from '../flashMessages'
 
 import {agentBindings} from './agentReposDialog'
-import {ProxyEntry} from './proxiesDialog'
+import ProxiesPanel, {ProxyEntry, isProxiesAvailable} from './proxiesPanel'
 
 import './agentsDialog.scss'
 
@@ -40,6 +40,8 @@ const commandPlaceholders: {[kind: string]: string} = {
     claude: 'proxychains4 -q -f /etc/myproxy.conf claude',
     codex: 'proxychains4 -q -f /etc/myproxy.conf codex',
     antigravity: 'antigravity --acp',
+    copilot: 'copilot --acp',
+    junie: 'junie --acp=true',
     acp: 'gemini --acp',
 }
 
@@ -128,8 +130,34 @@ const AgentsDialog = (props: Props) => {
             }
         } catch (e) {
             setError(String(e))
+            return
         }
-    }, [bindings])
+
+        // Every registered agent is kept assignable on the board being looked
+        // at: the accounts and memberships are created here, so a person field
+        // can name an agent. Idempotent, so it rides along with every refresh —
+        // opening the dialog, adding, editing or removing an agent — and stays
+        // quiet unless an account actually appears. A failure is reported but
+        // never hides the registry itself.
+        if (!bindings.SyncAgentUsers) {
+            return
+        }
+        try {
+            const synced = (JSON.parse(await bindings.SyncAgentUsers(board.id)) || []) as Array<{created?: boolean}>
+            const created = synced.filter((u) => u.created).length
+            if (created > 0) {
+                sendFlashMessage({
+                    content: intl.formatMessage(
+                        {id: 'Agents.users-synced', defaultMessage: 'Created {created} agent account(s); agents can now be assigned to cards'},
+                        {created},
+                    ),
+                    severity: 'normal',
+                })
+            }
+        } catch (e) {
+            setError(String(e))
+        }
+    }, [bindings, board.id, intl])
 
     useEffect(() => {
         refresh()
@@ -256,7 +284,7 @@ const AgentsDialog = (props: Props) => {
         <Dialog
             className='AgentsDialog'
             title={<span>{intl.formatMessage({id: 'Agents.title', defaultMessage: 'Agents'})}</span>}
-            subtitle={<span>{intl.formatMessage({id: 'Agents.subtitle', defaultMessage: 'Register coding agents (Claude / Codex) with their own prompt, model, launch command, environment and proxy. Cards route to an agent by the "Agent" field.'})}</span>}
+            subtitle={<span>{intl.formatMessage({id: 'Agents.subtitle', defaultMessage: 'Register coding agents (Claude, Codex, Antigravity, GitHub Copilot, JetBrains Junie or any other ACP agent) with their own prompt, model, launch command, environment and proxy. Cards route to an agent by their assignee or the "Agent" field.'})}</span>}
             onClose={onClose}
         >
             <div className='AgentsDialog__content'>
@@ -301,6 +329,8 @@ const AgentsDialog = (props: Props) => {
                                 <option value='claude'>{'Claude'}</option>
                                 <option value='codex'>{'Codex'}</option>
                                 <option value='antigravity'>{'Antigravity'}</option>
+                                <option value='copilot'>{'GitHub Copilot'}</option>
+                                <option value='junie'>{'JetBrains Junie'}</option>
                                 <option value='acp'>{'ACP (other)'}</option>
                             </select>
                         </label>
@@ -355,7 +385,7 @@ const AgentsDialog = (props: Props) => {
                         </label>
                         {proxies.length === 0 &&
                             <div className='AgentsDialog__hint'>
-                                {intl.formatMessage({id: 'Agents.proxy-hint', defaultMessage: 'Configurations are managed in the board menu → Proxy configurations…'})}
+                                {intl.formatMessage({id: 'Agents.proxy-hint', defaultMessage: 'Configurations are added under "Proxy configurations" at the bottom of this dialog.'})}
                             </div>}
                         <label>
                             {intl.formatMessage({id: 'Agents.env', defaultMessage: 'Environment (KEY=VALUE per line — e.g. CODEX_HOME, OPENAI_API_KEY)'})}
@@ -401,6 +431,11 @@ const AgentsDialog = (props: Props) => {
                             </Button>}
                     </div>}
 
+                {!form && agents.length > 0 && Boolean(bindings?.SyncAgentUsers) &&
+                    <div className='AgentsDialog__hint'>
+                        {intl.formatMessage({id: 'Agents.assignable-hint', defaultMessage: 'Every agent above is a member of this board under its own name, so you can pick it in a person field such as "Assignee".'})}
+                    </div>}
+
                 <div className='AgentsDialog__systemPrompt'>
                     <label>
                         {intl.formatMessage({id: 'Agents.system-prompt', defaultMessage: 'Board system prompt (prepended to every agent prompt)'})}
@@ -414,6 +449,16 @@ const AgentsDialog = (props: Props) => {
                         {intl.formatMessage({id: 'Agents.save-system-prompt', defaultMessage: 'Save system prompt'})}
                     </Button>
                 </div>
+
+                {/* Proxies exist only to be referenced by an agent, so they live
+                    here, folded away until someone needs one. */}
+                {isProxiesAvailable() &&
+                    <details className='AgentsDialog__proxies'>
+                        <summary>
+                            {intl.formatMessage({id: 'Proxies.title', defaultMessage: 'Proxy configurations'})}
+                        </summary>
+                        <ProxiesPanel onChange={refresh}/>
+                    </details>}
 
                 {error &&
                     <div className='AgentsDialog__error'>{error}</div>}

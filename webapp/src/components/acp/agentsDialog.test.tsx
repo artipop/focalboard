@@ -109,6 +109,134 @@ describe('components/acp/agentsDialog', () => {
         })
     })
 
+    test('offers the ACP-native kinds and saves one without a launch command', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([])),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AddAgent: jest.fn().mockResolvedValue(JSON.stringify({name: 'junie-a', kind: 'junie'})),
+            UpdateAgent: jest.fn(),
+            RemoveAgent: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByRole('button', {name: 'Add agent…'})).toBeInTheDocument())
+
+        userEvent.click(screen.getByRole('button', {name: 'Add agent…'}))
+        await waitFor(() => expect(screen.getAllByRole('combobox')).toHaveLength(2))
+
+        const kindSelect = screen.getAllByRole('combobox')[0]
+        expect(Array.from(kindSelect.querySelectorAll('option')).map((o) => o.value)).
+            toEqual(['claude', 'codex', 'antigravity', 'copilot', 'junie', 'acp'])
+
+        userEvent.selectOptions(kindSelect, 'junie')
+        userEvent.type(screen.getByPlaceholderText('Name (matches the "Agent" option)'), 'junie-a')
+
+        // The kind carries its own default launch flags, so the command input
+        // only shows them as a placeholder and stays empty.
+        expect(screen.getByPlaceholderText('junie --acp=true')).toHaveValue('')
+
+        userEvent.click(screen.getByRole('button', {name: 'Save'}))
+        await waitFor(() => expect(bindings.AddAgent).toBeCalled())
+        const payload = JSON.parse(bindings.AddAgent.mock.calls[0][0])
+        expect(payload).toMatchObject({name: 'junie-a', kind: 'junie', command: []})
+    })
+
+    test('keeps every agent assignable without being asked', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([{name: 'Codex Acct1', kind: 'codex'}])),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AddAgent: jest.fn().mockResolvedValue(JSON.stringify({name: 'claude', kind: 'claude'})),
+            UpdateAgent: jest.fn(),
+            RemoveAgent: jest.fn().mockResolvedValue(undefined),
+            SyncAgentUsers: jest.fn().mockResolvedValue(JSON.stringify([
+                {name: 'Codex Acct1', username: 'codex-acct1', userId: 'uid-1', created: true},
+            ])),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+
+        // Opening the dialog is enough: the accounts and board memberships are
+        // provisioned for the board being looked at.
+        await waitFor(() => expect(bindings.SyncAgentUsers).toBeCalledWith(board.id))
+        await waitFor(() => expect(screen.getByText('Codex Acct1')).toBeInTheDocument())
+
+        // And a newly registered agent is provisioned right after it is saved.
+        userEvent.click(screen.getByRole('button', {name: 'Add agent…'}))
+        await waitFor(() => expect(screen.getAllByRole('combobox')).toHaveLength(2))
+        userEvent.type(screen.getByPlaceholderText('Name (matches the "Agent" option)'), 'claude')
+        userEvent.click(screen.getByRole('button', {name: 'Save'}))
+
+        await waitFor(() => expect(bindings.AddAgent).toBeCalled())
+        await waitFor(() => expect(bindings.SyncAgentUsers).toBeCalledTimes(2))
+    })
+
+    test('carries the proxy registry in a folded-away section', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([{name: 'codex-a', kind: 'codex'}])),
+            ListProxies: jest.fn().mockResolvedValue(JSON.stringify([{name: 'office', proxy: 'http://proxy.example.com:8080'}])),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AddAgent: jest.fn(),
+            UpdateAgent: jest.fn(),
+            RemoveAgent: jest.fn(),
+            AddProxy: jest.fn(),
+            UpdateProxy: jest.fn(),
+            RemoveProxy: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByText('codex-a')).toBeInTheDocument())
+
+        // The proxies live behind a summary, in the dialog that references them.
+        const proxies = screen.getByText('Proxy configurations')
+        expect(proxies.tagName.toLowerCase()).toBe('summary')
+        await waitFor(() => expect(screen.getByText('office')).toBeInTheDocument())
+        expect(screen.getByRole('button', {name: 'Add configuration…'})).toBeInTheDocument()
+    })
+
+    test('shows the registry even when provisioning fails', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([{name: 'codex-a', kind: 'codex'}])),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AddAgent: jest.fn(),
+            UpdateAgent: jest.fn(),
+            RemoveAgent: jest.fn(),
+            SyncAgentUsers: jest.fn().mockRejectedValue('board app is not ready'),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+
+        await waitFor(() => expect(screen.getByText('codex-a')).toBeInTheDocument())
+        await waitFor(() => expect(screen.getByText('board app is not ready')).toBeInTheDocument())
+    })
+
     test('creates an Agent select field and adds missing options', async () => {
         const bindings = {
             ListAgents: jest.fn().mockResolvedValue(JSON.stringify([
