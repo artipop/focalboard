@@ -50,20 +50,81 @@ const AgentReposDialog = (props: Props) => {
     const [pendingName, setPendingName] = useState('')
     const [error, setError] = useState('')
 
-    const repoProperty = board.cardProperties.find((p: IPropertyTemplate) =>
-        p.name.trim().toLowerCase() === REPO_PROPERTY_NAME.toLowerCase() &&
-        (p.type === 'select' || p.type === 'multiSelect'))
+    // syncToBoard mirrors the registry into the board's "Repositories" property,
+    // creating that multiSelect property when the board has none. Add-only:
+    // existing options (which cards may reference) are never removed, and a
+    // board that already lists every repository is left untouched — this runs
+    // on its own, so it must not churn the board or the undo history.
+    const syncToBoard = useCallback(async (registry: AgentRepo[]) => {
+        if (registry.length === 0) {
+            return
+        }
+        const property = board.cardProperties.find((p: IPropertyTemplate) =>
+            p.name.trim().toLowerCase() === REPO_PROPERTY_NAME.toLowerCase() &&
+            (p.type === 'select' || p.type === 'multiSelect'))
+        const existing = new Set((property?.options || []).map((o: IPropertyOption) => o.value.trim().toLowerCase()))
+        const missing = registry.filter((r) => !existing.has(r.name.trim().toLowerCase()))
+        if (property && missing.length === 0) {
+            return
+        }
+
+        try {
+            const newProperties: IPropertyTemplate[] = board.cardProperties.map((p) => ({
+                ...p,
+                options: [...p.options],
+            }))
+            let target = newProperties.find((p) =>
+                p.name.trim().toLowerCase() === REPO_PROPERTY_NAME.toLowerCase() &&
+                (p.type === 'select' || p.type === 'multiSelect'))
+            if (!target) {
+                target = {
+                    id: Utils.createGuid(IDType.BlockID),
+                    name: REPO_PROPERTY_NAME,
+                    type: 'multiSelect',
+                    options: [],
+                }
+                newProperties.push(target)
+            }
+            for (const repo of missing) {
+                target.options.push({
+                    id: Utils.createGuid(IDType.BlockID),
+                    value: repo.name,
+                    color: 'propColorDefault',
+                })
+            }
+
+            await mutator.updateBoardCardProperties(board.id, board.cardProperties, newProperties, 'sync repositories')
+            if (missing.length > 0) {
+                sendFlashMessage({
+                    content: intl.formatMessage(
+                        {id: 'AgentRepos.options-added', defaultMessage: 'Added {count} repository option(s) to "{property}"'},
+                        {count: missing.length, property: REPO_PROPERTY_NAME},
+                    ),
+                    severity: 'normal',
+                })
+            }
+        } catch (e) {
+            setError(String(e))
+        }
+    }, [board, intl])
 
     const refresh = useCallback(async () => {
         if (!bindings) {
             return
         }
+        let registry: AgentRepo[] = []
         try {
-            setRepos(JSON.parse(await bindings.ListAgentRepos()) || [])
+            registry = JSON.parse(await bindings.ListAgentRepos()) || []
+            setRepos(registry)
         } catch (e) {
             setError(String(e))
+            return
         }
-    }, [bindings])
+
+        // The board's "Repositories" field is kept in step on its own, so a
+        // registered repository is selectable on a card without a second step.
+        await syncToBoard(registry)
+    }, [bindings, syncToBoard])
 
     useEffect(() => {
         refresh()
@@ -113,58 +174,11 @@ const AgentReposDialog = (props: Props) => {
         }
     }, [bindings, refresh])
 
-    // syncToBoard adds every registered repository name as an option of the
-    // board's "Repositories" property, creating that multiSelect property in a
-    // single board patch when it doesn't exist yet. Add-only: existing options
-    // (which cards may reference) are never removed.
-    const syncToBoard = useCallback(async () => {
-        setError('')
-        try {
-            const newProperties: IPropertyTemplate[] = board.cardProperties.map((p) => ({
-                ...p,
-                options: [...p.options],
-            }))
-            let property = newProperties.find((p) =>
-                p.name.trim().toLowerCase() === REPO_PROPERTY_NAME.toLowerCase() &&
-                (p.type === 'select' || p.type === 'multiSelect'))
-            if (!property) {
-                property = {
-                    id: Utils.createGuid(IDType.BlockID),
-                    name: REPO_PROPERTY_NAME,
-                    type: 'multiSelect',
-                    options: [],
-                }
-                newProperties.push(property)
-            }
-
-            const existing = new Set(property.options.map((o: IPropertyOption) => o.value.trim().toLowerCase()))
-            const missing = repos.filter((r) => !existing.has(r.name.trim().toLowerCase()))
-            for (const repo of missing) {
-                property.options.push({
-                    id: Utils.createGuid(IDType.BlockID),
-                    value: repo.name,
-                    color: 'propColorDefault',
-                })
-            }
-
-            await mutator.updateBoardCardProperties(board.id, board.cardProperties, newProperties, 'sync agent repositories')
-            sendFlashMessage({
-                content: intl.formatMessage(
-                    {id: 'AgentRepos.options-added', defaultMessage: 'Synced {count} repository option(s) to "{property}"'},
-                    {count: missing.length, property: REPO_PROPERTY_NAME},
-                ),
-                severity: 'normal',
-            })
-        } catch (e) {
-            setError(String(e))
-        }
-    }, [board, intl, repos])
-
     return (
         <Dialog
             className='AgentReposDialog'
-            title={<span>{intl.formatMessage({id: 'AgentRepos.title', defaultMessage: 'Agent repositories'})}</span>}
-            subtitle={<span>{intl.formatMessage({id: 'AgentRepos.subtitle', defaultMessage: 'Cards are matched to a repository when one of their select options or tags equals a repository name.'})}</span>}
+            title={<span>{intl.formatMessage({id: 'AgentRepos.title', defaultMessage: 'Repositories'})}</span>}
+            subtitle={<span>{intl.formatMessage({id: 'AgentRepos.subtitle', defaultMessage: 'Local git repositories an agent can work in. A card is matched to one by its "Repositories" field.'})}</span>}
             onClose={onClose}
         >
             <div className='AgentReposDialog__content'>
@@ -194,7 +208,7 @@ const AgentReposDialog = (props: Props) => {
                         <input
                             className='AgentReposDialog__nameInput'
                             value={pendingName}
-                            placeholder={intl.formatMessage({id: 'AgentRepos.name-placeholder', defaultMessage: 'Name (tag to match)'})}
+                            placeholder={intl.formatMessage({id: 'AgentRepos.name-placeholder', defaultMessage: 'Name (matches the "Repositories" option)'})}
                             onChange={(e) => setPendingName(e.target.value)}
                         />
                         <span className='AgentReposDialog__path'>{pendingPath}</span>
@@ -222,13 +236,8 @@ const AgentReposDialog = (props: Props) => {
                 {repos.length > 0 &&
                     <div className='AgentReposDialog__sync'>
                         <span>
-                            {repoProperty ?
-                                intl.formatMessage({id: 'AgentRepos.sync-label', defaultMessage: 'Sync repository names into the board’s "Repositories" field:'}) :
-                                intl.formatMessage({id: 'AgentRepos.sync-label-create', defaultMessage: 'Create a "Repositories" field on this board and add the repository names:'})}
+                            {intl.formatMessage({id: 'AgentRepos.sync-hint', defaultMessage: 'Every repository above is an option of the board’s "Repositories" field, so a card picks one there.'})}
                         </span>
-                        <Button onClick={syncToBoard}>
-                            {intl.formatMessage({id: 'AgentRepos.sync', defaultMessage: 'Sync to board'})}
-                        </Button>
                     </div>}
 
                 {error &&

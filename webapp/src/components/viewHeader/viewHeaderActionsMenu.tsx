@@ -135,7 +135,7 @@ const ViewHeaderActionsMenu = (props: Props) => {
                         <Menu.Text
                             key='agentRepos'
                             id='agentRepos'
-                            name={intl.formatMessage({id: 'ViewHeader.agent-repos', defaultMessage: 'Agent repositories…'})}
+                            name={intl.formatMessage({id: 'ViewHeader.agent-repos', defaultMessage: 'Repositories…'})}
                             onClick={() => setShowAgentRepos(true)}
                         />,
                     ] : []}
