@@ -146,6 +146,7 @@ func (c *sessionClient) askUser(ctx context.Context, params acpsdk.RequestPermis
 	case chosen = <-answer:
 	case <-timeout.C:
 		c.recordDecision(toolName, title, "reject", false)
+		c.m.tr.Event(c.s.ID, TraceApp, "permission_timeout", map[string]any{"requestId": requestID, "tool": toolName})
 		c.m.log.Info("acp: permission prompt timed out", "session", c.s.ID, "tool", toolName)
 		return selectOption(params, acpsdk.PermissionOptionKindRejectOnce)
 	case <-ctx.Done():

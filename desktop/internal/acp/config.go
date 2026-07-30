@@ -282,10 +282,14 @@ type Config struct {
 	AutoAllowTools           []string `json:"autoAllowTools"`
 	// PlanningTools is the policy for planning sessions; empty means the
 	// built-in read-only set.
-	PlanningTools       []string `json:"planningTools,omitempty"`
-	ShowThoughts        bool     `json:"showThoughts"`
-	WorktreeDir         string   `json:"worktreeDir"`
-	KeepFailedWorktrees bool     `json:"keepFailedWorktrees"`
+	PlanningTools []string `json:"planningTools,omitempty"`
+	ShowThoughts  bool     `json:"showThoughts"`
+	// DebugLog records every ACP message to DebugLogPath (default
+	// <dataDir>/acp-debug.jsonl). Also switched on by FOCALBOARD_ACP_DEBUG.
+	DebugLog            bool   `json:"debugLog,omitempty"`
+	DebugLogPath        string `json:"debugLogPath,omitempty"`
+	WorktreeDir         string `json:"worktreeDir"`
+	KeepFailedWorktrees bool   `json:"keepFailedWorktrees"`
 }
 
 // DefaultConfig returns the defaults written on first run. dataDir is the ACP

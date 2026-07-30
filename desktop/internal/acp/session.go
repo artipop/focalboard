@@ -521,6 +521,9 @@ func (m *Manager) connectClaude(ctx context.Context, s *Session) (*acpsdk.Client
 		Env:       env,
 		DropEnv:   drop,
 		Logger:    m.log,
+		Trace: func(direction string, line []byte) {
+			m.tr.Line(s.ID, direction, line)
+		},
 		AskUser: func(ctx context.Context, questions []claudebridge.Question) (string, error) {
 			return m.askUser(ctx, s, questions)
 		},

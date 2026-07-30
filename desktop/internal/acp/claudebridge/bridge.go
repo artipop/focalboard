@@ -47,6 +47,10 @@ type Options struct {
 	DropEnv []string
 	Logger  *slog.Logger
 
+	// Trace, when set, receives every protocol line in both directions. It is
+	// the only place the raw conversation with the CLI can be seen.
+	Trace func(direction string, line []byte)
+
 	// AskUser presents the agent's questions to a human and returns their
 	// answers. Without it the tool is refused with an explanation, since its
 	// own picker cannot render in stream-json mode.
@@ -121,6 +125,7 @@ func (s *session) wasAnswered(toolUseID string) bool {
 type procHandle struct {
 	proc     *procgroup.Process
 	scanner  *bufio.Scanner
+	trace    func(direction string, line []byte)
 	stdinMu  sync.Mutex
 	stopOnce sync.Once
 }
@@ -142,6 +147,9 @@ func (h *procHandle) writeLine(v any) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
+	}
+	if h.trace != nil {
+		h.trace("app→cli", b)
 	}
 	h.stdinMu.Lock()
 	defer h.stdinMu.Unlock()
@@ -315,7 +323,7 @@ func (b *Bridge) ensureProc(ctx context.Context, s *session) (*procHandle, error
 	}
 	scanner := bufio.NewScanner(proc.Stdout)
 	scanner.Buffer(make([]byte, 0, 1024*1024), 32*1024*1024)
-	h := &procHandle{proc: proc, scanner: scanner}
+	h := &procHandle{proc: proc, scanner: scanner, trace: b.opts.Trace}
 
 	s.mu.Lock()
 	s.h = h
@@ -436,6 +444,9 @@ func (b *Bridge) consumeStream(ctx context.Context, s *session, h *procHandle) (
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
+		if b.opts.Trace != nil {
+			b.opts.Trace("cli→app", line)
+		}
 		var msg streamLine
 		if err := json.Unmarshal(line, &msg); err != nil {
 			b.opts.Logger.Warn("claudebridge: unparsable line", "err", err)

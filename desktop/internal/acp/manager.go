@@ -27,6 +27,7 @@ type Manager struct {
 	reader  BoardReader // optional; enables opening a console on a card
 	ui      UIEmitter
 	log     *slog.Logger
+	tr      *Tracer
 
 	mu     sync.Mutex
 	active map[string]*Session // session ID → session
@@ -61,6 +62,10 @@ func NewManager(cfg Config, cfgPath string, st *Store, w BoardWriter, ui UIEmitt
 	if maxConc <= 0 {
 		maxConc = 1
 	}
+	tr := newTracer(cfg, log)
+	if tr.Enabled() {
+		ui = &tracingEmitter{inner: ui, tr: tr}
+	}
 	return &Manager{
 		cfg:     cfg,
 		cfgPath: cfgPath,
@@ -68,6 +73,7 @@ func NewManager(cfg Config, cfgPath string, st *Store, w BoardWriter, ui UIEmitt
 		writer:  w,
 		ui:      ui,
 		log:     log,
+		tr:      tr,
 		active:  make(map[string]*Session),
 		byCard:  make(map[string]*Session),
 		perms:   make(map[string]pendingPermission),
@@ -400,6 +406,7 @@ func (m *Manager) ComposeTask(sessionID string) (string, error) {
 
 // PromptSession queues a follow-up message onto a live session.
 func (m *Manager) PromptSession(sessionID, text string) error {
+	m.tr.Event(sessionID, TraceFromUI, "PromptSession", map[string]any{"text": text})
 	if strings.TrimSpace(text) == "" {
 		return fmt.Errorf("пустое сообщение")
 	}
@@ -432,6 +439,7 @@ func (m *Manager) PromptSession(sessionID, text string) error {
 // AttachSession marks a console as watching the session, which keeps it alive
 // between turns instead of finishing after the card task.
 func (m *Manager) AttachSession(sessionID string) bool {
+	m.tr.Event(sessionID, TraceFromUI, "AttachSession", nil)
 	s := m.session(sessionID)
 	if s == nil {
 		m.log.Info("acp: console asked to attach to a session that is no longer live", "session", sessionID)
@@ -446,6 +454,7 @@ func (m *Manager) AttachSession(sessionID string) bool {
 // DetachSession drops a console. The last one leaving ends an idle session so
 // it stops holding its repository.
 func (m *Manager) DetachSession(sessionID string) {
+	m.tr.Event(sessionID, TraceFromUI, "DetachSession", nil)
 	s := m.session(sessionID)
 	if s == nil {
 		return
@@ -457,6 +466,7 @@ func (m *Manager) DetachSession(sessionID string) {
 
 // CloseSession ends a session after its current turn.
 func (m *Manager) CloseSession(sessionID string) error {
+	m.tr.Event(sessionID, TraceFromUI, "CloseSession", nil)
 	s := m.session(sessionID)
 	if s == nil {
 		return fmt.Errorf("сессия %s не активна", sessionID)
@@ -495,6 +505,7 @@ func (m *Manager) forgetPermission(requestID string) {
 // not sit on a question for the whole permission timeout.
 func (m *Manager) askUser(ctx context.Context, s *Session, questions []claudebridge.Question) (string, error) {
 	if !s.hasConsole() {
+		m.tr.Event(s.ID, TraceApp, "question_refused", map[string]any{"reason": "no console attached"})
 		return "", fmt.Errorf("консоль не открыта")
 	}
 	requestID := uuid.NewString()
@@ -523,6 +534,7 @@ func (m *Manager) askUser(ctx context.Context, s *Session, questions []claudebri
 		})
 		return answers, nil
 	case <-timeout.C:
+		m.tr.Event(s.ID, TraceApp, "question_timeout", map[string]any{"requestId": requestID, "after": m.cfg.PermissionTimeout().String()})
 		return "", fmt.Errorf("пользователь не ответил за %s", m.cfg.PermissionTimeout())
 	case <-ctx.Done():
 		return "", ctx.Err()
@@ -532,6 +544,7 @@ func (m *Manager) askUser(ctx context.Context, s *Session, questions []claudebri
 // AnswerQuestion delivers the user's answers to a pending question. The text is
 // what the model will read, so the UI composes it from the picker.
 func (m *Manager) AnswerQuestion(sessionID, requestID, answers string) error {
+	m.tr.Event(sessionID, TraceFromUI, "AnswerQuestion", map[string]any{"requestId": requestID, "text": answers})
 	if strings.TrimSpace(answers) == "" {
 		return fmt.Errorf("пустой ответ")
 	}
@@ -540,10 +553,14 @@ func (m *Manager) AnswerQuestion(sessionID, requestID, answers string) error {
 
 // AnswerPermission delivers the user's choice for a pending permission prompt.
 func (m *Manager) AnswerPermission(sessionID, requestID, optionID string) error {
+	m.tr.Event(sessionID, TraceFromUI, "AnswerPermission", map[string]any{"requestId": requestID, "optionId": optionID})
 	m.permMu.Lock()
 	p, ok := m.perms[requestID]
 	m.permMu.Unlock()
 	if !ok || p.sessionID != sessionID {
+		// The common shape of "I answered and nothing happened": the prompt had
+		// already been resolved, most often by the permission timeout.
+		m.tr.Event(sessionID, TraceApp, "answer_unmatched", map[string]any{"requestId": requestID})
 		return fmt.Errorf("запрос разрешения %s больше не ждёт ответа", requestID)
 	}
 	select {
@@ -577,6 +594,7 @@ func (m *Manager) Shutdown(grace time.Duration) {
 	if m.store != nil {
 		_ = m.store.Close()
 	}
+	m.tr.Close()
 }
 
 // ---- internals ----

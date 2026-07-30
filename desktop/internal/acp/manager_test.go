@@ -3,6 +3,8 @@ package acp
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +12,11 @@ import (
 	"testing"
 	"time"
 )
+
+// testLogger keeps test output quiet unless something goes wrong.
+func testLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
 
 // fakeWriter records board writes.
 type fakeWriter struct {
