@@ -237,6 +237,52 @@ func TestGetUserList(t *testing.T) {
 	require.Equal(t, 2, len(guestUsers))
 }
 
+func TestGetUserListSingleUserWithRealAccounts(t *testing.T) {
+	// A single-user install still holds real accounts: the desktop app creates
+	// one per coding agent so cards can be assigned to it. The synthetic
+	// single-user has no row in the users table, so the list has to mix the two.
+	th := SetupTestHelperWithToken(t).Start()
+	defer th.TearDown()
+
+	err := th.Server.App().RegisterUser("agent-claude", "agent-claude@agents.invalid", utils.NewID(utils.IDTypeNone))
+	require.NoError(t, err)
+	agent, err := th.Server.App().GetUserByUsername("agent-claude")
+	require.NoError(t, err)
+	require.NotNil(t, agent)
+
+	// Both come back, whichever order they are asked for in.
+	users, resp := th.Client.GetUserList([]string{model.SingleUser, agent.ID})
+	require.NoError(t, resp.Error)
+	require.Len(t, users, 2)
+
+	users, resp = th.Client.GetUserList([]string{agent.ID, model.SingleUser})
+	require.NoError(t, resp.Error)
+	require.Len(t, users, 2)
+
+	usernames := make(map[string]bool, len(users))
+	for _, u := range users {
+		usernames[u.Username] = true
+	}
+	require.True(t, usernames[model.SingleUser], "single-user missing: %v", usernames)
+	require.True(t, usernames["agent-claude"], "agent account missing: %v", usernames)
+
+	// An id nobody owns (a card naming a deleted account) does not fail the
+	// whole request — the users that do exist still come back.
+	users, resp = th.Client.GetUserList([]string{model.SingleUser, agent.ID, "no-such-user"})
+	require.NoError(t, resp.Error)
+	require.Len(t, users, 2)
+
+	// The team-scoped variant behaves the same: this is the one the webapp
+	// resolves board members with, so an unnamed assignee comes from here.
+	users, resp = th.Client.GetTeamUserList([]string{model.SingleUser, agent.ID}, "team-id")
+	require.NoError(t, resp.Error)
+	require.Len(t, users, 2)
+
+	users, resp = th.Client.GetTeamUserList([]string{agent.ID, model.SingleUser, "no-such-user"}, "team-id")
+	require.NoError(t, resp.Error)
+	require.Len(t, users, 2)
+}
+
 func TestUserChangePassword(t *testing.T) {
 	th := SetupTestHelper(t).Start()
 	defer th.TearDown()

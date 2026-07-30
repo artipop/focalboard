@@ -1,6 +1,8 @@
 package acp
 
 import (
+	"context"
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -242,6 +244,114 @@ func TestResolveAgentByOption(t *testing.T) {
 	// Ambiguous (multiple agents, no selection) errors.
 	if _, err := m.resolveAgent(CardMoved{Props: map[string]string{}}); err == nil {
 		t.Error("ambiguous agent selection should error")
+	}
+}
+
+func TestResolveAgentByAssignee(t *testing.T) {
+	m := agentManager(t, "",
+		AgentEntry{Name: "claude", Kind: "claude"},
+		AgentEntry{Name: "Codex Acct1", Kind: "codex"},
+	)
+
+	// The assignee's username routes the card; the account carries the folded
+	// form of the registry name.
+	got, err := m.resolveAgent(CardMoved{PersonNames: []string{"artem", "codex-acct1"}, Props: map[string]string{}})
+	if err != nil || got.Name != "Codex Acct1" {
+		t.Fatalf("assignee match failed: got=%+v err=%v", got, err)
+	}
+
+	// An assignee outranks a tag: it is the more deliberate choice.
+	got, err = m.resolveAgent(CardMoved{
+		PersonNames: []string{"claude"},
+		OptionNames: []string{"Codex Acct1"},
+		Props:       map[string]string{},
+	})
+	if err != nil || got.Name != "claude" {
+		t.Fatalf("assignee should win over the option: got=%+v err=%v", got, err)
+	}
+
+	// The explicit property still wins over both.
+	got, err = m.resolveAgent(CardMoved{
+		PersonNames: []string{"claude"},
+		Props:       map[string]string{"agent": "codex-acct1"},
+	})
+	if err != nil || got.Name != "Codex Acct1" {
+		t.Fatalf("explicit agent property should win: got=%+v err=%v", got, err)
+	}
+
+	// A human assignee is simply not an agent.
+	if _, err := m.resolveAgent(CardMoved{PersonNames: []string{"artem"}, Props: map[string]string{}}); err == nil {
+		t.Error("a non-agent assignee should not resolve an agent")
+	}
+}
+
+func TestAgentUsername(t *testing.T) {
+	for in, want := range map[string]string{
+		"claude":       "claude",
+		"Codex Acct1":  "codex-acct1",
+		"  My Agent  ": "my-agent",
+		"claude/main":  "claude-main",
+		"agent.two_3":  "agent.two_3",
+		"---":          "",
+		"":             "",
+	} {
+		if got := AgentUsername(in); got != want {
+			t.Errorf("AgentUsername(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+// fakeBoardUsers records what the manager asked to provision.
+type fakeBoardUsers struct {
+	boardID string
+	agents  []AgentUser
+	err     error
+}
+
+func (f *fakeBoardUsers) EnsureAgentUsers(_ context.Context, boardID string, agents []AgentUser) ([]AgentUser, error) {
+	f.boardID = boardID
+	f.agents = agents
+	if f.err != nil {
+		return nil, f.err
+	}
+	out := make([]AgentUser, 0, len(agents))
+	for i, a := range agents {
+		a.UserID = fmt.Sprintf("uid-%d", i)
+		a.Created = true
+		out = append(out, a)
+	}
+	return out, nil
+}
+
+func TestSyncAgentUsers(t *testing.T) {
+	m := agentManager(t, "", AgentEntry{Name: "Codex Acct1", Kind: "codex"}, AgentEntry{Name: "claude", Kind: "claude"})
+
+	// Without a board-users implementation the feature is simply unavailable.
+	if _, err := m.SyncAgentUsers(context.Background(), "board1"); err == nil {
+		t.Error("expected an error without a BoardUsers implementation")
+	}
+
+	users := &fakeBoardUsers{}
+	m.SetBoardUsers(users)
+	got, err := m.SyncAgentUsers(context.Background(), "board1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if users.boardID != "board1" || len(got) != 2 {
+		t.Fatalf("sync passed board=%q agents=%+v", users.boardID, got)
+	}
+	if got[0].Name != "Codex Acct1" || got[0].Username != "codex-acct1" {
+		t.Errorf("first account = %+v, want the folded username", got[0])
+	}
+	if got[0].UserID == "" || !got[0].Created {
+		t.Errorf("provisioning result not returned: %+v", got[0])
+	}
+
+	// An empty registry has nothing to provision, and says so.
+	empty := agentManager(t, "")
+	empty.SetBoardUsers(users)
+	if _, err := empty.SyncAgentUsers(context.Background(), "board1"); err == nil {
+		t.Error("expected an error for an empty registry")
 	}
 }
 

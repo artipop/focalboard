@@ -148,6 +148,32 @@ describe('components/acp/agentsDialog', () => {
         expect(payload).toMatchObject({name: 'junie-a', kind: 'junie', command: []})
     })
 
+    test('gives agents board accounts so they can be assigned', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([{name: 'Codex Acct1', kind: 'codex'}])),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AddAgent: jest.fn(),
+            UpdateAgent: jest.fn(),
+            RemoveAgent: jest.fn(),
+            SyncAgentUsers: jest.fn().mockResolvedValue(JSON.stringify([
+                {name: 'Codex Acct1', username: 'codex-acct1', userId: 'uid-1', created: true},
+            ])),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByText('Codex Acct1')).toBeInTheDocument())
+
+        userEvent.click(screen.getByRole('button', {name: 'Make assignable'}))
+        await waitFor(() => expect(bindings.SyncAgentUsers).toBeCalledWith(board.id))
+    })
+
     test('creates an Agent select field and adds missing options', async () => {
         const bindings = {
             ListAgents: jest.fn().mockResolvedValue(JSON.stringify([

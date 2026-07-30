@@ -35,6 +35,7 @@ export interface IAppWindow extends Window {
                 AddProxy(entryJSON: string): Promise<string>
                 UpdateProxy(entryJSON: string): Promise<string>
                 RemoveProxy(name: string): Promise<void>
+                SyncAgentUsers(boardId: string): Promise<string>
                 GetAgentSystemPrompt(): Promise<string>
                 SetAgentSystemPrompt(text: string): Promise<void>
                 GetCardSessions(cardId: string): Promise<string>

@@ -154,6 +154,22 @@ func (a *App) RemoveAgent(name string) error {
 	return a.mgr.RemoveAgent(name)
 }
 
+// SyncAgentUsers gives every registered agent a board account and adds it to
+// the board's members, so cards can be assigned to an agent in a person
+// property. Returns the accounts as JSON: [{"name","username","userId",
+// "created"}, …].
+func (a *App) SyncAgentUsers(boardID string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	users, err := a.mgr.SyncAgentUsers(context.Background(), boardID)
+	if err != nil {
+		return "", err
+	}
+	out, _ := json.Marshal(users)
+	return string(out), nil
+}
+
 // ListProxies returns the proxy registry as JSON: [{"name","proxy",…}, …].
 func (a *App) ListProxies() (string, error) {
 	if a.mgr == nil {

@@ -624,6 +624,27 @@ func (c *Client) GetUserList(ids []string) ([]model.User, *Response) {
 	return users, BuildResponse(r)
 }
 
+// GetTeamUserList resolves user ids within a team — the call the webapp uses to
+// put names on board members.
+func (c *Client) GetTeamUserList(ids []string, teamID string) ([]model.User, *Response) {
+	r, err := c.DoAPIPost(fmt.Sprintf("/teams/%s/users", teamID), toJSON(ids))
+	if err != nil {
+		return nil, BuildErrorResponse(r, err)
+	}
+	defer closeBody(r)
+
+	requestBody, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nil, BuildErrorResponse(r, err)
+	}
+
+	var users []model.User
+	if err = json.Unmarshal(requestBody, &users); err != nil {
+		return nil, BuildErrorResponse(r, err)
+	}
+	return users, BuildResponse(r)
+}
+
 func (c *Client) GetUserChangePasswordRoute(id string) string {
 	return fmt.Sprintf("/users/%s/changepassword", id)
 }

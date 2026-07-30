@@ -29,6 +29,10 @@ type CardMoved struct {
 	Body        string            // card description text, if any
 	Props       map[string]string // lowercased property name → display value
 	OptionNames []string          // display names of every selected select/multiSelect option (tags included)
+	// PersonNames are the usernames behind every person/multiPerson value on the
+	// card — the "Assignee" route to an agent, which works because a registered
+	// agent is provisioned as a board user (see BoardUsers).
+	PersonNames []string
 	FromColumn  Column
 	ToColumn    Column
 	At          time.Time
@@ -50,6 +54,23 @@ type BoardWriter interface {
 // returned event carries no columns — nothing was moved.
 type BoardReader interface {
 	CardByID(ctx context.Context, cardID string) (CardMoved, error)
+}
+
+// AgentUser is a registry entry seen as a board account: the user an agent is
+// assigned as. Username is derived from Name (see AgentUsername); UserID and
+// Created are filled in by BoardUsers.
+type AgentUser struct {
+	Name     string `json:"name"`
+	Username string `json:"username"`
+	UserID   string `json:"userId,omitempty"`
+	Created  bool   `json:"created,omitempty"`
+}
+
+// BoardUsers provisions the board-side account of a registered agent, so it can
+// be picked in a person property ("Assignee") like any other member. Optional:
+// without it the "Agent" select field remains the only routing mechanism.
+type BoardUsers interface {
+	EnsureAgentUsers(ctx context.Context, boardID string, agents []AgentUser) ([]AgentUser, error)
 }
 
 // UIEmitter pushes events to the desktop UI. Implementations must be safe to

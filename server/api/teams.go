@@ -325,7 +325,21 @@ func (a *API) handleGetTeamUsersByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if userIDs[0] == model.SingleUser {
+	// The single-user id is synthesized (it has no row in the users table); the
+	// rest are looked up as usual, so a single-user install can hold real
+	// accounts alongside it — the desktop app creates one per coding agent, and
+	// this is the call the webapp resolves board members with.
+	realIDs := make([]string, 0, len(userIDs))
+	singleUserRequested := false
+	for _, id := range userIDs {
+		if id == model.SingleUser {
+			singleUserRequested = true
+			continue
+		}
+		realIDs = append(realIDs, id)
+	}
+
+	if singleUserRequested {
 		ws, _ := a.app.GetRootTeam()
 		now := utils.GetMillis()
 		user := &model.User{
@@ -336,21 +350,30 @@ func (a *API) handleGetTeamUsersByID(w http.ResponseWriter, r *http.Request) {
 			UpdateAt: now,
 		}
 		users = append(users, user)
-	} else {
-		users, error = a.app.GetUsersList(userIDs)
+	}
+
+	if len(realIDs) > 0 {
+		var found []*model.User
+		found, error = a.app.GetUsersList(realIDs)
 		if error != nil {
-			a.errorResponse(w, r, error)
-			return
+			// A card can outlive the account it names; the members that do
+			// exist are more useful than failing the whole board.
+			if !model.IsErrNotFound(error) {
+				a.errorResponse(w, r, error)
+				return
+			}
+			a.logger.Debug("getTeamUsersByID: some of the requested users no longer exist")
 		}
 
-		for i, u := range users {
+		for i, u := range found {
 			if a.permissions.HasPermissionToTeam(u.ID, teamID, model.PermissionManageTeam) {
-				users[i].Permissions = append(users[i].Permissions, model.PermissionManageTeam.Id)
+				found[i].Permissions = append(found[i].Permissions, model.PermissionManageTeam.Id)
 			}
 			if a.permissions.HasPermissionTo(u.ID, model.PermissionManageSystem) {
-				users[i].Permissions = append(users[i].Permissions, model.PermissionManageSystem.Id)
+				found[i].Permissions = append(found[i].Permissions, model.PermissionManageSystem.Id)
 			}
 		}
+		users = append(users, found...)
 	}
 
 	usersList, err := json.Marshal(users)

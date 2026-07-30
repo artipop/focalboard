@@ -252,13 +252,36 @@ const AgentsDialog = (props: Props) => {
         }
     }, [board, intl, agents])
 
+    // syncToUsers gives every registered agent a board account and adds it to
+    // the board's members, so it can be picked in a person field ("Assignee")
+    // like a teammate. The store needs no nudge: the added members arrive over
+    // the websocket like any other membership change.
+    const syncToUsers = useCallback(async () => {
+        if (!bindings?.SyncAgentUsers) {
+            return
+        }
+        setError('')
+        try {
+            const synced = (JSON.parse(await bindings.SyncAgentUsers(board.id)) || []) as Array<{created?: boolean}>
+            sendFlashMessage({
+                content: intl.formatMessage(
+                    {id: 'Agents.users-synced', defaultMessage: '{count} agent(s) can now be assigned ({created} account(s) created)'},
+                    {count: synced.length, created: synced.filter((u) => u.created).length},
+                ),
+                severity: 'normal',
+            })
+        } catch (e) {
+            setError(String(e))
+        }
+    }, [bindings, board.id, intl])
+
     const updateForm = (patch: Partial<AgentEntry>) => setForm((f) => (f ? {...f, ...patch} : f))
 
     return (
         <Dialog
             className='AgentsDialog'
             title={<span>{intl.formatMessage({id: 'Agents.title', defaultMessage: 'Agents'})}</span>}
-            subtitle={<span>{intl.formatMessage({id: 'Agents.subtitle', defaultMessage: 'Register coding agents (Claude, Codex, Antigravity, GitHub Copilot, JetBrains Junie or any other ACP agent) with their own prompt, model, launch command, environment and proxy. Cards route to an agent by the "Agent" field.'})}</span>}
+            subtitle={<span>{intl.formatMessage({id: 'Agents.subtitle', defaultMessage: 'Register coding agents (Claude, Codex, Antigravity, GitHub Copilot, JetBrains Junie or any other ACP agent) with their own prompt, model, launch command, environment and proxy. Cards route to an agent by their assignee or the "Agent" field.'})}</span>}
             onClose={onClose}
         >
             <div className='AgentsDialog__content'>
@@ -403,6 +426,15 @@ const AgentsDialog = (props: Props) => {
                             <Button onClick={syncToBoard}>
                                 {intl.formatMessage({id: 'Agents.sync', defaultMessage: 'Sync to board'})}
                             </Button>}
+                        {agents.length > 0 && Boolean(bindings?.SyncAgentUsers) &&
+                            <Button onClick={syncToUsers}>
+                                {intl.formatMessage({id: 'Agents.sync-users', defaultMessage: 'Make assignable'})}
+                            </Button>}
+                    </div>}
+
+                {!form && agents.length > 0 && Boolean(bindings?.SyncAgentUsers) &&
+                    <div className='AgentsDialog__hint'>
+                        {intl.formatMessage({id: 'Agents.sync-users-hint', defaultMessage: '"Make assignable" gives each agent a board account named after it, so you can pick it in a person field such as "Assignee".'})}
                     </div>}
 
                 <div className='AgentsDialog__systemPrompt'>

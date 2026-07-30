@@ -40,6 +40,13 @@ func (a *App) GetUserPreferences(userID string) ([]mmModel.Preference, error) {
 }
 
 func (a *App) UserIsGuest(userID string) (bool, error) {
+	// The single-user session is synthesized by the API and has no row in the
+	// users table; it owns the whole install, so it is never a guest. Without
+	// this, every call that guards on guest-ness fails in single-user mode.
+	if userID == model.SingleUser {
+		return false, nil
+	}
+
 	user, err := a.store.GetUserByID(userID)
 	if err != nil {
 		return false, err

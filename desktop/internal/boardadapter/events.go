@@ -71,6 +71,7 @@ func (b *EventsBackend) BlockChanged(evt notify.BlockChangeEvent) error {
 	}
 	oldProps := rawProperties(evt.BlockOld)
 	newProps := rawProperties(evt.BlockChanged)
+	resolver := newUserResolver(b.appUserLookup())
 
 	for propID, def := range schema {
 		if def.Type != "select" {
@@ -87,8 +88,9 @@ func (b *EventsBackend) BlockChanged(evt notify.BlockChangeEvent) error {
 			BoardID:     evt.Board.ID,
 			Title:       evt.BlockChanged.Title,
 			Body:        b.cardBody(evt.Board.ID, evt.BlockChanged),
-			Props:       namedProperties(evt.BlockChanged, schema),
+			Props:       namedProperties(evt.BlockChanged, schema, resolver),
 			OptionNames: selectedOptionNames(newProps, schema),
+			PersonNames: personNames(newProps, schema, resolver),
 			FromColumn:  column(def, oldVal),
 			ToColumn:    column(def, newVal),
 			At:          time.Now(),
@@ -127,14 +129,16 @@ func (b *EventsBackend) CardByID(ctx context.Context, cardID string) (acp.CardMo
 	if err != nil {
 		return acp.CardMoved{}, fmt.Errorf("parse board schema: %w", err)
 	}
+	resolver := newUserResolver(b.appUserLookup())
 	return acp.CardMoved{
 		EventID:     uuid.NewString(),
 		CardID:      block.ID,
 		BoardID:     board.ID,
 		Title:       block.Title,
 		Body:        b.cardBody(board.ID, block),
-		Props:       namedProperties(block, schema),
+		Props:       namedProperties(block, schema, resolver),
 		OptionNames: selectedOptionNames(rawProperties(block), schema),
+		PersonNames: personNames(rawProperties(block), schema, resolver),
 		At:          time.Now(),
 	}, nil
 }
@@ -200,11 +204,95 @@ func selectedOptionNames(props map[string]any, schema model.PropSchema) []string
 	return out
 }
 
+// userLookup resolves a user id to a username. Person property values are ids;
+// an agent is matched by the name behind them.
+type userLookup func(userID string) string
+
+// userResolver adapts userLookup to model.PropValueResolver, memoizing lookups:
+// ParseProperties asks once per person value, and BlockChanged runs on the
+// notify worker, which must stay quick.
+type userResolver struct {
+	lookup userLookup
+	seen   map[string]*model.User
+}
+
+func newUserResolver(lookup userLookup) *userResolver {
+	return &userResolver{lookup: lookup, seen: make(map[string]*model.User)}
+}
+
+// GetUserByID never fails: an unknown or deleted user leaves the raw id as the
+// property value instead of discarding the whole property map.
+func (r *userResolver) GetUserByID(userID string) (*model.User, error) {
+	if r == nil || r.lookup == nil || userID == "" {
+		return nil, nil
+	}
+	if user, ok := r.seen[userID]; ok {
+		return user, nil
+	}
+	var user *model.User
+	if username := r.lookup(userID); username != "" {
+		user = &model.User{ID: userID, Username: username}
+	}
+	r.seen[userID] = user
+	return user, nil
+}
+
+// appUserLookup reads usernames through the app layer.
+func (b *EventsBackend) appUserLookup() userLookup {
+	b.mu.Lock()
+	a := b.app
+	b.mu.Unlock()
+	if a == nil {
+		return nil
+	}
+	return func(userID string) string {
+		user, err := a.GetUser(userID)
+		if err != nil || user == nil {
+			return ""
+		}
+		return user.Username
+	}
+}
+
+// personNames collects the usernames of every selected person/multiPerson
+// value — how an assignee routes a card to an agent.
+func personNames(props map[string]any, schema model.PropSchema, resolver *userResolver) []string {
+	var out []string
+	appendUser := func(v any) {
+		id, ok := v.(string)
+		if !ok || id == "" {
+			return
+		}
+		user, _ := resolver.GetUserByID(id)
+		if user != nil && user.Username != "" {
+			out = append(out, user.Username)
+		}
+	}
+	for propID, def := range schema {
+		v, ok := props[propID]
+		if !ok || v == nil {
+			continue
+		}
+		switch def.Type {
+		case "person":
+			appendUser(v)
+		case "multiPerson":
+			if vals, ok := v.([]any); ok {
+				for _, item := range vals {
+					appendUser(item)
+				}
+			}
+		}
+	}
+	return out
+}
+
 // namedProperties resolves the card's properties into a lowercased
-// name → display-value map (repo_path, branch, …).
-func namedProperties(block *model.Block, schema model.PropSchema) map[string]string {
+// name → display-value map (repo_path, branch, …). Person values come out as
+// usernames when a resolver is supplied.
+func namedProperties(block *model.Block, schema model.PropSchema, resolver *userResolver) map[string]string {
 	out := make(map[string]string)
-	parsed, err := model.ParseProperties(block, schema, nil)
+	parsed, err := model.ParseProperties(block, schema, resolver)
 	if err != nil {
 		return out
 	}

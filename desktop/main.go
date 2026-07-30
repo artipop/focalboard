@@ -92,6 +92,9 @@ func main() {
 			mgr = acp.NewManager(acpCfg, filepath.Join(dir, "config.json"), store, boardadapter.NewWriter(srv.App()), emitter, nil)
 			// Lets the UI open a console on a card without moving it.
 			mgr.SetBoardReader(events)
+			// Lets the UI give agents board accounts, so cards can be
+			// assigned to them in a person property.
+			mgr.SetBoardUsers(events)
 			if err := mgr.Start(context.Background(), events); err != nil {
 				log.Printf("acp: disabled, start error: %v", err)
 				mgr = nil
