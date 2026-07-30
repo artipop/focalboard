@@ -88,6 +88,44 @@ func (b *EventsBackend) EnsureAgentUsers(ctx context.Context, boardID string, ag
 	return out, nil
 }
 
+// RetireAgentUser takes an unregistered agent off every board it belongs to, so
+// it stops being offered as an assignee, and reports how many memberships were
+// dropped. The account is deliberately left in place: cards may still name it
+// (its name would otherwise vanish from them), and registering the agent again
+// gives it the same identity back.
+func (b *EventsBackend) RetireAgentUser(ctx context.Context, agent acp.AgentUser) (int, error) {
+	b.mu.Lock()
+	a := b.app
+	b.mu.Unlock()
+	if a == nil {
+		return 0, fmt.Errorf("board app is not ready")
+	}
+	if agent.Username == "" {
+		return 0, nil
+	}
+
+	user, err := a.GetUserByUsername(agent.Username)
+	if err != nil {
+		return 0, fmt.Errorf("поиск пользователя %q: %w", agent.Username, err)
+	}
+	if user == nil {
+		return 0, nil // never provisioned; nothing to take away
+	}
+
+	members, err := a.GetMembersForUser(user.ID)
+	if err != nil {
+		return 0, fmt.Errorf("список досок пользователя %q: %w", agent.Username, err)
+	}
+	removed := 0
+	for _, member := range members {
+		if err := a.DeleteBoardMember(member.BoardID, user.ID); err != nil {
+			return removed, fmt.Errorf("удаление %q из участников доски %s: %w", agent.Username, member.BoardID, err)
+		}
+		removed++
+	}
+	return removed, nil
+}
+
 // randomPassword returns a password no one knows, long enough for the server's
 // own validation.
 func randomPassword() (string, error) {

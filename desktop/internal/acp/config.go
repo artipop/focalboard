@@ -312,6 +312,15 @@ type Config struct {
 	KeepFailedWorktrees bool   `json:"keepFailedWorktrees"`
 }
 
+// The column a card is dropped into to hand it to an agent. Work starts where
+// work normally starts on a board, rather than in a lane invented for agents.
+const (
+	DefaultTriggerColumn = "In Progress"
+	// legacyTriggerColumn is the column earlier versions triggered on; configs
+	// still carrying it are migrated on load.
+	legacyTriggerColumn = "To Agent"
+)
+
 // DefaultConfig returns the defaults written on first run. dataDir is the ACP
 // data directory (worktrees live under it).
 func DefaultConfig(dataDir string) Config {
@@ -319,7 +328,7 @@ func DefaultConfig(dataDir string) Config {
 		Enabled:                  true,
 		AgentMode:                "claude",
 		TriggerProperty:          "Status",
-		TriggerColumn:            "To Agent",
+		TriggerColumn:            DefaultTriggerColumn,
 		RepoWhitelist:            []string{},
 		Repos:                    []RepoEntry{},
 		Agents:                   []AgentEntry{},
@@ -360,6 +369,12 @@ func LoadConfig(path, dataDir string) (Config, error) {
 	cfg := DefaultConfig(dataDir)
 	if err := json.Unmarshal(b, &cfg); err != nil {
 		return Config{}, fmt.Errorf("parse %s: %w", path, err)
+	}
+	// An existing config keeps whatever it says, so the old default would live
+	// on forever in installs that never touched it. Only the abandoned default
+	// is rewritten; a column the user chose is left alone.
+	if strings.EqualFold(strings.TrimSpace(cfg.TriggerColumn), legacyTriggerColumn) {
+		cfg.TriggerColumn = DefaultTriggerColumn
 	}
 	return cfg, nil
 }

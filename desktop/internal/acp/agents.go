@@ -133,17 +133,38 @@ func (m *Manager) SetSystemPrompt(text string) error {
 	return m.persistConfigLocked()
 }
 
-// RemoveAgent deletes a registry entry by name and persists the config.
+// RemoveAgent deletes a registry entry by name, persists the config and takes
+// the agent's account off the boards it was a member of — an unregistered agent
+// must stop being offered as an assignee. The account survives (cards may still
+// name it), so re-registering the agent restores the same identity.
 func (m *Manager) RemoveAgent(name string) error {
+	removed, err := m.removeAgentEntry(name)
+	if err != nil {
+		return err
+	}
+	if m.users == nil {
+		return nil
+	}
+	if _, err := m.users.RetireAgentUser(context.Background(), removed); err != nil {
+		// The entry is already gone; the account is the part left dangling, so
+		// say so rather than pretend the removal failed.
+		return fmt.Errorf("агент %q удалён из реестра, но его учётная запись осталась в участниках доски: %w", removed.Name, err)
+	}
+	return nil
+}
+
+// removeAgentEntry drops the entry from the registry and returns it as an
+// account, so the caller can retire it outside the config lock.
+func (m *Manager) removeAgentEntry(name string) (AgentUser, error) {
 	m.cfgMu.Lock()
 	defer m.cfgMu.Unlock()
 	for i, e := range m.cfg.Agents {
 		if strings.EqualFold(e.Name, name) {
 			m.cfg.Agents = append(m.cfg.Agents[:i], m.cfg.Agents[i+1:]...)
-			return m.persistConfigLocked()
+			return AgentUser{Name: e.Name, Username: AgentUsername(e.Name)}, m.persistConfigLocked()
 		}
 	}
-	return fmt.Errorf("агент %q не найден", name)
+	return AgentUser{}, fmt.Errorf("агент %q не найден", name)
 }
 
 // AgentUsername is the board username an agent is provisioned under: the

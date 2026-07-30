@@ -66,11 +66,16 @@ type AgentUser struct {
 	Created  bool   `json:"created,omitempty"`
 }
 
-// BoardUsers provisions the board-side account of a registered agent, so it can
-// be picked in a person property ("Assignee") like any other member. Optional:
-// without it the "Agent" select field remains the only routing mechanism.
+// BoardUsers keeps the board-side accounts in step with the agent registry, so
+// an agent can be picked in a person property ("Assignee") like any other
+// member — and stops being offered once it is unregistered. Optional: without
+// it the "Agent" select field remains the only routing mechanism.
 type BoardUsers interface {
 	EnsureAgentUsers(ctx context.Context, boardID string, agents []AgentUser) ([]AgentUser, error)
+	// RetireAgentUser drops the account's board memberships and reports how
+	// many were removed. The account itself stays: cards may still name it, and
+	// re-registering the agent should give it its identity back.
+	RetireAgentUser(ctx context.Context, agent AgentUser) (int, error)
 }
 
 // UIEmitter pushes events to the desktop UI. Implementations must be safe to

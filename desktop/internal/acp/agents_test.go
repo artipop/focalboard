@@ -3,6 +3,7 @@ package acp
 import (
 	"context"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -301,11 +302,21 @@ func TestAgentUsername(t *testing.T) {
 	}
 }
 
-// fakeBoardUsers records what the manager asked to provision.
+// fakeBoardUsers records what the manager asked to provision and retire.
 type fakeBoardUsers struct {
-	boardID string
-	agents  []AgentUser
-	err     error
+	boardID  string
+	agents   []AgentUser
+	retired  []AgentUser
+	err      error
+	retryErr error
+}
+
+func (f *fakeBoardUsers) RetireAgentUser(_ context.Context, agent AgentUser) (int, error) {
+	if f.retryErr != nil {
+		return 0, f.retryErr
+	}
+	f.retired = append(f.retired, agent)
+	return 1, nil
 }
 
 func (f *fakeBoardUsers) EnsureAgentUsers(_ context.Context, boardID string, agents []AgentUser) ([]AgentUser, error) {
@@ -357,6 +368,43 @@ func TestSyncAgentUsers(t *testing.T) {
 	}
 }
 
+func TestRemoveAgentRetiresItsAccount(t *testing.T) {
+	cfgPath := filepath.Join(t.TempDir(), "config.json")
+	users := &fakeBoardUsers{}
+	m := agentManager(t, cfgPath, AgentEntry{Name: "Codex Acct1", Kind: "codex"})
+	m.SetBoardUsers(users)
+
+	if err := m.RemoveAgent("codex acct1"); err != nil { // name match is loose
+		t.Fatal(err)
+	}
+	if len(m.Agents()) != 0 {
+		t.Errorf("entry not removed: %+v", m.Agents())
+	}
+	if len(users.retired) != 1 || users.retired[0].Username != "codex-acct1" {
+		t.Fatalf("account not retired: %+v", users.retired)
+	}
+
+	// A retirement that fails is reported, but the entry stays removed — the
+	// registry is the source of truth and it has already been written.
+	m2 := agentManager(t, cfgPath, AgentEntry{Name: "claude", Kind: "claude"})
+	m2.SetBoardUsers(&fakeBoardUsers{retryErr: fmt.Errorf("board app is not ready")})
+	err := m2.RemoveAgent("claude")
+	if err == nil || !strings.Contains(err.Error(), "board app is not ready") {
+		t.Errorf("expected the retirement failure to surface, got %v", err)
+	}
+	if len(m2.Agents()) != 0 {
+		t.Errorf("entry should still be removed: %+v", m2.Agents())
+	}
+
+	// Removing an unknown agent is still an error, and touches no account.
+	if err := m.RemoveAgent("nope"); err == nil {
+		t.Error("removing a missing agent should fail")
+	}
+	if len(users.retired) != 1 {
+		t.Errorf("a failed removal must not retire anything: %+v", users.retired)
+	}
+}
+
 func TestResolveAgentSingleAndFallback(t *testing.T) {
 	// Exactly one agent → used without a card selection.
 	m := agentManager(t, "", AgentEntry{Name: "only", Kind: "codex"})
@@ -378,5 +426,33 @@ func TestResolveAgentSingleAndFallback(t *testing.T) {
 	got, _ = m3.resolveAgent(CardMoved{Props: map[string]string{}})
 	if got.Kind != "acp-command" {
 		t.Fatalf("expected acp-command fallback, got %+v", got)
+	}
+}
+
+func TestLoadConfigMigratesLegacyTriggerColumn(t *testing.T) {
+	dir := t.TempDir()
+	write := func(triggerColumn string) Config {
+		t.Helper()
+		path := filepath.Join(t.TempDir(), "config.json")
+		if err := os.WriteFile(path, []byte(`{"triggerColumn":"`+triggerColumn+`"}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		cfg, err := LoadConfig(path, dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return cfg
+	}
+
+	// The abandoned default is rewritten, whatever its case…
+	if got := write("To Agent").TriggerColumn; got != DefaultTriggerColumn {
+		t.Errorf("legacy column = %q, want %q", got, DefaultTriggerColumn)
+	}
+	if got := write("to agent").TriggerColumn; got != DefaultTriggerColumn {
+		t.Errorf("legacy column (lowercase) = %q, want %q", got, DefaultTriggerColumn)
+	}
+	// …but a column the user picked is theirs.
+	if got := write("Ready for agent").TriggerColumn; got != "Ready for agent" {
+		t.Errorf("custom column was rewritten to %q", got)
 	}
 }

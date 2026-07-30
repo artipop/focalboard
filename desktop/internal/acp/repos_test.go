@@ -81,7 +81,7 @@ func TestResolveRepoByTag(t *testing.T) {
 	got, err = m.resolveRepo(CardMoved{
 		Props:      map[string]string{},
 		FromColumn: Column{PropertyName: "Status", Name: "myrepo"},
-		ToColumn:   Column{PropertyName: "Status", Name: "To Agent"},
+		ToColumn:   Column{PropertyName: "Status", Name: DefaultTriggerColumn},
 	})
 	if err != nil || got != repo {
 		t.Fatalf("from-column match failed: got=%q err=%v", got, err)
