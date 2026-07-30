@@ -210,6 +210,56 @@ func TestSessionMCPServersOnlyForDeploySessions(t *testing.T) {
 	}
 }
 
+func TestDeploySessionMayUseItsOwnTools(t *testing.T) {
+	target := deployEntry("prod")
+	s := &Session{RepoPath: "/repo", Deploy: &target, DeployBranch: "feat/x", allowTools: map[string]bool{}}
+	if _, err := sessionMCPServers(s); err != nil {
+		t.Fatal(err)
+	}
+
+	// Nobody is watching a card-triggered deploy, so the tools it was started
+	// for have to be allowed without asking — including on an install whose
+	// config predates them.
+	for _, tool := range dokkuAutoAllowTools {
+		if !s.toolAllowed(tool) {
+			t.Errorf("%s is not allowed for a deploy session", tool)
+		}
+	}
+	// Tearing a deployment down still asks.
+	if s.toolAllowed("mcp__dokku__destroy_deployment") {
+		t.Error("destroy_deployment must not be auto-allowed")
+	}
+	if !s.usesOurMCP() {
+		t.Error("the session should know it was given an MCP server")
+	}
+
+	// An ordinary session gets neither.
+	plain := &Session{RepoPath: "/repo", allowTools: map[string]bool{}}
+	if _, err := sessionMCPServers(plain); err != nil {
+		t.Fatal(err)
+	}
+	if plain.usesOurMCP() || plain.toolAllowed("mcp__dokku__deploy_branch") {
+		t.Error("an ordinary session must not inherit the deploy tools")
+	}
+}
+
+func TestMCPLaunchPromptIsOurs(t *testing.T) {
+	// Junie asks this with no tool name at all, so the title is the whole
+	// request; a name-based policy has nothing to match and would reject the
+	// server we ourselves configured.
+	for _, title := range []string{"Allow running MCP?", "allow launching mcp endpoint"} {
+		if !isMCPLaunchPrompt(title, title) {
+			t.Errorf("%q should read as an MCP launch prompt", title)
+		}
+	}
+	if isMCPLaunchPrompt("Allow running this command?", "Allow running this command?") {
+		t.Error("a shell prompt must stay the user's decision")
+	}
+	if isMCPLaunchPrompt("Bash", "git push") {
+		t.Error("an ordinary tool call must stay the user's decision")
+	}
+}
+
 func TestMCPArgsPerAgentKind(t *testing.T) {
 	specs := []mcpServerSpec{{
 		Name:    "dokku",

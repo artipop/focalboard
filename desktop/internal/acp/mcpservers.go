@@ -21,6 +21,16 @@ import (
 // --mcp-config, codex gets -c overrides, and an ACP-native agent gets the
 // servers in session/new, where the protocol has a field for them.
 
+// dokkuAutoAllowTools are the deploy tools a session may call unasked. Reading
+// the state of a deployment is safe and is most of what the agent does between
+// pushes; tearing one down is not, so destroy_deployment still asks.
+var dokkuAutoAllowTools = []string{
+	"mcp__dokku__deploy_branch",
+	"mcp__dokku__deployment_status",
+	"mcp__dokku__app_logs",
+	"mcp__dokku__list_deployments",
+}
+
 // mcpServerSpec is one stdio MCP server offered to an agent.
 type mcpServerSpec struct {
 	Name    string
@@ -44,6 +54,14 @@ func sessionMCPServers(s *Session) ([]mcpServerSpec, error) {
 	if err != nil {
 		return nil, fmt.Errorf("не удалось сериализовать цель деплоя: %w", err)
 	}
+	// The tools of the server we are configuring: an unattended deploy has
+	// nobody to ask, and seeding the session (rather than the config's
+	// autoAllowTools) also reaches installs whose config.json predates the
+	// deploy feature. destroy_deployment is deliberately not here.
+	for _, tool := range dokkuAutoAllowTools {
+		s.allowToolAlways(tool)
+	}
+	s.markMCPConfigured()
 	return []mcpServerSpec{{
 		Name:    dokku.ServerName,
 		Command: self,

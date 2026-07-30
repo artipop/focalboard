@@ -90,13 +90,19 @@ func (c *sessionClient) RequestPermission(ctx context.Context, params acpsdk.Req
 		c.recordDecision(toolName, title, "allow", true)
 		return selectOption(params, acpsdk.PermissionOptionKindAllowOnce)
 	}
+	if c.s.usesOurMCP() && isMCPLaunchPrompt(toolName, title) {
+		c.recordDecision(toolName, title, "allow", true)
+		return selectOption(params, acpsdk.PermissionOptionKindAllowOnce)
+	}
 	if !c.s.hasConsole() {
 		c.recordDecision(toolName, title, "reject", true)
 		// Spell out why: the tool is simply not on the allow list, and there is
 		// no console open on the card to ask. Opening the card attaches one.
 		c.m.log.Info("acp: permission rejected — no console attached to ask",
 			"session", c.s.ID, "card", c.s.CardID, "tool", toolName,
-			"hint", "open the card to answer prompts, or add the tool to autoAllowTools")
+			// The name to add is the one printed above: an agent that sends no
+			// tool name leaves the prompt's own text as its only identity.
+			"hint", fmt.Sprintf("open the card to answer prompts, or add %q to autoAllowTools", toolName))
 		return selectOption(params, acpsdk.PermissionOptionKindRejectOnce)
 	}
 	return c.askUser(ctx, params, toolName, title)
@@ -219,6 +225,22 @@ func permissionToolName(params acpsdk.RequestPermissionRequest) string {
 		return *params.ToolCall.Title
 	}
 	return ""
+}
+
+// isMCPLaunchPrompt spots an agent asking whether it may start an MCP server.
+// Junie sends that question with no tool name at all — "Allow running MCP?" is
+// the entire request — so there is nothing for a name-based policy to match,
+// and an unattended session would reject the very server it was started with,
+// leaving the agent without the tools it was asked to use. Answering it
+// ourselves is honest only because we are the ones who configured that server
+// (usesOurMCP): consent was given when the session was started.
+func isMCPLaunchPrompt(toolName, title string) bool {
+	for _, text := range []string{toolName, title} {
+		if strings.Contains(strings.ToLower(text), "mcp") {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *sessionClient) SessionUpdate(ctx context.Context, params acpsdk.SessionNotification) error {

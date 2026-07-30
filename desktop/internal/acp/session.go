@@ -54,6 +54,10 @@ type Session struct {
 	// presence is what turns those tools on.
 	Deploy       *DeployEntry
 	DeployBranch string
+	// mcpConfigured records that we handed this session an MCP server of our
+	// own, which is what makes the agent's "may I launch MCP?" prompt ours to
+	// answer rather than the user's.
+	mcpConfigured bool
 
 	Worktree     WorktreeInfo
 	usedWorktree bool // a dedicated worktree was actually created
@@ -154,10 +158,27 @@ func (s *Session) hasConsole() bool {
 	return s.attached > 0
 }
 
+// markMCPConfigured records that this session was started with an MCP server we
+// configured ourselves.
+func (s *Session) markMCPConfigured() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.mcpConfigured = true
+}
+
+func (s *Session) usesOurMCP() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.mcpConfigured
+}
+
 // allowToolAlways remembers a tool the user approved for the rest of the session.
 func (s *Session) allowToolAlways(name string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.allowTools == nil {
+		s.allowTools = make(map[string]bool)
+	}
 	s.allowTools[name] = true
 }
 
