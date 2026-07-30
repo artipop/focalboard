@@ -228,11 +228,13 @@ func (a *App) SetAgentSystemPrompt(text string) error {
 
 // StartCardSession opens an interactive agent session on a card (or attaches to
 // the one already running) and returns its session id.
-func (a *App) StartCardSession(cardID string) (string, error) {
+// repoName may be empty, in which case the repository is taken from the card;
+// the console supplies one when the card carries no repository tag.
+func (a *App) StartCardSession(cardID, repoName string) (string, error) {
 	if a.mgr == nil {
 		return "", errACPDisabled
 	}
-	s, err := a.mgr.StartSessionForCard(cardID)
+	s, err := a.mgr.StartSessionForCard(cardID, repoName)
 	if err != nil {
 		return "", err
 	}

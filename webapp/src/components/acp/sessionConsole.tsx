@@ -36,6 +36,11 @@ const SessionConsole = (props: Props) => {
     const [draft, setDraft] = useState('')
     const [busy, setBusy] = useState(false)
 
+    // Offered only after the card turns out not to say which repository it is
+    // about — the common case is a tagged card and one click.
+    const [repos, setRepos] = useState<Array<{name: string}>>([])
+    const [repoName, setRepoName] = useState('')
+
     // The live session id drives attach/detach; a ref keeps the unmount cleanup
     // from capturing a stale value.
     const liveSessionId = useRef<string | null>(null)
@@ -98,22 +103,33 @@ const SessionConsole = (props: Props) => {
         }
     }, [bindings])
 
-    const openSession = useCallback(async () => {
+    const openSession = useCallback(async (repo = '') => {
         if (!bindings?.StartCardSession) {
             return
         }
         setError('')
         setBusy(true)
         try {
-            const id = await bindings.StartCardSession(cardId)
+            const id = await bindings.StartCardSession(cardId, repo)
 
             // StartCardSession already counts this console as attached, so this
             // records the id without attaching a second time.
             liveSessionId.current = id
             setSession({id, status: 'queued'})
             setEntries([])
+            setRepos([])
         } catch (e) {
             setError(String(e))
+
+            // The card does not name a repository; let it be chosen rather than
+            // leaving a dead end.
+            if (String(e).includes('репозитори') && bindings.ListAgentRepos) {
+                try {
+                    setRepos(JSON.parse(await bindings.ListAgentRepos()) || [])
+                } catch {
+                    // Listing failed too; the original error is the useful one.
+                }
+            }
         } finally {
             setBusy(false)
         }
@@ -206,7 +222,7 @@ const SessionConsole = (props: Props) => {
                 <div className='SessionConsole__actions'>
                     {!live &&
                         <Button
-                            onClick={openSession}
+                            onClick={() => openSession()}
                             disabled={busy}
                         >
                             {intl.formatMessage({id: 'SessionConsole.open', defaultMessage: 'Open session'})}
@@ -223,6 +239,31 @@ const SessionConsole = (props: Props) => {
             </div>
 
             {error && <div className='SessionConsole__error'>{error}</div>}
+
+            {repos.length > 0 && !live &&
+                <div className='SessionConsole__repoPicker'>
+                    <select
+                        value={repoName}
+                        onChange={(e) => setRepoName(e.target.value)}
+                    >
+                        <option value=''>
+                            {intl.formatMessage({id: 'SessionConsole.choose-repo', defaultMessage: 'Choose a repository…'})}
+                        </option>
+                        {repos.map((r) => (
+                            <option
+                                key={r.name}
+                                value={r.name}
+                            >{r.name}</option>
+                        ))}
+                    </select>
+                    <Button
+                        filled={true}
+                        onClick={() => openSession(repoName)}
+                        disabled={busy || !repoName}
+                    >
+                        {intl.formatMessage({id: 'SessionConsole.open-here', defaultMessage: 'Open here'})}
+                    </Button>
+                </div>}
 
             {(entries.length > 0 || live) &&
                 <Transcript

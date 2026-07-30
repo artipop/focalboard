@@ -39,7 +39,7 @@ export interface IAppWindow extends Window {
                 SetAgentSystemPrompt(text: string): Promise<void>
                 GetCardSessions(cardId: string): Promise<string>
                 CancelSession(cardId: string): Promise<boolean>
-                StartCardSession(cardId: string): Promise<string>
+                StartCardSession(cardId: string, repoName: string): Promise<string>
                 PromptSession(sessionId: string, text: string): Promise<void>
                 AnswerPermission(sessionId: string, requestId: string, optionId: string): Promise<void>
                 AnswerQuestion(sessionId: string, requestId: string, text: string): Promise<void>

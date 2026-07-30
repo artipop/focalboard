@@ -28,6 +28,7 @@ function bindingsWith(sessions: any[], events: any[] = []) {
     return {
         GetCardSessions: jest.fn().mockResolvedValue(JSON.stringify({sessions, events})),
         StartCardSession: jest.fn().mockResolvedValue('sess-new'),
+        ListAgentRepos: jest.fn().mockResolvedValue(JSON.stringify([{name: 'NotBro'}, {name: 'leadheat'}])),
         PromptSession: jest.fn().mockResolvedValue(undefined),
         AnswerPermission: jest.fn().mockResolvedValue(undefined),
         AttachSession: jest.fn().mockResolvedValue(true),
@@ -74,7 +75,7 @@ describe('components/acp/sessionConsole', () => {
         // A terminal session is not attached to and offers a fresh one.
         expect(bindings.AttachSession).not.toBeCalled()
         userEvent.click(screen.getByRole('button', {name: 'Open session'}))
-        await waitFor(() => expect(bindings.StartCardSession).toBeCalledWith('card1'))
+        await waitFor(() => expect(bindings.StartCardSession).toBeCalledWith('card1', ''))
     })
 
     test('attaches to a live session and sends a follow-up turn', async () => {
@@ -208,6 +209,24 @@ describe('components/acp/sessionConsole', () => {
         expect(sessionId).toBe('sess-q')
         expect(requestId).toBe('q-1')
         expect(text).toContain('Цель: Читаемость')
+    })
+
+    test('offers a repository when the card does not name one', async () => {
+        const bindings = bindingsWith([{id: 'sess-old', status: 'done'}])
+        bindings.StartCardSession = jest.fn()
+            .mockRejectedValueOnce(new Error('ни тег карточки, ни исходная колонка не совпали с репозиторием из реестра (NotBro, leadheat)'))
+            .mockResolvedValueOnce('sess-picked')
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(<SessionConsole cardId='card1'/>))
+        userEvent.click(await screen.findByRole('button', {name: 'Open session'}))
+
+        // The dead end becomes a choice instead of just an error.
+        const select = await screen.findByRole('combobox')
+        userEvent.selectOptions(select, 'leadheat')
+        userEvent.click(screen.getByRole('button', {name: 'Open here'}))
+
+        await waitFor(() => expect(bindings.StartCardSession).toHaveBeenLastCalledWith('card1', 'leadheat'))
     })
 
     test('ignores events belonging to other cards', async () => {

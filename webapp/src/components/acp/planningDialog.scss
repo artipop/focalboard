@@ -3,7 +3,19 @@
     flex-direction: column;
     gap: 12px;
     padding: 0 24px 24px;
-    min-width: 560px;
+    // Width is pinned: the transcript holds agent output with long paths, code
+    // and tool titles, and without this the dialog grows to whatever the widest
+    // line happens to be.
+    width: min(720px, 86vw);
+    max-width: 86vw;
+    min-width: 0;
+
+    // Flex children default to min-width:auto, which lets a wide child push the
+    // container open regardless of the width above.
+    > * {
+        min-width: 0;
+        max-width: 100%;
+    }
 
     .PlanningDialog__setup,
     .PlanningDialog__review {

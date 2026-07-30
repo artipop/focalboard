@@ -407,7 +407,7 @@ printf '%s\n' '{"type":"result","is_error":false,"result":"finished"}'
 
 func liveSession(t *testing.T, m *Manager, cardID string) *Session {
 	t.Helper()
-	s, err := m.StartSessionForCard(cardID)
+	s, err := m.StartSessionForCard(cardID, "")
 	if err != nil {
 		t.Fatalf("open console session: %v", err)
 	}
@@ -845,4 +845,29 @@ func lastAgentText(t *testing.T, m *Manager, s *Session) string {
 		}
 	}
 	return b.String()
+}
+
+// A card with no repository tag is exactly when someone wants to open a console
+// on it, so the choice can be supplied instead of failing.
+func TestConsoleCanNameTheRepository(t *testing.T) {
+	m, repo := planningManager(t, fakeClaudeMultiTurn)
+
+	// The fake card carries repo_path, so drop it to get an untagged card.
+	m.reader = &fakeReader{ev: CardMoved{BoardID: "board1", Title: "Untagged", Props: map[string]string{}}}
+
+	if _, err := m.StartSessionForCard("cardNoRepo", ""); err == nil {
+		t.Fatal("expected the untagged card to be refused without a choice")
+	}
+
+	s, err := m.StartSessionForCard("cardNoRepo", "app")
+	if err != nil {
+		t.Fatalf("naming the repository should start the session: %v", err)
+	}
+	if s.RepoPath != repo {
+		t.Errorf("session should run in the named repository, got %q", s.RepoPath)
+	}
+
+	if _, err := m.StartSessionForCard("cardOther", "nope"); err == nil {
+		t.Error("an unknown repository name should be refused")
+	}
 }

@@ -82,6 +82,25 @@ func (m *Manager) persistConfigLocked() error {
 //  2. a select/multiSelect option name (tag) matching a registry entry;
 //  3. the name of the column the card was dragged out of — supports boards
 //     whose trigger property has one lane per repository.
+//
+// resolveNamedRepo looks a registry entry up by name. Opening a console on a
+// card that carries no repository tag would otherwise be a dead end: the card
+// is not going to grow one just because someone wants to talk about it.
+func (m *Manager) resolveNamedRepo(name string) (string, error) {
+	m.cfgMu.RLock()
+	repos := append([]RepoEntry(nil), m.cfg.Repos...)
+	m.cfgMu.RUnlock()
+	for _, r := range repos {
+		if strings.EqualFold(strings.TrimSpace(name), r.Name) {
+			if info, err := os.Stat(r.Path); err != nil || !info.IsDir() {
+				return "", fmt.Errorf("репозиторий %q указывает на несуществующий каталог %s", r.Name, r.Path)
+			}
+			return r.Path, nil
+		}
+	}
+	return "", fmt.Errorf("репозиторий %q не найден в реестре (%s)", name, repoNames(repos))
+}
+
 func (m *Manager) resolveRepo(ev CardMoved) (string, error) {
 	if explicit := strings.TrimSpace(ev.Props["repo_path"]); explicit != "" {
 		m.cfgMu.RLock()

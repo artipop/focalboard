@@ -124,13 +124,18 @@ func (m *Manager) recover() {
 // StartSessionForEvent creates and launches a session for a validated trigger
 // event. Callers must have passed idempotency/liveness checks.
 func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
-	return m.startSession(ev, false)
+	return m.startSession(ev, false, "")
 }
 
 // startSession is the shared launch path. An interactive session survives its
 // turns and waits for the user; a triggered one runs the card task and ends.
-func (m *Manager) startSession(ev CardMoved, interactive bool) (*Session, error) {
+func (m *Manager) startSession(ev CardMoved, interactive bool, repoName string) (*Session, error) {
 	repoPath, err := m.resolveRepo(ev)
+	if repoName != "" {
+		// An explicit choice wins: the console offers one exactly when the card
+		// itself does not say which repository it is about.
+		repoPath, err = m.resolveNamedRepo(repoName)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +239,7 @@ func (m *Manager) CancelSessionForCard(cardID, reason string) bool {
 
 // StartSessionForCard opens an interactive session on a card without moving it
 // into the trigger column — the "open a console" path from the UI.
-func (m *Manager) StartSessionForCard(cardID string) (*Session, error) {
+func (m *Manager) StartSessionForCard(cardID, repoName string) (*Session, error) {
 	if m.reader == nil {
 		return nil, fmt.Errorf("чтение карточек недоступно")
 	}
@@ -253,7 +258,7 @@ func (m *Manager) StartSessionForCard(cardID string) (*Session, error) {
 	if err != nil {
 		return nil, fmt.Errorf("не удалось прочитать карточку: %w", err)
 	}
-	s, err := m.startSession(ev, true)
+	s, err := m.startSession(ev, true, repoName)
 	if err != nil {
 		return nil, err
 	}
