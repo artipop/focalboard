@@ -39,8 +39,23 @@ export interface IAppWindow extends Window {
                 SetAgentSystemPrompt(text: string): Promise<void>
                 GetCardSessions(cardId: string): Promise<string>
                 CancelSession(cardId: string): Promise<boolean>
+                StartCardSession(cardId: string, repoName: string): Promise<string>
+                PromptSession(sessionId: string, text: string): Promise<void>
+                AnswerPermission(sessionId: string, requestId: string, optionId: string): Promise<void>
+                AnswerQuestion(sessionId: string, requestId: string, text: string): Promise<void>
+                StartPlanningSession(repoName: string, agentName: string): Promise<string>
+                ComposeTask(sessionId: string): Promise<string>
+                AttachSession(sessionId: string): Promise<boolean>
+                DetachSession(sessionId: string): Promise<void>
+                CloseSession(sessionId: string): Promise<void>
             }
         }
+    }
+
+    // Wails event bus, injected alongside the bindings. Present only in the
+    // desktop app; feature-detect before use.
+    runtime?: {
+        EventsOn(event: string, callback: (...data: any[]) => void): () => void
     }
     webkit?: {messageHandlers: {nativeApp?: {postMessage: <T>(message: T) => void}}}
     openPricingModal?: () => (telemetry: TelemetryProps) => void

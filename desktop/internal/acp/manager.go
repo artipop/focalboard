@@ -12,6 +12,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+
+	"github.com/mattermost/focalboard/desktop/internal/acp/claudebridge"
 )
 
 // Manager owns all agent sessions: it consumes board events, enforces limits
@@ -22,18 +24,33 @@ type Manager struct {
 	cfgPath string       // where registry edits are persisted; empty in tests
 	store   *Store
 	writer  BoardWriter
+	reader  BoardReader // optional; enables opening a console on a card
 	ui      UIEmitter
 	log     *slog.Logger
+	tr      *Tracer
 
 	mu     sync.Mutex
 	active map[string]*Session // session ID → session
 	byCard map[string]*Session // card ID → live (non-terminal) session
+
+	permMu sync.Mutex
+	perms  map[string]pendingPermission // request ID → prompt awaiting a human
 
 	sem     chan struct{}
 	rootCtx context.Context
 	stop    context.CancelFunc
 	wg      sync.WaitGroup
 }
+
+// pendingPermission is one permission prompt waiting for a human decision.
+type pendingPermission struct {
+	sessionID string
+	answer    chan string // receives the chosen option id
+}
+
+// SetBoardReader supplies on-demand card reads, which the "open a console on
+// this card" path needs. Optional: without it, sessions start only on a move.
+func (m *Manager) SetBoardReader(r BoardReader) { m.reader = r }
 
 // NewManager wires the manager. cfgPath is where repo-registry edits are
 // persisted (may be empty in tests). Call Start to begin consuming events.
@@ -45,6 +62,10 @@ func NewManager(cfg Config, cfgPath string, st *Store, w BoardWriter, ui UIEmitt
 	if maxConc <= 0 {
 		maxConc = 1
 	}
+	tr := newTracer(cfg, log)
+	if tr.Enabled() {
+		ui = &tracingEmitter{inner: ui, tr: tr}
+	}
 	return &Manager{
 		cfg:     cfg,
 		cfgPath: cfgPath,
@@ -52,8 +73,10 @@ func NewManager(cfg Config, cfgPath string, st *Store, w BoardWriter, ui UIEmitt
 		writer:  w,
 		ui:      ui,
 		log:     log,
+		tr:      tr,
 		active:  make(map[string]*Session),
 		byCard:  make(map[string]*Session),
+		perms:   make(map[string]pendingPermission),
 		sem:     make(chan struct{}, maxConc),
 	}
 }
@@ -94,14 +117,25 @@ func (m *Manager) recover() {
 			m.log.Warn("acp: recovery update failed", "session", r.ID, "err", err)
 			continue
 		}
-		m.commentCard(r.CardID, "⚠️ Сессия агента была прервана перезапуском приложения.")
+		m.commentCard(r.CardID, "Сессия агента была прервана перезапуском приложения.")
 	}
 }
 
 // StartSessionForEvent creates and launches a session for a validated trigger
 // event. Callers must have passed idempotency/liveness checks.
 func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
+	return m.startSession(ev, false, "")
+}
+
+// startSession is the shared launch path. An interactive session survives its
+// turns and waits for the user; a triggered one runs the card task and ends.
+func (m *Manager) startSession(ev CardMoved, interactive bool, repoName string) (*Session, error) {
 	repoPath, err := m.resolveRepo(ev)
+	if repoName != "" {
+		// An explicit choice wins: the console offers one exactly when the card
+		// itself does not say which repository it is about.
+		repoPath, err = m.resolveNamedRepo(repoName)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -119,14 +153,16 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 		m.mu.Lock()
 		var busyCard string
 		for _, other := range m.active {
-			if other.RepoPath == repoPath {
+			// A planning session only reads, so it neither claims the working
+			// copy nor keeps a card's session out of it.
+			if other.RepoPath == repoPath && !other.Planning {
 				busyCard = other.CardID
 				break
 			}
 		}
 		m.mu.Unlock()
 		if busyCard != "" {
-			return nil, fmt.Errorf("в репозитории %s уже работает сессия другой карточки (%s) — дождитесь её завершения", repoPath, busyCard)
+			return nil, fmt.Errorf("в репозитории %s уже работает сессия другой карточки (%s) — дождитесь её завершения или закройте её консоль", repoPath, busyCard)
 		}
 	}
 
@@ -134,16 +170,23 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 	systemPrompt := m.cfg.SystemPrompt
 	m.cfgMu.RUnlock()
 	s := &Session{
-		ID:         uuid.NewString(),
-		CardID:     ev.CardID,
-		BoardID:    ev.BoardID,
-		RepoPath:   repoPath,
-		BaseBranch: ev.Props["branch"],
-		Agent:      agent,
-		Net:        net,
-		PromptText: composePrompt(ev, agent, systemPrompt, m.cfg.UseWorktrees()),
-		status:     StatusQueued,
-		allowTools: make(map[string]bool),
+		ID:          uuid.NewString(),
+		CardID:      ev.CardID,
+		BoardID:     ev.BoardID,
+		RepoPath:    repoPath,
+		BaseBranch:  ev.Props["branch"],
+		Agent:       agent,
+		Net:         net,
+		PromptText:  composePrompt(ev, agent, systemPrompt, m.cfg.UseWorktrees()),
+		Policy:      agentPolicy(agent),
+		status:      StatusQueued,
+		allowTools:  make(map[string]bool),
+		interactive: interactive,
+		turns:       make(chan turnRequest, 1),
+		closeCh:     make(chan struct{}),
+	}
+	if interactive {
+		s.attached = 1
 	}
 	rec := SessionRecord{
 		ID:        s.ID,
@@ -168,7 +211,9 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 	return s, nil
 }
 
-// CancelSessionForCard cancels the live session of a card, if any.
+// CancelSessionForCard cancels the live session of a card, if any. An
+// interactive session goes back to idle and keeps its conversation; a
+// card-triggered one ends.
 func (m *Manager) CancelSessionForCard(cardID, reason string) bool {
 	m.mu.Lock()
 	s := m.byCard[cardID]
@@ -179,15 +224,356 @@ func (m *Manager) CancelSessionForCard(cardID, reason string) bool {
 	m.log.Info("acp: cancelling session", "session", s.ID, "card", cardID, "reason", reason)
 	s.mu.Lock()
 	s.cancelSent = true
-	cancel := s.cancel
+	cancel := s.turnCancel
+	running := s.status == StatusRunning || s.status == StatusWaitingPermission
 	s.mu.Unlock()
-	if cancel != nil {
+	if cancel != nil && running {
 		cancel()
-	} else {
-		// Still queued: mark terminal right away; runSession will observe.
+	} else if !s.isInteractive() {
+		// Queued, or idle and nobody is talking to it: end it outright.
 		m.finishSession(s, StatusCancelled, reason)
+		s.requestClose()
 	}
 	return true
+}
+
+// StartSessionForCard opens an interactive session on a card without moving it
+// into the trigger column — the "open a console" path from the UI.
+func (m *Manager) StartSessionForCard(cardID, repoName string) (*Session, error) {
+	if m.reader == nil {
+		return nil, fmt.Errorf("чтение карточек недоступно")
+	}
+	m.mu.Lock()
+	live := m.byCard[cardID]
+	m.mu.Unlock()
+	if live != nil {
+		live.attach()
+		m.emitSession(live, "")
+		return live, nil
+	}
+
+	ctx, cancel := context.WithTimeout(m.rootCtx, 10*time.Second)
+	defer cancel()
+	ev, err := m.reader.CardByID(ctx, cardID)
+	if err != nil {
+		return nil, fmt.Errorf("не удалось прочитать карточку: %w", err)
+	}
+	s, err := m.startSession(ev, true, repoName)
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
+}
+
+// StartPlanningSession opens a card-less session for talking a task through
+// before it exists. An empty repoName plans without one — useful when the task
+// is not about existing code yet; agentName may be empty when the agent
+// registry holds exactly one entry.
+func (m *Manager) StartPlanningSession(repoName, agentName string) (*Session, error) {
+	repo, err := m.planningRepo(repoName)
+	if err != nil {
+		return nil, err
+	}
+	agent, err := m.planningAgent(agentName)
+	if err != nil {
+		return nil, err
+	}
+	// Without a repository the agent still needs somewhere to run; a scratch
+	// directory keeps it away from anything of the user's.
+	scratch := ""
+	if repo.Path == "" {
+		if scratch, err = os.MkdirTemp("", "focalboard-planning-*"); err != nil {
+			return nil, fmt.Errorf("не удалось создать каталог для сессии: %w", err)
+		}
+	}
+	net, err := m.resolveNetwork(agent)
+	if err != nil {
+		return nil, err
+	}
+
+	m.cfgMu.RLock()
+	systemPrompt := m.cfg.SystemPrompt
+	m.cfgMu.RUnlock()
+
+	s := &Session{
+		ID:          uuid.NewString(),
+		RepoPath:    firstNonEmpty(repo.Path, scratch),
+		Agent:       agent,
+		Net:         net,
+		PromptText:  planningPrompt(systemPrompt, agent, repo),
+		Planning:    true,
+		scratchDir:  scratch,
+		Policy:      m.cfg.PlanningPolicy(),
+		status:      StatusQueued,
+		allowTools:  make(map[string]bool),
+		interactive: true,
+		attached:    1,
+		turns:       make(chan turnRequest, 1),
+		closeCh:     make(chan struct{}),
+	}
+	rec := SessionRecord{
+		ID:        s.ID,
+		AgentKind: agent.Kind,
+		Status:    StatusQueued,
+		StartedAt: time.Now(),
+	}
+	if err := m.store.InsertSession(rec); err != nil {
+		return nil, fmt.Errorf("persist session: %w", err)
+	}
+
+	m.mu.Lock()
+	m.active[s.ID] = s
+	m.mu.Unlock()
+	m.emitSession(s, "")
+	m.log.Info("acp: planning session started", "session", s.ID, "repo", repo.Path, "agent", agent.Name)
+
+	m.wg.Add(1)
+	go m.runSession(s)
+	return s, nil
+}
+
+// planningRepo picks the registry entry to plan against. An empty name means
+// planning without a repository, which is a valid choice rather than a default:
+// the dialog preselects a lone entry, so nothing here has to guess.
+func (m *Manager) planningRepo(name string) (RepoEntry, error) {
+	if name == "" {
+		return RepoEntry{}, nil
+	}
+	for _, r := range m.Repos() {
+		if strings.EqualFold(r.Name, name) {
+			return r, nil
+		}
+	}
+	return RepoEntry{}, fmt.Errorf("репозиторий %q не найден в реестре", name)
+}
+
+// planningAgent picks the registry entry that will do the planning.
+func (m *Manager) planningAgent(name string) (AgentEntry, error) {
+	agents := m.Agents()
+	if len(agents) == 0 {
+		return AgentEntry{}, fmt.Errorf("не зарегистрировано ни одного агента (меню доски → Agents)")
+	}
+	if name == "" {
+		if len(agents) > 1 {
+			return AgentEntry{}, fmt.Errorf("укажи агента: зарегистрировано несколько")
+		}
+		return agents[0], nil
+	}
+	for _, a := range agents {
+		if strings.EqualFold(a.Name, name) {
+			return a, nil
+		}
+	}
+	return AgentEntry{}, fmt.Errorf("агент %q не найден в реестре", name)
+}
+
+// composeTaskPrompt asks for the conversation to be boiled down to a card. The
+// shape is fixed because the UI splits the answer on the first line.
+const composeTaskPrompt = `Оформи то, о чём мы договорились, как задачу для трекера.
+Ответь ровно в таком виде, без markdown-заголовков и без вступления:
+первая строка — краткий заголовок задачи (до 80 символов),
+далее с новой строки — описание: что нужно сделать, где в коде и как проверить.`
+
+// ComposeTask runs one more turn asking the agent to boil the conversation down
+// to a task, and returns its answer: first line the title, the rest the body.
+func (m *Manager) ComposeTask(sessionID string) (string, error) {
+	s := m.session(sessionID)
+	if s == nil {
+		return "", fmt.Errorf("сессия %s не активна", sessionID)
+	}
+	req := turnRequest{text: composeTaskPrompt, done: make(chan turnOutcome, 1)}
+	select {
+	case s.turns <- req:
+	case <-s.closeCh:
+		return "", fmt.Errorf("сессия закрывается")
+	default:
+		return "", fmt.Errorf("агент ещё занят предыдущим сообщением")
+	}
+
+	s.appendEvent(m, "prompt", map[string]any{"text": composeTaskPrompt})
+	m.ui.Emit(EventPrompt, map[string]any{
+		"sessionId": s.ID, "cardId": s.CardID, "text": composeTaskPrompt,
+	})
+
+	select {
+	case out := <-req.done:
+		if out.err != nil {
+			return "", out.err
+		}
+		if strings.TrimSpace(out.text) == "" {
+			return "", fmt.Errorf("агент вернул пустой ответ")
+		}
+		return out.text, nil
+	case <-m.rootCtx.Done():
+		return "", fmt.Errorf("приложение завершается")
+	}
+}
+
+// PromptSession queues a follow-up message onto a live session.
+func (m *Manager) PromptSession(sessionID, text string) error {
+	m.tr.Event(sessionID, TraceFromUI, "PromptSession", map[string]any{"text": text})
+	if strings.TrimSpace(text) == "" {
+		return fmt.Errorf("пустое сообщение")
+	}
+	s := m.session(sessionID)
+	if s == nil {
+		return fmt.Errorf("сессия %s не активна", sessionID)
+	}
+	// Typing into a session is what makes it interactive. It must not claim a
+	// console slot: the console attached when it opened, and an unpaired
+	// increment here would keep the session alive after that console left.
+	s.markInteractive()
+	s.appendEvent(m, "prompt", map[string]any{"text": text})
+	m.ui.Emit(EventPrompt, map[string]any{
+		"sessionId": s.ID, "cardId": s.CardID, "text": text,
+	})
+
+	// The queue holds one message, so typing while the agent is still working
+	// is fine: the turn loop picks it up as soon as it goes idle.
+	req := turnRequest{text: text, done: make(chan turnOutcome, 1)}
+	select {
+	case s.turns <- req:
+		return nil
+	case <-s.closeCh:
+		return fmt.Errorf("сессия закрывается")
+	default:
+		return fmt.Errorf("предыдущее сообщение ещё не взято в работу")
+	}
+}
+
+// AttachSession marks a console as watching the session, which keeps it alive
+// between turns instead of finishing after the card task.
+func (m *Manager) AttachSession(sessionID string) bool {
+	m.tr.Event(sessionID, TraceFromUI, "AttachSession", nil)
+	s := m.session(sessionID)
+	if s == nil {
+		m.log.Info("acp: console asked to attach to a session that is no longer live", "session", sessionID)
+		return false
+	}
+	s.attach()
+	m.log.Info("acp: console attached", "session", s.ID, "card", s.CardID)
+	m.emitSession(s, "")
+	return true
+}
+
+// DetachSession drops a console. The last one leaving ends an idle session so
+// it stops holding its repository.
+func (m *Manager) DetachSession(sessionID string) {
+	m.tr.Event(sessionID, TraceFromUI, "DetachSession", nil)
+	s := m.session(sessionID)
+	if s == nil {
+		return
+	}
+	if s.detach() && s.Status() == StatusIdle {
+		s.requestClose()
+	}
+}
+
+// CloseSession ends a session after its current turn.
+func (m *Manager) CloseSession(sessionID string) error {
+	m.tr.Event(sessionID, TraceFromUI, "CloseSession", nil)
+	s := m.session(sessionID)
+	if s == nil {
+		return fmt.Errorf("сессия %s не активна", sessionID)
+	}
+	s.requestClose()
+	return nil
+}
+
+// session looks up a live session by id.
+func (m *Manager) session(sessionID string) *Session {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.active[sessionID]
+}
+
+// ---- permission prompts ----
+
+// registerPermission opens a slot for a human decision and returns the channel
+// the answer arrives on.
+func (m *Manager) registerPermission(requestID, sessionID string) chan string {
+	ch := make(chan string, 1)
+	m.permMu.Lock()
+	m.perms[requestID] = pendingPermission{sessionID: sessionID, answer: ch}
+	m.permMu.Unlock()
+	return ch
+}
+
+func (m *Manager) forgetPermission(requestID string) {
+	m.permMu.Lock()
+	delete(m.perms, requestID)
+	m.permMu.Unlock()
+}
+
+// askUser shows the agent's questions on the console and waits for answers. It
+// fails rather than blocks when nobody is watching: an unattended session must
+// not sit on a question for the whole permission timeout.
+func (m *Manager) askUser(ctx context.Context, s *Session, questions []claudebridge.Question) (string, error) {
+	if !s.hasConsole() {
+		m.tr.Event(s.ID, TraceApp, "question_refused", map[string]any{"reason": "no console attached"})
+		return "", fmt.Errorf("консоль не открыта")
+	}
+	requestID := uuid.NewString()
+	answer := m.registerPermission(requestID, s.ID)
+	defer m.forgetPermission(requestID)
+
+	payload := map[string]any{
+		"sessionId": s.ID,
+		"cardId":    s.CardID,
+		"requestId": requestID,
+		"questions": questions,
+	}
+	s.appendEvent(m, "question", payload)
+	m.setStatus(s, StatusWaitingPermission)
+	m.ui.Emit(EventQuestion, payload)
+	defer m.setStatus(s, StatusRunning)
+
+	timeout := time.NewTimer(m.cfg.PermissionTimeout())
+	defer timeout.Stop()
+
+	select {
+	case answers := <-answer:
+		s.appendEvent(m, "answer", map[string]any{"requestId": requestID, "text": answers})
+		m.ui.Emit(EventAnswer, map[string]any{
+			"sessionId": s.ID, "cardId": s.CardID, "requestId": requestID, "text": answers,
+		})
+		return answers, nil
+	case <-timeout.C:
+		m.tr.Event(s.ID, TraceApp, "question_timeout", map[string]any{"requestId": requestID, "after": m.cfg.PermissionTimeout().String()})
+		return "", fmt.Errorf("пользователь не ответил за %s", m.cfg.PermissionTimeout())
+	case <-ctx.Done():
+		return "", ctx.Err()
+	}
+}
+
+// AnswerQuestion delivers the user's answers to a pending question. The text is
+// what the model will read, so the UI composes it from the picker.
+func (m *Manager) AnswerQuestion(sessionID, requestID, answers string) error {
+	m.tr.Event(sessionID, TraceFromUI, "AnswerQuestion", map[string]any{"requestId": requestID, "text": answers})
+	if strings.TrimSpace(answers) == "" {
+		return fmt.Errorf("пустой ответ")
+	}
+	return m.AnswerPermission(sessionID, requestID, answers)
+}
+
+// AnswerPermission delivers the user's choice for a pending permission prompt.
+func (m *Manager) AnswerPermission(sessionID, requestID, optionID string) error {
+	m.tr.Event(sessionID, TraceFromUI, "AnswerPermission", map[string]any{"requestId": requestID, "optionId": optionID})
+	m.permMu.Lock()
+	p, ok := m.perms[requestID]
+	m.permMu.Unlock()
+	if !ok || p.sessionID != sessionID {
+		// The common shape of "I answered and nothing happened": the prompt had
+		// already been resolved, most often by the permission timeout.
+		m.tr.Event(sessionID, TraceApp, "answer_unmatched", map[string]any{"requestId": requestID})
+		return fmt.Errorf("запрос разрешения %s больше не ждёт ответа", requestID)
+	}
+	select {
+	case p.answer <- optionID:
+		return nil
+	default:
+		return fmt.Errorf("на запрос разрешения %s уже ответили", requestID)
+	}
 }
 
 // CardSessions returns persisted sessions and events for a card (UI hydration).
@@ -213,6 +599,7 @@ func (m *Manager) Shutdown(grace time.Duration) {
 	if m.store != nil {
 		_ = m.store.Close()
 	}
+	m.tr.Close()
 }
 
 // ---- internals ----
@@ -240,6 +627,19 @@ func (m *Manager) releaseSession(s *Session) {
 	m.mu.Unlock()
 }
 
+// setStatus moves a live (non-terminal) session between running states, e.g.
+// in and out of a permission prompt. Terminal sessions are left alone.
+func (m *Manager) setStatus(s *Session, status SessionStatus) {
+	s.mu.Lock()
+	if s.status.Terminal() {
+		s.mu.Unlock()
+		return
+	}
+	s.status = status
+	s.mu.Unlock()
+	m.persistStatus(s, status, "")
+}
+
 func (m *Manager) persistStatus(s *Session, status SessionStatus, errText string) {
 	if err := m.store.SetSessionStatus(s.ID, status, errText); err != nil {
 		m.log.Warn("acp: failed to persist status", "session", s.ID, "status", status, "err", err)
@@ -248,11 +648,16 @@ func (m *Manager) persistStatus(s *Session, status SessionStatus, errText string
 }
 
 func (m *Manager) emitSession(s *Session, errText string) {
+	s.mu.Lock()
+	status, interactive, turn := s.status, s.interactive, s.turnNo
+	s.mu.Unlock()
 	m.ui.Emit(EventSession, map[string]any{
-		"sessionId": s.ID,
-		"cardId":    s.CardID,
-		"status":    string(s.Status()),
-		"error":     errText,
+		"sessionId":   s.ID,
+		"cardId":      s.CardID,
+		"status":      string(status),
+		"error":       errText,
+		"interactive": interactive,
+		"turn":        turn,
 	})
 }
 
@@ -261,6 +666,9 @@ func (m *Manager) comment(s *Session, text string) {
 }
 
 func (m *Manager) commentCard(cardID, text string) {
+	if cardID == "" {
+		return // a planning session has no card to report to
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := m.writer.AddComment(ctx, cardID, text); err != nil {
@@ -367,6 +775,32 @@ func resolveArgv0(argv []string) []string {
 		out[0] = p
 	}
 	return out
+}
+
+// planningPrompt opens a planning conversation: the board/agent system prompts,
+// then what this session is for. It is deliberately explicit that nothing is to
+// be changed — the tool policy enforces it, but the agent should not try.
+func planningPrompt(systemPrompt string, agent AgentEntry, repo RepoEntry) string {
+	var b []byte
+	if p := strings.TrimSpace(systemPrompt); p != "" {
+		b = fmt.Appendf(b, "%s\n\n", p)
+	}
+	if p := strings.TrimSpace(agent.Prompt); p != "" {
+		b = fmt.Appendf(b, "%s\n\n", p)
+	}
+	if repo.Path == "" {
+		b = fmt.Appendf(b, "Мы планируем новую задачу. Репозиторий не выбран, кода под рукой нет — ")
+		b = fmt.Appendf(b, "опирайся на то, что расскажет пользователь, и не пытайся ничего искать в файлах.\n\n")
+		b = fmt.Appendf(b, "Начни с короткого вопроса о том, что нужно сделать.")
+		return string(b)
+	}
+	b = fmt.Appendf(b, "Мы планируем новую задачу по репозиторию `%s` (%s).\n", repo.Name, repo.Path)
+	b = fmt.Appendf(b, "Код у тебя есть — читай файлы, ищи по ним, смотри историю git: ")
+	b = fmt.Appendf(b, "чтение и безопасные команды осмотра разрешены, опирайся на код, а не на догадки.\n")
+	b = fmt.Appendf(b, "Не меняй ничего: ни файлов, ни состояния. Это обсуждение, а не выполнение. ")
+	b = fmt.Appendf(b, "Если для ответа всё же нужна команда, меняющая состояние, — попроси, у пользователя спросят подтверждение.\n\n")
+	b = fmt.Appendf(b, "Начни с короткого вопроса о том, что нужно сделать.")
+	return string(b)
 }
 
 // composePrompt builds the agent task text from the card. The final prompt is

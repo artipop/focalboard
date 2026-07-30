@@ -58,6 +58,24 @@ Observed against the codex CLI installed on this machine. Sample captures:
 {"type":"item.completed","item":{"id":"item_1","type":"agent_message","text":"`sample.txt` contains 2 lines."}}
 ```
 
+## Resuming a thread (multi-turn)
+
+`codex exec` is one turn per process, so a second turn must resume the thread
+explicitly. Verified against codex-cli 0.145.0 with
+`acpspike -mode multiturn -agent codex`:
+
+```
+codex exec resume <thread_id> --json --skip-git-repo-check [-m <model>] <prompt>
+```
+
+- `<thread_id>` is the `thread_id` of the `thread.started` event of the first turn;
+  the resumed turn re-emits `thread.started` with the same id.
+- **`exec resume` rejects `-C`** (`error: unexpected argument '-C' found`) — set the
+  working directory on the process itself (`procgroup.Spawn`'s cwd), not via a flag.
+- Context is retained: the "remember 4271" / "what number" probe answered correctly.
+- `--last` resumes the newest recorded session instead of naming an id; unused here,
+  since sessions are addressed explicitly.
+
 ## Not yet handled / future work
 
 - No incremental text deltas: codex emits whole `agent_message` text on

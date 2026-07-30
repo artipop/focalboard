@@ -45,6 +45,13 @@ type BoardWriter interface {
 	MoveCard(ctx context.Context, cardID, optionID string) error
 }
 
+// BoardReader reads a card on demand, so a session can be opened from the UI
+// without waiting for the card to be moved into the trigger column. The
+// returned event carries no columns — nothing was moved.
+type BoardReader interface {
+	CardByID(ctx context.Context, cardID string) (CardMoved, error)
+}
+
 // UIEmitter pushes events to the desktop UI. Implementations must be safe to
 // call before the UI is ready (drop and log).
 type UIEmitter interface {
@@ -55,8 +62,11 @@ type UIEmitter interface {
 type SessionStatus string
 
 const (
-	StatusQueued            SessionStatus = "queued"
-	StatusRunning           SessionStatus = "running"
+	StatusQueued  SessionStatus = "queued"
+	StatusRunning SessionStatus = "running"
+	// StatusIdle is a live interactive session between turns: the agent
+	// connection is up and waiting for the next user message.
+	StatusIdle              SessionStatus = "idle"
 	StatusWaitingPermission SessionStatus = "waiting_permission"
 	StatusDone              SessionStatus = "done"
 	StatusFailed            SessionStatus = "failed"
@@ -74,4 +84,11 @@ const (
 	EventChunk      = "acp:chunk"
 	EventTool       = "acp:tool"
 	EventPermission = "acp:permission"
+	// EventPrompt echoes a user turn back to every attached console, so a
+	// second console shows what was typed into the first one.
+	EventPrompt = "acp:prompt"
+	// EventQuestion carries the agent's own questions to the console, which
+	// renders them as a picker; EventAnswer reports what was chosen.
+	EventQuestion = "acp:question"
+	EventAnswer   = "acp:answer"
 )

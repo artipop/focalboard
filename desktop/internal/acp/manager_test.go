@@ -2,6 +2,9 @@ package acp
 
 import (
 	"context"
+	"encoding/json"
+	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,6 +12,11 @@ import (
 	"testing"
 	"time"
 )
+
+// testLogger keeps test output quiet unless something goes wrong.
+func testLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
 
 // fakeWriter records board writes.
 type fakeWriter struct {
@@ -33,16 +41,63 @@ func (w *fakeWriter) cardComments(cardID string) []string {
 	return append([]string(nil), w.comments[cardID]...)
 }
 
-// fakeEmitter records UI events.
+// fakeEmitter records UI events with their payloads.
 type fakeEmitter struct {
-	mu     sync.Mutex
-	events []string
+	mu       sync.Mutex
+	events   []string
+	payloads []map[string]any
 }
 
 func (e *fakeEmitter) Emit(event string, payload any) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	e.events = append(e.events, event)
+	p, _ := payload.(map[string]any)
+	e.payloads = append(e.payloads, p)
+}
+
+// pendingPermissionID returns the request id of the permission prompt the UI
+// was asked to answer, or "" while none is waiting.
+func (e *fakeEmitter) pendingPermissionID() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for i, name := range e.events {
+		if name != EventPermission {
+			continue
+		}
+		p := e.payloads[i]
+		if p == nil || p["pending"] != true {
+			continue
+		}
+		if id, ok := p["requestId"].(string); ok {
+			return id
+		}
+	}
+	return ""
+}
+
+// pendingQuestionID returns the request id of a question awaiting an answer.
+func (e *fakeEmitter) pendingQuestionID() string {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for i, name := range e.events {
+		if name != EventQuestion {
+			continue
+		}
+		if id, ok := e.payloads[i]["requestId"].(string); ok {
+			return id
+		}
+	}
+	return ""
+}
+
+// fakeReader serves one card to the "open a console" path.
+type fakeReader struct{ ev CardMoved }
+
+func (r *fakeReader) CardByID(ctx context.Context, cardID string) (CardMoved, error) {
+	ev := r.ev
+	ev.CardID = cardID
+	return ev, nil
 }
 
 // fakeEvents is a manual BoardEvents feed.
@@ -77,6 +132,12 @@ sleep 300
 
 func testManager(t *testing.T, claudeScript string, mutate func(*Config)) (*Manager, *fakeWriter, *fakeEvents, string) {
 	t.Helper()
+	m, w, ev, repo, _ := testManagerWithEmitter(t, claudeScript, mutate)
+	return m, w, ev, repo
+}
+
+func testManagerWithEmitter(t *testing.T, claudeScript string, mutate func(*Config)) (*Manager, *fakeWriter, *fakeEvents, string, *fakeEmitter) {
+	t.Helper()
 	repo := initTestRepo(t)
 	dir := t.TempDir()
 	cfg := DefaultConfig(dir)
@@ -93,12 +154,19 @@ func testManager(t *testing.T, claudeScript string, mutate func(*Config)) (*Mana
 	}
 	writer := newFakeWriter()
 	events := &fakeEvents{ch: make(chan CardMoved, 16)}
-	m := NewManager(cfg, "", st, writer, &fakeEmitter{}, nil)
+	emitter := &fakeEmitter{}
+	m := NewManager(cfg, "", st, writer, emitter, nil)
+	m.SetBoardReader(&fakeReader{ev: CardMoved{
+		BoardID: "board1",
+		Title:   "Test task",
+		Body:    "Do nothing useful.",
+		Props:   map[string]string{"repo_path": repo},
+	}})
 	if err := m.Start(context.Background(), events); err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { m.Shutdown(3 * time.Second) })
-	return m, writer, events, repo
+	return m, writer, events, repo, emitter
 }
 
 func moveEvent(cardID, repo, from, to string) CardMoved {
@@ -312,5 +380,494 @@ func TestFindClaudeErrorIsClear(t *testing.T) {
 	m := NewManager(cfg, "", nil, newFakeWriter(), &fakeEmitter{}, nil)
 	if _, err := m.findClaude(); err == nil || !strings.Contains(err.Error(), "claudePath") {
 		t.Errorf("expected clear claudePath error, got %v", err)
+	}
+}
+
+// fakeClaudeMultiTurn stays alive across turns the way the real CLI does,
+// answering every user message it reads with one text delta and a result.
+const fakeClaudeMultiTurn = `#!/bin/sh
+turn=0
+while read line; do
+  turn=$((turn+1))
+  printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-multi"}'
+  printf '{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"turn %s done"}}}\n' "$turn"
+  printf '{"type":"result","is_error":false,"result":"turn %s done"}\n' "$turn"
+done
+`
+
+// fakeClaudeAsksPermission requests a tool that is not on autoAllowTools, then waits
+// for the control_response before finishing the turn.
+const fakeClaudeAsksPermission = `#!/bin/sh
+read line
+printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-perm"}'
+printf '%s\n' '{"type":"control_request","request_id":"r1","request":{"subtype":"can_use_tool","tool_name":"WebFetch","tool_use_id":"tu1","description":"fetch https://example.com","input":{}}}'
+read response
+printf '%s\n' '{"type":"result","is_error":false,"result":"finished"}'
+`
+
+func liveSession(t *testing.T, m *Manager, cardID string) *Session {
+	t.Helper()
+	s, err := m.StartSessionForCard(cardID, "")
+	if err != nil {
+		t.Fatalf("open console session: %v", err)
+	}
+	return s
+}
+
+func waitStatus(t *testing.T, s *Session, want SessionStatus) {
+	t.Helper()
+	waitFor(t, 15*time.Second, "session status "+string(want), func() bool {
+		return s.Status() == want
+	})
+}
+
+func TestConsoleSessionRunsSecondTurn(t *testing.T) {
+	m, writer, _, _, _ := testManagerWithEmitter(t, fakeClaudeMultiTurn, nil)
+
+	s := liveSession(t, m, "cardConsole")
+
+	// A console session parks between turns instead of finishing.
+	waitStatus(t, s, StatusIdle)
+	if got := writer.cardComments("cardConsole"); len(got) < 2 || !strings.Contains(got[len(got)-1], "turn 1 done") {
+		t.Fatalf("first turn should still report to the card, got %v", got)
+	}
+
+	if err := m.PromptSession(s.ID, "keep going"); err != nil {
+		t.Fatalf("prompt: %v", err)
+	}
+	waitFor(t, 15*time.Second, "second turn to run", func() bool {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return s.turnNo >= 2
+	})
+	waitStatus(t, s, StatusIdle)
+
+	// Only the first turn comments; the rest belongs to the console.
+	if got := writer.cardComments("cardConsole"); strings.Contains(strings.Join(got, "\n"), "turn 2 done") {
+		t.Errorf("second turn should not comment on the card, got %v", got)
+	}
+
+	if err := m.CloseSession(s.ID); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	waitStatus(t, s, StatusDone)
+	if last := writer.cardComments("cardConsole"); !strings.Contains(last[len(last)-1], "ходов: 2") {
+		t.Errorf("closing comment should record the turn count, got %v", last)
+	}
+}
+
+func TestPermissionPromptAnsweredByUser(t *testing.T) {
+	m, _, _, _, emitter := testManagerWithEmitter(t, fakeClaudeAsksPermission, nil)
+
+	s := liveSession(t, m, "cardPerm")
+
+	// A watched session asks instead of rejecting by policy.
+	waitStatus(t, s, StatusWaitingPermission)
+	var requestID string
+	waitFor(t, 5*time.Second, "permission prompt on the console", func() bool {
+		requestID = emitter.pendingPermissionID()
+		return requestID != ""
+	})
+
+	if err := m.AnswerPermission(s.ID, requestID, "allow"); err != nil {
+		t.Fatalf("answer permission: %v", err)
+	}
+	waitStatus(t, s, StatusIdle)
+
+	// The slot is gone once answered.
+	if err := m.AnswerPermission(s.ID, requestID, "allow"); err == nil {
+		t.Error("answering the same prompt twice should fail")
+	}
+}
+
+func TestPermissionRejectedWithoutConsole(t *testing.T) {
+	m, _, events, repo, emitter := testManagerWithEmitter(t, fakeClaudeAsksPermission, nil)
+
+	// A card-triggered session has nobody watching: it must decide by policy
+	// straight away rather than block until the prompt times out.
+	events.ch <- moveEvent("cardAuto", repo, "opt-backlog", "opt-agent")
+	waitFor(t, 15*time.Second, "session done", func() bool {
+		sessions, _, err := m.store.SessionsForCard("cardAuto")
+		return err == nil && len(sessions) == 1 && sessions[0].Status == StatusDone
+	})
+	if id := emitter.pendingPermissionID(); id != "" {
+		t.Errorf("unattended session should not have prompted the user, got request %s", id)
+	}
+}
+
+func TestDetachEndsIdleSession(t *testing.T) {
+	m, _, _, _, _ := testManagerWithEmitter(t, fakeClaudeMultiTurn, nil)
+
+	s := liveSession(t, m, "cardDetach")
+	waitStatus(t, s, StatusIdle)
+
+	// The last console leaving must not leave the repository held.
+	m.DetachSession(s.ID)
+	waitStatus(t, s, StatusDone)
+}
+
+func TestIdleConsoleFreesConcurrencySlot(t *testing.T) {
+	m, _, events, repo, _ := testManagerWithEmitter(t, fakeClaudeMultiTurn, func(c *Config) {
+		c.MaxConcurrent = 1
+		c.WorktreeMode = "always" // otherwise the repo lock, not the slot, would block
+	})
+
+	s := liveSession(t, m, "cardIdle")
+	waitStatus(t, s, StatusIdle)
+
+	// The idle console holds no slot, so another card still runs.
+	events.ch <- moveEvent("cardOther", repo, "opt-backlog", "opt-agent")
+	waitFor(t, 15*time.Second, "second card to finish while a console idles", func() bool {
+		sessions, _, err := m.store.SessionsForCard("cardOther")
+		return err == nil && len(sessions) == 1 && sessions[0].Status == StatusDone
+	})
+	if s.Status() != StatusIdle {
+		t.Errorf("console session should still be idle, got %s", s.Status())
+	}
+}
+
+// fakeClaudeSlowPermission waits before asking, leaving a window for a console
+// to attach to an already-running session.
+const fakeClaudeSlowPermission = `#!/bin/sh
+read line
+printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-slow"}'
+sleep 1
+printf '%s\n' '{"type":"control_request","request_id":"r1","request":{"subtype":"can_use_tool","tool_name":"WebFetch","tool_use_id":"tu1","description":"fetch https://example.com","input":{}}}'
+read response
+printf '%s\n' '{"type":"result","is_error":false,"result":"finished"}'
+`
+
+// A card-triggered session starts unattended, so opening its card mid-run must
+// be enough to get the permission prompt instead of a policy rejection.
+func TestConsoleAttachedAfterTriggerGetsPrompt(t *testing.T) {
+	m, _, events, repo, emitter := testManagerWithEmitter(t, fakeClaudeSlowPermission, nil)
+
+	events.ch <- moveEvent("cardLate", repo, "opt-backlog", "opt-agent")
+
+	var s *Session
+	waitFor(t, 10*time.Second, "session to start", func() bool {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		s = m.byCard["cardLate"]
+		return s != nil
+	})
+	if !m.AttachSession(s.ID) {
+		t.Fatal("AttachSession refused a live session")
+	}
+
+	waitStatus(t, s, StatusWaitingPermission)
+	var requestID string
+	waitFor(t, 5*time.Second, "permission prompt on the console", func() bool {
+		requestID = emitter.pendingPermissionID()
+		return requestID != ""
+	})
+	if err := m.AnswerPermission(s.ID, requestID, "allow"); err != nil {
+		t.Fatalf("answer permission: %v", err)
+	}
+
+	// Attaching also turned it into a console session: it waits rather than ending.
+	waitStatus(t, s, StatusIdle)
+}
+
+// fakeClaudeSlowTurn keeps one turn running long enough to close the card
+// while the agent is still working.
+const fakeClaudeSlowTurn = `#!/bin/sh
+while read line; do
+  printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-slow-turn"}'
+  sleep 1
+  printf '%s\n' '{"type":"result","is_error":false,"result":"done"}'
+done
+`
+
+// Closing the card mid-turn detaches a console that cannot end the session yet,
+// because it is not idle. The session must still not park afterwards: it would
+// hold its repository for the whole idle timeout with nobody watching, and the
+// next card on that repo would be refused.
+func TestDetachDuringTurnDoesNotParkSession(t *testing.T) {
+	m, _, _, repo, _ := testManagerWithEmitter(t, fakeClaudeSlowTurn, nil)
+
+	s := liveSession(t, m, "cardBusy")
+	waitStatus(t, s, StatusRunning)
+	m.DetachSession(s.ID)
+
+	waitStatus(t, s, StatusDone)
+
+	// The repository is free again, so another card can take it.
+	waitFor(t, 5*time.Second, "repo to be released", func() bool {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		for _, other := range m.active {
+			if other.RepoPath == repo {
+				return false
+			}
+		}
+		return true
+	})
+}
+
+// Talking to a session must not claim a console slot: an unpaired increment
+// would keep it alive after the only console is gone.
+func TestPromptDoesNotLeakConsoleCount(t *testing.T) {
+	m, _, _, _, _ := testManagerWithEmitter(t, fakeClaudeMultiTurn, nil)
+
+	s := liveSession(t, m, "cardCount")
+	waitStatus(t, s, StatusIdle)
+
+	if err := m.PromptSession(s.ID, "again"); err != nil {
+		t.Fatalf("prompt: %v", err)
+	}
+	waitFor(t, 15*time.Second, "second turn", func() bool {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		return s.turnNo >= 2
+	})
+	waitStatus(t, s, StatusIdle)
+
+	// One console opened it, so one detach must be enough to end it.
+	m.DetachSession(s.ID)
+	waitStatus(t, s, StatusDone)
+}
+
+// fakeClaudeEcho answers every turn with a canned two-line "task", which is the
+// shape ComposeTask promises its caller.
+const fakeClaudeEcho = `#!/bin/sh
+while read line; do
+  printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-plan"}'
+  printf '%s\n' '{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Кэшировать список досок\nДобавить кеш в store и инвалидировать его на запись."}}}'
+  printf '%s\n' '{"type":"result","is_error":false,"result":"ok"}'
+done
+`
+
+// planningManager wires a manager whose registries hold one repo and one agent,
+// which is what a planning session resolves against.
+func planningManager(t *testing.T, script string) (*Manager, string) {
+	t.Helper()
+	m, _, _, repo, _ := testManagerWithEmitter(t, script, func(c *Config) {
+		c.Agents = []AgentEntry{{Name: "planner", Kind: AgentKindClaude}}
+	})
+	// The repo is created by the helper, so its path is only known now.
+	m.cfgMu.Lock()
+	m.cfg.Repos = []RepoEntry{{Name: "app", Path: repo}}
+	m.cfgMu.Unlock()
+	return m, repo
+}
+
+func TestPlanningSessionComposesTask(t *testing.T) {
+	m, _ := planningManager(t, fakeClaudeEcho)
+
+	s, err := m.StartPlanningSession("app", "planner")
+	if err != nil {
+		t.Fatalf("start planning session: %v", err)
+	}
+	if s.CardID != "" {
+		t.Errorf("a planning session must not be bound to a card, got %q", s.CardID)
+	}
+	waitStatus(t, s, StatusIdle)
+
+	text, err := m.ComposeTask(s.ID)
+	if err != nil {
+		t.Fatalf("compose task: %v", err)
+	}
+	title, _, found := strings.Cut(text, "\n")
+	if !found || !strings.Contains(title, "Кэшировать") {
+		t.Errorf("expected a title on the first line, got %q", text)
+	}
+	waitStatus(t, s, StatusIdle)
+}
+
+// Planning only reads, so it must not take the working copy away from cards.
+func TestPlanningSessionDoesNotHoldRepo(t *testing.T) {
+	m, repo := planningManager(t, fakeClaudeEcho)
+
+	s, err := m.StartPlanningSession("app", "planner")
+	if err != nil {
+		t.Fatalf("start planning session: %v", err)
+	}
+	waitStatus(t, s, StatusIdle)
+
+	if _, err := m.StartSessionForEvent(moveEvent("cardWhilePlanning", repo, "opt-backlog", "opt-agent")); err != nil {
+		t.Fatalf("a card session was refused while planning: %v", err)
+	}
+}
+
+// Whatever the global policy allows, planning is held to read-only tools.
+func TestPlanningSessionIsReadOnly(t *testing.T) {
+	m, _ := planningManager(t, fakeClaudeEcho)
+
+	s, err := m.StartPlanningSession("app", "planner")
+	if err != nil {
+		t.Fatalf("start planning session: %v", err)
+	}
+	for _, tool := range []string{"Read", "Grep", "Glob"} {
+		if !s.autoAllowed(tool, nil, m.cfg) {
+			t.Errorf("%s should run unasked while planning", tool)
+		}
+	}
+	// Looking around is allowed, changing things is not — even though the
+	// global policy permits both.
+	if !s.autoAllowed("Bash", bashInput("git status"), m.cfg) {
+		t.Error("planning should be able to inspect the repository with the shell")
+	}
+	for _, tool := range []string{"Write", "Edit"} {
+		if s.autoAllowed(tool, nil, m.cfg) {
+			t.Errorf("%s must not run unasked while planning", tool)
+		}
+		if !m.cfg.ToolAllowed(tool, nil) {
+			t.Errorf("test premise broken: %s should be on the global allow list", tool)
+		}
+	}
+	if s.autoAllowed("Bash", bashInput("rm -rf build"), m.cfg) {
+		t.Error("planning must ask before a destructive command")
+	}
+}
+
+func TestPlanningSessionNeedsAnAgent(t *testing.T) {
+	m, _, _, _, _ := testManagerWithEmitter(t, fakeClaudeEcho, nil)
+
+	// A repository is optional; an agent is not.
+	if _, err := m.StartPlanningSession("", ""); err == nil {
+		t.Fatal("expected an error when no agent is registered")
+	} else if !strings.Contains(err.Error(), "агент") {
+		t.Errorf("error should name the missing registry, got %v", err)
+	}
+}
+
+// Planning is useful before there is any code to point at, so a session must
+// start with no repository and run in a scratch directory of its own.
+func TestPlanningSessionWithoutRepository(t *testing.T) {
+	m, repo := planningManager(t, fakeClaudeEcho)
+
+	s, err := m.StartPlanningSession("", "planner")
+	if err != nil {
+		t.Fatalf("start repo-less planning session: %v", err)
+	}
+	if s.RepoPath == repo {
+		t.Fatal("session should not have picked the registered repository")
+	}
+	if s.scratchDir == "" || s.RepoPath != s.scratchDir {
+		t.Fatalf("expected a scratch working directory, got %q", s.RepoPath)
+	}
+	if _, err := os.Stat(s.scratchDir); err != nil {
+		t.Fatalf("scratch directory should exist while the session runs: %v", err)
+	}
+	waitStatus(t, s, StatusIdle)
+
+	// It goes away with the session rather than piling up in the temp dir.
+	if err := m.CloseSession(s.ID); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	waitStatus(t, s, StatusDone)
+	waitFor(t, 5*time.Second, "scratch dir to be removed", func() bool {
+		_, err := os.Stat(s.scratchDir)
+		return os.IsNotExist(err)
+	})
+}
+
+func TestPlanningSessionRejectsUnknownRepository(t *testing.T) {
+	m, _ := planningManager(t, fakeClaudeEcho)
+
+	if _, err := m.StartPlanningSession("nope", "planner"); err == nil {
+		t.Fatal("expected an error for a repository that is not registered")
+	}
+}
+
+// fakeClaudeAsksQuestion drives the AskUserQuestion path: the CLI announces the
+// tool as a can_use_tool control request, then reports whether the answer came
+// back to it — which is the whole point, since the answers travel in the deny
+// message of that same control response.
+const fakeClaudeAsksQuestion = `#!/bin/sh
+read line
+printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-ask"}'
+printf '%s\n' '{"type":"control_request","request_id":"q1","request":{"subtype":"can_use_tool","tool_name":"AskUserQuestion","tool_use_id":"tu1","input":{"questions":[{"question":"Что рефакторим?","header":"Цель","multiSelect":false,"options":[{"label":"Читаемость","description":"структура"},{"label":"Скорость","description":"перф"}]}]}}}'
+read response
+case "$response" in
+  *behavior*deny*Читаемость*) seen=ANSWER_REACHED_AGENT ;;
+  *) seen=NO_ANSWER ;;
+esac
+printf '{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"%s"}}}\n' "$seen"
+printf '%s\n' '{"type":"result","is_error":false,"result":"done"}'
+`
+
+// The agent's questions must reach the console and the answers must come back
+// to the model — the tool's own picker cannot render in stream-json mode.
+func TestQuestionReachesConsoleAndAnswersComeBack(t *testing.T) {
+	m, _, _, _, emitter := testManagerWithEmitter(t, fakeClaudeAsksQuestion, nil)
+
+	s := liveSession(t, m, "cardAsk")
+
+	waitStatus(t, s, StatusWaitingPermission)
+	var requestID string
+	waitFor(t, 5*time.Second, "question on the console", func() bool {
+		requestID = emitter.pendingQuestionID()
+		return requestID != ""
+	})
+
+	if err := m.AnswerQuestion(s.ID, requestID, "Цель: Читаемость"); err != nil {
+		t.Fatalf("answer question: %v", err)
+	}
+	waitStatus(t, s, StatusIdle)
+
+	// The fake reports back whether the answer actually arrived at the CLI.
+	if got := lastAgentText(t, m, s); !strings.Contains(got, "ANSWER_REACHED_AGENT") {
+		t.Errorf("the answer should have reached the agent, got %q", got)
+	}
+}
+
+// An unattended session must not sit on a question: nobody can answer it.
+func TestQuestionWithoutConsoleIsRefusedAtOnce(t *testing.T) {
+	m, _, events, repo, emitter := testManagerWithEmitter(t, fakeClaudeAsksQuestion, nil)
+
+	events.ch <- moveEvent("cardAskAuto", repo, "opt-backlog", "opt-agent")
+	waitFor(t, 15*time.Second, "session to finish", func() bool {
+		sessions, _, err := m.store.SessionsForCard("cardAskAuto")
+		return err == nil && len(sessions) == 1 && sessions[0].Status.Terminal()
+	})
+	if id := emitter.pendingQuestionID(); id != "" {
+		t.Errorf("an unattended session should not have asked, got request %s", id)
+	}
+}
+
+// lastAgentText returns what the agent finally said, as stored in the log.
+func lastAgentText(t *testing.T, m *Manager, s *Session) string {
+	t.Helper()
+	_, events, err := m.store.SessionsForCard(s.CardID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var b strings.Builder
+	for _, ev := range events {
+		if ev.Kind == "chunk" {
+			var p struct {
+				Text string `json:"text"`
+			}
+			_ = json.Unmarshal(ev.Payload, &p)
+			b.WriteString(p.Text)
+		}
+	}
+	return b.String()
+}
+
+// A card with no repository tag is exactly when someone wants to open a console
+// on it, so the choice can be supplied instead of failing.
+func TestConsoleCanNameTheRepository(t *testing.T) {
+	m, repo := planningManager(t, fakeClaudeMultiTurn)
+
+	// The fake card carries repo_path, so drop it to get an untagged card.
+	m.reader = &fakeReader{ev: CardMoved{BoardID: "board1", Title: "Untagged", Props: map[string]string{}}}
+
+	if _, err := m.StartSessionForCard("cardNoRepo", ""); err == nil {
+		t.Fatal("expected the untagged card to be refused without a choice")
+	}
+
+	s, err := m.StartSessionForCard("cardNoRepo", "app")
+	if err != nil {
+		t.Fatalf("naming the repository should start the session: %v", err)
+	}
+	if s.RepoPath != repo {
+		t.Errorf("session should run in the named repository, got %q", s.RepoPath)
+	}
+
+	if _, err := m.StartSessionForCard("cardOther", "nope"); err == nil {
+		t.Error("an unknown repository name should be refused")
 	}
 }

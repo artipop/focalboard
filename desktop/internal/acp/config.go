@@ -30,6 +30,12 @@ type AgentEntry struct {
 	Env     map[string]string `json:"env,omitempty"`     // per-process env (CODEX_HOME, OPENAI_API_KEY, …)
 	Args    []string          `json:"args,omitempty"`    // extra CLI args (sandbox/approval, etc.)
 
+	// AutoAllowTools overrides the global policy for this agent, so a trusted
+	// one can be let loose and a new one kept on a short leash without changing
+	// anything for the rest. Entries take the same form as autoAllowTools,
+	// including argument patterns such as "Bash(git *)".
+	AutoAllowTools []string `json:"autoAllowTools,omitempty"`
+
 	// Command is the launch argv. For the ACP-native kinds it is the whole
 	// agent command (required for "acp"). For claude/codex it replaces the
 	// binary the bridge builds its invocation on: the last element is the CLI
@@ -266,14 +272,24 @@ type Config struct {
 	// "auto" (escalate to a worktree when the repo is busy/dirty) may come later.
 	WorktreeMode string `json:"worktreeMode"`
 
-	MaxConcurrent            int      `json:"maxConcurrent"`
+	MaxConcurrent int `json:"maxConcurrent"`
+	// SessionTimeoutMinutes bounds one agent turn; SessionIdleMinutes bounds
+	// how long an interactive session sits between turns before closing.
 	SessionTimeoutMinutes    int      `json:"sessionTimeoutMinutes"`
+	SessionIdleMinutes       int      `json:"sessionIdleMinutes"`
 	PermissionTimeoutMinutes int      `json:"permissionTimeoutMinutes"`
 	IdempotencyWindowSeconds int      `json:"idempotencyWindowSeconds"`
 	AutoAllowTools           []string `json:"autoAllowTools"`
-	ShowThoughts             bool     `json:"showThoughts"`
-	WorktreeDir              string   `json:"worktreeDir"`
-	KeepFailedWorktrees      bool     `json:"keepFailedWorktrees"`
+	// PlanningTools is the policy for planning sessions; empty means the
+	// built-in read-only set.
+	PlanningTools []string `json:"planningTools,omitempty"`
+	ShowThoughts  bool     `json:"showThoughts"`
+	// DebugLog records every ACP message to DebugLogPath (default
+	// <dataDir>/acp-debug.jsonl). Also switched on by FOCALBOARD_ACP_DEBUG.
+	DebugLog            bool   `json:"debugLog,omitempty"`
+	DebugLogPath        string `json:"debugLogPath,omitempty"`
+	WorktreeDir         string `json:"worktreeDir"`
+	KeepFailedWorktrees bool   `json:"keepFailedWorktrees"`
 }
 
 // DefaultConfig returns the defaults written on first run. dataDir is the ACP
@@ -291,10 +307,16 @@ func DefaultConfig(dataDir string) Config {
 		WorktreeMode:             "never",
 		MaxConcurrent:            3,
 		SessionTimeoutMinutes:    15,
+		SessionIdleMinutes:       30,
+		ShowThoughts:             true,
 		PermissionTimeoutMinutes: 5,
 		IdempotencyWindowSeconds: 10,
-		AutoAllowTools:           []string{"Read", "Grep", "Glob", "Edit", "Write", "MultiEdit", "NotebookEdit", "TodoWrite"},
-		WorktreeDir:              filepath.Join(dataDir, "worktrees"),
+		// Bash is on the list because a coding agent cannot do its job without a
+		// shell (tests, git, build), and a session with no console open has
+		// nobody to ask — every prompt would simply be rejected. Edit/Write are
+		// already allowed, so withholding the shell bought little in practice.
+		AutoAllowTools: []string{"Read", "Grep", "Glob", "Edit", "Write", "MultiEdit", "NotebookEdit", "TodoWrite", "Bash", "Skill"},
+		WorktreeDir:    filepath.Join(dataDir, "worktrees"),
 	}
 }
 
@@ -322,8 +344,18 @@ func LoadConfig(path, dataDir string) (Config, error) {
 	return cfg, nil
 }
 
+// SessionTimeout bounds a single agent turn.
 func (c Config) SessionTimeout() time.Duration {
 	return time.Duration(c.SessionTimeoutMinutes) * time.Minute
+}
+
+// SessionIdle bounds how long an interactive session waits between turns
+// before closing itself and releasing its repository.
+func (c Config) SessionIdle() time.Duration {
+	if c.SessionIdleMinutes <= 0 {
+		return 30 * time.Minute
+	}
+	return time.Duration(c.SessionIdleMinutes) * time.Minute
 }
 
 func (c Config) PermissionTimeout() time.Duration {
@@ -339,14 +371,22 @@ func (c Config) UseWorktrees() bool {
 	return c.WorktreeMode == "always"
 }
 
-// ToolAllowed reports whether toolName is on the auto-allow list.
-func (c Config) ToolAllowed(toolName string) bool {
-	for _, t := range c.AutoAllowTools {
-		if strings.EqualFold(t, toolName) {
-			return true
-		}
+// ToolAllowed reports whether the call runs without asking, under the global
+// policy. input is the tool's raw input, which entries carrying an argument
+// pattern are matched against; pass nil when it is not available.
+func (c Config) ToolAllowed(toolName string, input any) bool {
+	return ToolPolicy(c.AutoAllowTools).Allows(toolName, input)
+}
+
+// PlanningPolicy is what a planning session may do unasked. It is deliberately
+// separate from AutoAllowTools: planning reads a repository to argue about it,
+// so it needs to look around freely but must not be able to change anything,
+// whatever the global policy has been relaxed to.
+func (c Config) PlanningPolicy() ToolPolicy {
+	if len(c.PlanningTools) > 0 {
+		return ToolPolicy(c.PlanningTools)
 	}
-	return false
+	return ToolPolicy(defaultPlanningTools())
 }
 
 // SaveConfig writes cfg to path (used when the UI edits the repo registry).

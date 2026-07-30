@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -17,7 +18,23 @@ import (
 	"github.com/mattermost/focalboard/desktop/internal/procgroup"
 )
 
-// Session is one agent run bound to a card.
+// turnRequest is one user message queued onto a live session.
+type turnRequest struct {
+	text string
+	done chan turnOutcome // buffered(1); receives the turn's outcome
+}
+
+// turnOutcome is what a turn produced: the agent's final message and the error
+// that ended it, if any.
+type turnOutcome struct {
+	text string
+	err  error
+}
+
+// Session is one agent conversation bound to a card. A session triggered by a
+// card move runs a single turn and finishes, as it always has; a session a
+// console is attached to stays alive between turns so the user can keep
+// talking to the agent.
 type Session struct {
 	ID         string
 	CardID     string
@@ -31,11 +48,30 @@ type Session struct {
 	Worktree     WorktreeInfo
 	usedWorktree bool // a dedicated worktree was actually created
 
-	mu         sync.Mutex
-	status     SessionStatus
-	cancel     context.CancelFunc
-	cancelSent bool
-	allowTools map[string]bool
+	// Planning is a session with no card behind it: it exists only to talk
+	// through a task before one is created. It reads the repository but never
+	// writes, so it neither takes the repo lock nor reports to a card.
+	Planning bool
+	// Policy decides which tool calls run without asking. It is resolved once
+	// at start — planning is held read-only, an agent may carry its own list,
+	// otherwise the global one applies — so the rule cannot drift mid-session.
+	Policy ToolPolicy
+	// scratchDir is a throwaway working directory made for a session that has
+	// no repository, removed when the session ends.
+	scratchDir string
+
+	mu          sync.Mutex
+	status      SessionStatus
+	turnCancel  context.CancelFunc // cancels the in-flight turn
+	cancelSent  bool
+	allowTools  map[string]bool
+	interactive bool // opened as a console, or attached to while running
+	attached    int  // consoles currently watching
+	turnNo      int
+
+	turns     chan turnRequest
+	closeCh   chan struct{}
+	closeOnce sync.Once
 
 	finalMu  sync.Mutex
 	finalBuf strings.Builder
@@ -49,10 +85,76 @@ func (s *Session) Status() SessionStatus {
 	return s.status
 }
 
+// isInteractive reports whether the session should stay alive between turns.
+func (s *Session) isInteractive() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.interactive
+}
+
+// attach marks a console as watching; the session then survives its turns.
+// Every attach must be paired with a detach, or the session would outlive the
+// consoles and go on holding its repository.
+func (s *Session) attach() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.attached++
+	s.interactive = true
+}
+
+// markInteractive records that the session is being driven by a user without
+// claiming a console slot — talking to a session already implies one is open.
+func (s *Session) markInteractive() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.interactive = true
+}
+
+// detach drops a console. The last console leaving an idle session ends it:
+// an unattended session would otherwise hold its repository lock forever.
+func (s *Session) detach() (lastLeft bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.attached > 0 {
+		s.attached--
+	}
+	return s.attached == 0
+}
+
+// requestClose ends the turn loop after the current turn.
+func (s *Session) requestClose() {
+	s.closeOnce.Do(func() { close(s.closeCh) })
+}
+
+// hasConsole reports whether a human is watching and could answer a prompt.
+// Unattended sessions must never block on one.
+func (s *Session) hasConsole() bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.attached > 0
+}
+
+// allowToolAlways remembers a tool the user approved for the rest of the session.
+func (s *Session) allowToolAlways(name string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.allowTools[name] = true
+}
+
 func (s *Session) toolAllowed(name string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.allowTools[name]
+}
+
+// autoAllowed reports whether the call runs without asking, under the policy
+// resolved for this session. input is the tool's raw input, so entries that
+// narrow a tool by argument — "Bash(git log*)" — can be checked.
+func (s *Session) autoAllowed(name string, input any, cfg Config) bool {
+	if s.Policy == nil {
+		return cfg.ToolAllowed(name, input)
+	}
+	return s.Policy.Allows(name, input)
 }
 
 // appendEvent persists a session event with the next sequence number.
@@ -67,82 +169,204 @@ func (m *Manager) runSession(s *Session) {
 	defer m.wg.Done()
 	defer m.releaseSession(s)
 
-	// Wait for a concurrency slot.
-	select {
-	case m.sem <- struct{}{}:
-		defer func() { <-m.sem }()
-	case <-m.rootCtx.Done():
-		m.finishSession(s, StatusCancelled, "приложение завершается")
-		return
-	}
 	if m.rootCtx.Err() != nil {
 		m.finishSession(s, StatusCancelled, "приложение завершается")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(m.rootCtx, m.cfg.SessionTimeout())
-	defer cancel()
-	s.mu.Lock()
-	s.cancel = cancel
-	s.status = StatusRunning
-	s.mu.Unlock()
-	m.persistStatus(s, StatusRunning, "")
-
 	// 1. Working directory: a dedicated worktree, or the repo itself.
-	if m.cfg.UseWorktrees() {
-		wt, err := CreateWorktree(ctx, s.RepoPath, s.BaseBranch, s.CardID, s.ID, m.cfg.WorktreeDir)
+	if err := m.prepareWorkdir(s); err != nil {
+		m.finishSession(s, StatusFailed, err.Error())
+		m.comment(s, failComment(s, err.Error()))
+		return
+	}
+
+	// 2. Agent connection, held for the whole session so turns share context.
+	conn, acpSessionID, cleanup, err := m.openConnection(m.rootCtx, s)
+	if err != nil {
+		m.finishSession(s, StatusFailed, err.Error())
+		m.comment(s, failComment(s, err.Error()))
+		m.cleanupWorktree(s)
+		return
+	}
+	defer cleanup()
+
+	// 3. Turns, starting with the card task.
+	m.turnLoop(s, conn, acpSessionID)
+
+	// 4. Worktree cleanup for unsuccessful sessions.
+	m.cleanupWorktree(s)
+}
+
+// prepareWorkdir sets up the session's working directory and announces it.
+func (m *Manager) prepareWorkdir(s *Session) error {
+	// A planning session only reads, so it runs in the repository itself even
+	// under worktreeMode "always": a worktree would cost a checkout and leave
+	// a branch behind for a conversation that changes nothing.
+	if m.cfg.UseWorktrees() && !s.Planning {
+		wt, err := CreateWorktree(m.rootCtx, s.RepoPath, s.BaseBranch, s.CardID, s.ID, m.cfg.WorktreeDir)
 		if err != nil {
-			m.finishSession(s, StatusFailed, fmt.Sprintf("не удалось создать git worktree: %v", err))
-			return
+			return fmt.Errorf("не удалось создать git worktree: %w", err)
 		}
 		s.Worktree = wt
 		s.usedWorktree = true
 		if err := m.store.UpdateSession(s.ID, StatusRunning, "", wt.Path, wt.Path, wt.Branch, "", nil); err != nil {
 			m.log.Warn("acp: failed to persist worktree info", "session", s.ID, "err", err)
 		}
-		m.comment(s, fmt.Sprintf("🤖 Агент запущен.\nWorktree: `%s`\nВетка: `%s` (от `%s`)", wt.Path, wt.Branch, wt.BaseRef))
-	} else {
-		s.Worktree = WorktreeInfo{Path: s.RepoPath, BaseRef: "HEAD"}
-		if err := m.store.UpdateSession(s.ID, StatusRunning, "", s.RepoPath, "", "", "", nil); err != nil {
-			m.log.Warn("acp: failed to persist session cwd", "session", s.ID, "err", err)
-		}
-		m.comment(s, fmt.Sprintf("🤖 Агент запущен прямо в репозитории `%s`.", s.RepoPath))
+		m.comment(s, fmt.Sprintf("Агент запущен.\nWorktree: `%s`\nВетка: `%s` (от `%s`)", wt.Path, wt.Branch, wt.BaseRef))
+		return nil
 	}
-
-	// 2. Agent connection.
-	finalText, runErr := m.runAgentTurn(ctx, s)
-
-	// 3. Outcome.
-	switch {
-	case runErr == nil:
-		m.finishSession(s, StatusDone, "")
-		m.comment(s, doneComment(s, finalText))
-	case ctx.Err() != nil && m.rootCtx.Err() != nil:
-		m.finishSession(s, StatusCancelled, "приложение завершается")
-	case s.wasCancelled():
-		m.finishSession(s, StatusCancelled, "сессия отменена")
-		m.comment(s, cancelComment(s))
-	case ctx.Err() == context.DeadlineExceeded:
-		m.finishSession(s, StatusFailed, fmt.Sprintf("таймаут сессии (%s)", m.cfg.SessionTimeout()))
-		m.comment(s, failComment(s, fmt.Sprintf("таймаут %s", m.cfg.SessionTimeout())))
-	default:
-		m.finishSession(s, StatusFailed, runErr.Error())
-		m.comment(s, failComment(s, runErr.Error()))
+	s.Worktree = WorktreeInfo{Path: s.RepoPath, BaseRef: "HEAD"}
+	if err := m.store.UpdateSession(s.ID, StatusRunning, "", s.RepoPath, "", "", "", nil); err != nil {
+		m.log.Warn("acp: failed to persist session cwd", "session", s.ID, "err", err)
 	}
+	m.comment(s, fmt.Sprintf("Агент запущен прямо в репозитории `%s`.", s.RepoPath))
+	return nil
+}
 
-	// 4. Worktree cleanup for unsuccessful sessions.
-	if s.usedWorktree && s.Status() != StatusDone && !m.cfg.KeepFailedWorktrees {
-		if removed, err := RemoveWorktreeIfClean(context.Background(), s.RepoPath, s.Worktree); err != nil {
-			m.log.Warn("acp: worktree cleanup failed", "session", s.ID, "err", err)
-		} else if removed {
-			s.Worktree = WorktreeInfo{}
+func (m *Manager) cleanupWorktree(s *Session) {
+	if s.scratchDir != "" {
+		if err := os.RemoveAll(s.scratchDir); err != nil {
+			m.log.Warn("acp: failed to remove planning scratch dir", "session", s.ID, "err", err)
 		}
+	}
+	if !s.usedWorktree || s.Status() == StatusDone || m.cfg.KeepFailedWorktrees {
+		return
+	}
+	if removed, err := RemoveWorktreeIfClean(context.Background(), s.RepoPath, s.Worktree); err != nil {
+		m.log.Warn("acp: worktree cleanup failed", "session", s.ID, "err", err)
+	} else if removed {
+		s.Worktree = WorktreeInfo{}
 	}
 }
 
-// runAgentTurn builds the in-process ACP stack, runs one prompt and returns
-// the agent's final message text.
-func (m *Manager) runAgentTurn(ctx context.Context, s *Session) (string, error) {
+// turnLoop runs the card task, then — for a session a console is attached to —
+// every follow-up message the user sends, until the console closes, the session
+// goes idle for too long, or the app shuts down.
+func (m *Manager) turnLoop(s *Session, conn *acpsdk.ClientSideConnection, acpSessionID acpsdk.SessionId) {
+	req := turnRequest{text: s.PromptText}
+	for {
+		finalText, err := m.runTurn(s, conn, acpSessionID, req.text)
+		if req.done != nil {
+			req.done <- turnOutcome{text: finalText, err: err}
+		}
+
+		s.mu.Lock()
+		turn := s.turnNo
+		s.mu.Unlock()
+
+		// The first turn always reports to the card: that is the whole point of
+		// a session triggered by a card move. Later turns belong to the console.
+		if turn == 1 {
+			m.commentFirstTurn(s, finalText, err)
+		}
+
+		switch {
+		case m.rootCtx.Err() != nil:
+			m.finishSession(s, StatusCancelled, "приложение завершается")
+			return
+		case err != nil && !s.isInteractive():
+			return // commentFirstTurn already recorded the terminal status
+		case err != nil && connectionLost(conn):
+			m.finishSession(s, StatusFailed, err.Error())
+			m.comment(s, failComment(s, err.Error()))
+			return
+		case !s.isInteractive():
+			m.finishSession(s, StatusDone, "")
+			return
+		case err != nil:
+			// A failed follow-up turn keeps the session usable, but the console
+			// has to say so — nothing else surfaces this error.
+			s.appendEvent(m, "error", map[string]any{"text": err.Error()})
+			m.emitSession(s, err.Error())
+		}
+
+		next, ok := m.waitForTurn(s)
+		if !ok {
+			return
+		}
+		req = next
+	}
+}
+
+// commentFirstTurn records the outcome of the card-triggered turn and, for a
+// one-shot session, the terminal status that goes with it.
+func (m *Manager) commentFirstTurn(s *Session, finalText string, err error) {
+	interactive := s.isInteractive()
+	switch {
+	case m.rootCtx.Err() != nil:
+		// Shutdown: turnLoop reports it.
+	case s.wasCancelled():
+		// A cancelled turn ends with StopReason "cancelled", not an error.
+		if !interactive {
+			m.finishSession(s, StatusCancelled, "сессия отменена")
+		}
+		m.comment(s, cancelComment(s))
+	case err != nil:
+		if !interactive {
+			m.finishSession(s, StatusFailed, err.Error())
+		}
+		m.comment(s, failComment(s, err.Error()))
+	default:
+		if !interactive {
+			m.finishSession(s, StatusDone, "")
+		}
+		m.comment(s, doneComment(s, finalText))
+	}
+}
+
+// waitForTurn parks an interactive session between turns. It reports false when
+// the session should end.
+func (m *Manager) waitForTurn(s *Session) (turnRequest, bool) {
+	// Parking is only justified while a console is watching. A card closed
+	// mid-turn detaches without being able to end the session — it was not idle
+	// yet — so the check belongs here, or the session would sit on its
+	// repository until the idle timeout with nobody looking at it.
+	if !s.hasConsole() {
+		m.finishSession(s, StatusDone, "")
+		return turnRequest{}, false
+	}
+
+	s.mu.Lock()
+	s.status = StatusIdle
+	s.mu.Unlock()
+	m.persistStatus(s, StatusIdle, "")
+
+	idle := time.NewTimer(m.cfg.SessionIdle())
+	defer idle.Stop()
+
+	select {
+	case req := <-s.turns:
+		return req, true
+	case <-s.closeCh:
+		m.finishSession(s, StatusDone, "")
+		m.comment(s, closeComment(s))
+		return turnRequest{}, false
+	case <-idle.C:
+		m.finishSession(s, StatusDone, "")
+		m.comment(s, idleComment(s, m.cfg.SessionIdle()))
+		return turnRequest{}, false
+	case <-m.rootCtx.Done():
+		m.finishSession(s, StatusCancelled, "приложение завершается")
+		return turnRequest{}, false
+	}
+}
+
+// connectionLost reports whether the agent connection is gone, which makes
+// every further turn pointless.
+func connectionLost(conn *acpsdk.ClientSideConnection) bool {
+	select {
+	case <-conn.Done():
+		return true
+	default:
+		return false
+	}
+}
+
+// openConnection builds the ACP stack for a session and negotiates the agent
+// session. The connection is held for the session's whole life, so every turn
+// runs against the same agent process and keeps the conversation.
+func (m *Manager) openConnection(ctx context.Context, s *Session) (*acpsdk.ClientSideConnection, acpsdk.SessionId, func(), error) {
 	var (
 		conn    *acpsdk.ClientSideConnection
 		cleanup func()
@@ -163,9 +387,8 @@ func (m *Manager) runAgentTurn(ctx context.Context, s *Session) (string, error) 
 		conn, cleanup, err = m.connectExternal(ctx, s)
 	}
 	if err != nil {
-		return "", err
+		return nil, "", nil, err
 	}
-	defer cleanup()
 
 	if _, err := conn.Initialize(ctx, acpsdk.InitializeRequest{
 		ProtocolVersion: acpsdk.ProtocolVersionNumber,
@@ -173,12 +396,14 @@ func (m *Manager) runAgentTurn(ctx context.Context, s *Session) (string, error) 
 			Fs: acpsdk.FileSystemCapabilities{ReadTextFile: true, WriteTextFile: true},
 		},
 	}); err != nil {
-		return "", fmt.Errorf("initialize: %w", err)
+		cleanup()
+		return nil, "", nil, fmt.Errorf("initialize: %w", err)
 	}
 
 	sess, err := conn.NewSession(ctx, acpsdk.NewSessionRequest{Cwd: s.Worktree.Path, McpServers: []acpsdk.McpServer{}})
 	if err != nil {
-		return "", fmt.Errorf("session/new: %w", err)
+		cleanup()
+		return nil, "", nil, fmt.Errorf("session/new: %w", err)
 	}
 	worktreePath := ""
 	if s.usedWorktree {
@@ -187,11 +412,35 @@ func (m *Manager) runAgentTurn(ctx context.Context, s *Session) (string, error) 
 	if err := m.store.UpdateSession(s.ID, StatusRunning, string(sess.SessionId), s.Worktree.Path, worktreePath, s.Worktree.Branch, "", nil); err != nil {
 		m.log.Warn("acp: failed to persist acp session id", "session", s.ID, "err", err)
 	}
+	return conn, sess.SessionId, cleanup, nil
+}
 
-	// Register the ACP session id so cancellation can address it.
+// runTurn sends one prompt and returns the agent's final message text. It holds
+// a concurrency slot only while the agent is actually working, so an idle
+// console never starves other cards.
+func (m *Manager) runTurn(s *Session, conn *acpsdk.ClientSideConnection, acpSessionID acpsdk.SessionId, prompt string) (string, error) {
+	select {
+	case m.sem <- struct{}{}:
+		defer func() { <-m.sem }()
+	case <-m.rootCtx.Done():
+		return "", m.rootCtx.Err()
+	}
+
+	ctx, cancel := context.WithTimeout(m.rootCtx, m.cfg.SessionTimeout())
+	defer cancel()
+
 	s.mu.Lock()
-	acpSessionID := sess.SessionId
+	s.turnCancel = cancel
+	s.cancelSent = false
+	s.status = StatusRunning
+	s.turnNo++
 	s.mu.Unlock()
+	m.persistStatus(s, StatusRunning, "")
+
+	// Each turn reports only its own output.
+	s.finalMu.Lock()
+	s.finalBuf.Reset()
+	s.finalMu.Unlock()
 
 	cancelACP := func() {
 		s.mu.Lock()
@@ -207,9 +456,12 @@ func (m *Manager) runAgentTurn(ctx context.Context, s *Session) (string, error) 
 
 	resp, err := conn.Prompt(ctx, acpsdk.PromptRequest{
 		SessionId: acpSessionID,
-		Prompt:    []acpsdk.ContentBlock{acpsdk.TextBlock(s.PromptText)},
+		Prompt:    []acpsdk.ContentBlock{acpsdk.TextBlock(prompt)},
 	})
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded && !s.wasCancelled() {
+			return "", fmt.Errorf("таймаут хода (%s)", m.cfg.SessionTimeout())
+		}
 		return "", fmt.Errorf("session/prompt: %w", err)
 	}
 	if resp.StopReason == acpsdk.StopReasonCancelled {
@@ -269,6 +521,12 @@ func (m *Manager) connectClaude(ctx context.Context, s *Session) (*acpsdk.Client
 		Env:       env,
 		DropEnv:   drop,
 		Logger:    m.log,
+		Trace: func(direction string, line []byte) {
+			m.tr.Line(s.ID, direction, line)
+		},
+		AskUser: func(ctx context.Context, questions []claudebridge.Question) (string, error) {
+			return m.askUser(ctx, s, questions)
+		},
 	})
 
 	clientIn, agentOut := io.Pipe() // agent writes → client reads
@@ -392,7 +650,7 @@ func (s *Session) wasCancelled() bool {
 
 func doneComment(s *Session, finalText string) string {
 	var b strings.Builder
-	b.WriteString("✅ Агент завершил работу.\n\n")
+	b.WriteString("Агент завершил работу.\n\n")
 	if t := strings.TrimSpace(finalText); t != "" {
 		b.WriteString(truncateRunes(t, 4000))
 		b.WriteString("\n\n")
@@ -410,7 +668,7 @@ func doneComment(s *Session, finalText string) string {
 func failComment(s *Session, reason string) string {
 	reason = s.Net.redactProxySecret(reason)
 	var b strings.Builder
-	fmt.Fprintf(&b, "❌ Сессия агента завершилась с ошибкой: %s", truncateRunes(reason, 1500))
+	fmt.Fprintf(&b, "Сессия агента завершилась с ошибкой: %s", truncateRunes(reason, 1500))
 	// 407 arrives as a bare status code from the CLI, with no hint that the
 	// proxy — not the model API — refused the request.
 	if s.Net.Proxy != "" && strings.Contains(reason, "407") {
@@ -423,7 +681,23 @@ func failComment(s *Session, reason string) string {
 }
 
 func cancelComment(s *Session) string {
-	return "🛑 Сессия агента отменена."
+	return "Сессия агента отменена."
+}
+
+// closeComment closes out an interactive session. Turns after the first are not
+// commented one by one, so this records how long the conversation ran.
+func closeComment(s *Session) string {
+	s.mu.Lock()
+	turns := s.turnNo
+	s.mu.Unlock()
+	if turns <= 1 {
+		return "Интерактивная сессия закрыта."
+	}
+	return fmt.Sprintf("Интерактивная сессия закрыта, ходов: %d.", turns)
+}
+
+func idleComment(s *Session, idle time.Duration) string {
+	return fmt.Sprintf("Сессия закрыта: без сообщений дольше %s.", idle)
 }
 
 func truncateRunes(s string, n int) string {

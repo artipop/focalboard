@@ -19,6 +19,7 @@ import {sendFlashMessage} from '../flashMessages'
 import AgentReposDialog, {isAgentReposAvailable} from '../acp/agentReposDialog'
 import AgentsDialog, {isAgentsAvailable} from '../acp/agentsDialog'
 import ProxiesDialog, {isProxiesAvailable} from '../acp/proxiesDialog'
+import PlanningDialog, {isPlanningAvailable} from '../acp/planningDialog'
 
 type Props = {
     board: Board
@@ -103,6 +104,7 @@ const ViewHeaderActionsMenu = (props: Props) => {
     const [showAgentRepos, setShowAgentRepos] = useState(false)
     const [showAgents, setShowAgents] = useState(false)
     const [showProxies, setShowProxies] = useState(false)
+    const [showPlanning, setShowPlanning] = useState(false)
 
     return (
         <ModalWrapper>
@@ -121,6 +123,14 @@ const ViewHeaderActionsMenu = (props: Props) => {
                     />
                     {/* An empty array (unlike false/null) leaves no wrapper
                         div behind: Menu wraps every child slot in a div. */}
+                    {isPlanningAvailable() ? [
+                        <Menu.Text
+                            key='planTask'
+                            id='planTask'
+                            name={intl.formatMessage({id: 'ViewHeader.plan-task', defaultMessage: 'Plan a task…'})}
+                            onClick={() => setShowPlanning(true)}
+                        />,
+                    ] : []}
                     {isAgentReposAvailable() ? [
                         <Menu.Text
                             key='agentRepos'
@@ -184,6 +194,12 @@ const ViewHeaderActionsMenu = (props: Props) => {
             {showProxies &&
                 <ProxiesDialog
                     onClose={() => setShowProxies(false)}
+                />}
+            {showPlanning &&
+                <PlanningDialog
+                    board={board}
+                    activeView={activeView}
+                    onClose={() => setShowPlanning(false)}
                 />}
         </ModalWrapper>
     )

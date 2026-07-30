@@ -69,7 +69,15 @@ type session struct {
 	mu        sync.Mutex
 	proc      *procgroup.Process
 	cancelled bool
-	started   map[string]bool // item id → StartToolCall already emitted
+	threadID  string          // codex thread_id, set from thread.started; resumed on later turns
+	turn      int             // 1-based turn counter, namespaces per-turn item ids
+	started   map[string]bool // item id → StartToolCall already emitted (this turn)
+}
+
+// toolCallID namespaces a codex item id by turn: codex restarts item numbering
+// at item_0 on every turn, so the raw id would collide across turns.
+func (s *session) toolCallID(itemID string) acp.ToolCallId {
+	return acp.ToolCallId(fmt.Sprintf("t%d-%s", s.turn, itemID))
 }
 
 // New creates a bridge. SetConn must be called before the first Prompt.
@@ -178,13 +186,24 @@ func (b *Bridge) SetSessionMode(ctx context.Context, params acp.SetSessionModeRe
 
 // runTurn spawns `codex exec --json`, feeds it the prompt as the final argument
 // and translates the NDJSON stream into ACP updates until turn.completed.
+// `codex exec` is one turn per process, so every turn after the first resumes
+// the thread captured from thread.started.
 func (b *Bridge) runTurn(ctx context.Context, s *session, prompt string) (acp.PromptResponse, error) {
-	argv := append(append([]string(nil), b.opts.Launch...),
-		"exec",
-		"--json",
-		"--skip-git-repo-check",
-		"-C", s.cwd,
-	)
+	// Cancellation and item ids are scoped to a turn.
+	s.mu.Lock()
+	s.cancelled = false
+	s.turn++
+	s.started = map[string]bool{}
+	threadID := s.threadID
+	s.mu.Unlock()
+
+	argv := append([]string(nil), b.opts.Launch...)
+	if threadID != "" {
+		// `exec resume` takes no -C; the cwd comes from the process itself.
+		argv = append(argv, "exec", "resume", threadID, "--json", "--skip-git-repo-check")
+	} else {
+		argv = append(argv, "exec", "--json", "--skip-git-repo-check", "-C", s.cwd)
+	}
 	if b.opts.Model != "" {
 		argv = append(argv, "-m", b.opts.Model)
 	}
@@ -238,9 +257,10 @@ func (s *session) isCancelled() bool {
 
 // codexEvent is the subset of codex exec --json output the bridge cares about.
 type codexEvent struct {
-	Type  string     `json:"type"`
-	Item  *codexItem `json:"item"`
-	Error *struct {
+	Type     string     `json:"type"`
+	ThreadID string     `json:"thread_id"` // thread.started
+	Item     *codexItem `json:"item"`
+	Error    *struct {
 		Message string `json:"message"`
 	} `json:"error"`
 }
@@ -271,6 +291,14 @@ func (b *Bridge) consumeStream(ctx context.Context, s *session, stdout io.Reader
 			continue
 		}
 		switch ev.Type {
+		case "thread.started":
+			// Recorded on the first turn and replayed as `exec resume <id>`; a
+			// resumed turn re-announces the same id.
+			if ev.ThreadID != "" {
+				s.mu.Lock()
+				s.threadID = ev.ThreadID
+				s.mu.Unlock()
+			}
 		case "item.started", "item.updated", "item.completed":
 			b.handleItem(ctx, s, ev.Type, ev.Item)
 		case "turn.completed":
@@ -334,13 +362,14 @@ func (b *Bridge) handleToolItem(ctx context.Context, s *session, phase string, i
 	if !started {
 		s.started[item.ID] = true
 	}
+	toolCallID := s.toolCallID(item.ID)
 	s.mu.Unlock()
 
 	if !started {
 		_ = b.conn.SessionUpdate(ctx, acp.SessionNotification{
 			SessionId: s.id,
 			Update: acp.StartToolCall(
-				acp.ToolCallId(item.ID),
+				toolCallID,
 				title,
 				acp.WithStartStatus(acp.ToolCallStatusInProgress),
 			),
@@ -355,7 +384,7 @@ func (b *Bridge) handleToolItem(ctx context.Context, s *session, phase string, i
 		_ = b.conn.SessionUpdate(ctx, acp.SessionNotification{
 			SessionId: s.id,
 			Update: acp.UpdateToolCall(
-				acp.ToolCallId(item.ID),
+				toolCallID,
 				acp.WithUpdateStatus(status),
 			),
 		})

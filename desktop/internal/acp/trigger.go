@@ -58,7 +58,7 @@ func (m *Manager) handleEnter(ev CardMoved) {
 	s, err := m.StartSessionForEvent(ev)
 	if err != nil {
 		m.log.Warn("acp: session not started", "card", ev.CardID, "err", err)
-		m.commentCard(ev.CardID, fmt.Sprintf("⚠️ Агент не запущен: %v", err))
+		m.commentCard(ev.CardID, fmt.Sprintf("Агент не запущен: %v", err))
 		return
 	}
 	m.log.Info("acp: session started", "session", s.ID, "card", ev.CardID, "repo", s.RepoPath)

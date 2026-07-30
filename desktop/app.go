@@ -226,6 +226,94 @@ func (a *App) SetAgentSystemPrompt(text string) error {
 	return a.mgr.SetSystemPrompt(text)
 }
 
+// StartCardSession opens an interactive agent session on a card (or attaches to
+// the one already running) and returns its session id.
+// repoName may be empty, in which case the repository is taken from the card;
+// the console supplies one when the card carries no repository tag.
+func (a *App) StartCardSession(cardID, repoName string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	s, err := a.mgr.StartSessionForCard(cardID, repoName)
+	if err != nil {
+		return "", err
+	}
+	return s.ID, nil
+}
+
+// StartPlanningSession opens a card-less session for talking a task through
+// before it exists, and returns its session id. repoName/agentName may be empty
+// when the corresponding registry holds exactly one entry.
+func (a *App) StartPlanningSession(repoName, agentName string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	s, err := a.mgr.StartPlanningSession(repoName, agentName)
+	if err != nil {
+		return "", err
+	}
+	return s.ID, nil
+}
+
+// ComposeTask asks the agent to boil the conversation down to a task and
+// returns its answer: the first line is the title, the rest the description.
+func (a *App) ComposeTask(sessionID string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	return a.mgr.ComposeTask(sessionID)
+}
+
+// PromptSession sends a follow-up message to a live session.
+func (a *App) PromptSession(sessionID, text string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	return a.mgr.PromptSession(sessionID, text)
+}
+
+// AnswerPermission delivers the user's choice for a pending permission prompt.
+func (a *App) AnswerPermission(sessionID, requestID, optionID string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	return a.mgr.AnswerPermission(sessionID, requestID, optionID)
+}
+
+// AnswerQuestion delivers the user's answers to the agent's questions. text is
+// what the model will read, composed by the console from the picker.
+func (a *App) AnswerQuestion(sessionID, requestID, text string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	return a.mgr.AnswerQuestion(sessionID, requestID, text)
+}
+
+// AttachSession marks the console as watching a session, keeping it alive
+// between turns. Returns false when the session is no longer live.
+func (a *App) AttachSession(sessionID string) bool {
+	if a.mgr == nil {
+		return false
+	}
+	return a.mgr.AttachSession(sessionID)
+}
+
+// DetachSession drops the console; an unattended idle session then closes.
+func (a *App) DetachSession(sessionID string) {
+	if a.mgr == nil {
+		return
+	}
+	a.mgr.DetachSession(sessionID)
+}
+
+// CloseSession ends a session after its current turn.
+func (a *App) CloseSession(sessionID string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	return a.mgr.CloseSession(sessionID)
+}
+
 // GetCardSessions returns the card's persisted agent sessions and their event
 // logs as JSON: {"sessions": [...], "events": [...]}.
 func (a *App) GetCardSessions(cardID string) (string, error) {

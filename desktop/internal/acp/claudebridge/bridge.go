@@ -3,12 +3,16 @@
 // pure ACP (coder/acp-go-sdk) while the only external dependency is the claude
 // CLI itself — no Node.js adapter.
 //
-// Wire-protocol facts (verified against claude 2.1.218, see cmd/acpspike/NOTES.md):
+// Wire-protocol facts (verified against claude 2.1.218/2.1.220, see
+// cmd/acpspike/NOTES.md):
 //   - spawn: claude --input-format stream-json --output-format stream-json
 //     --verbose --include-partial-messages --permission-prompt-tool stdio -p
 //   - permission requests arrive as {"type":"control_request","request":
 //     {"subtype":"can_use_tool",...}}; the response envelope must nest
 //     request_id INSIDE "response", otherwise the CLI hangs silently.
+//   - the CLI does not exit after a turn's terminal "result" line: writing
+//     another user message into the same stdin starts the next turn with the
+//     conversation intact, so one subprocess serves the whole session.
 package claudebridge
 
 import (
@@ -16,7 +20,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"strings"
 	"sync"
@@ -43,7 +46,37 @@ type Options struct {
 	Env     []string
 	DropEnv []string
 	Logger  *slog.Logger
+
+	// Trace, when set, receives every protocol line in both directions. It is
+	// the only place the raw conversation with the CLI can be seen.
+	Trace func(direction string, line []byte)
+
+	// AskUser presents the agent's questions to a human and returns their
+	// answers. Without it the tool is refused with an explanation, since its
+	// own picker cannot render in stream-json mode.
+	AskUser AskUserFunc
 }
+
+// AskUserFunc shows questions to the user and returns the answers as the text
+// the model will read.
+type AskUserFunc func(ctx context.Context, questions []Question) (string, error)
+
+// Question is one question of an AskUserQuestion call, as the CLI phrases it.
+type Question struct {
+	Question    string           `json:"question"`
+	Header      string           `json:"header"`
+	MultiSelect bool             `json:"multiSelect"`
+	Options     []QuestionOption `json:"options"`
+}
+
+// QuestionOption is one offered answer.
+type QuestionOption struct {
+	Label       string `json:"label"`
+	Description string `json:"description"`
+}
+
+// askUserQuestionTool is the CLI's built-in "ask the human" tool.
+const askUserQuestionTool = "AskUserQuestion"
 
 // Bridge implements acp.Agent by driving one claude subprocess per session.
 type Bridge struct {
@@ -59,8 +92,69 @@ type session struct {
 	cwd string
 
 	mu        sync.Mutex
-	proc      *procgroup.Process
+	h         *procHandle
+	started   bool // a subprocess has already run for this session id
 	cancelled bool
+	// answered holds the tool_use_ids of questions the user actually answered.
+	// The answers travel in a deny, so the CLI reports those calls as errors —
+	// but from the user's side the question was answered, and a red FAILED next
+	// to their own answer is simply wrong.
+	answered map[string]bool
+}
+
+// markAnswered records that a question tool call was satisfied by the user.
+func (s *session) markAnswered(toolUseID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.answered == nil {
+		s.answered = map[string]bool{}
+	}
+	s.answered[toolUseID] = true
+}
+
+func (s *session) wasAnswered(toolUseID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.answered[toolUseID]
+}
+
+// procHandle is one live claude subprocess together with the reader and writer
+// state bound to it. Every turn of a session shares the same handle: the
+// scanner must be created once per subprocess, since it buffers ahead of the
+// lines it has returned and a fresh scanner would drop what it already read.
+type procHandle struct {
+	proc     *procgroup.Process
+	scanner  *bufio.Scanner
+	trace    func(direction string, line []byte)
+	stdinMu  sync.Mutex
+	stopOnce sync.Once
+}
+
+// stop tears the subprocess down exactly once. Cancellation and the turn loop
+// can both reach a dying handle, and Cmd.Wait must not be called twice.
+func (h *procHandle) stop(grace time.Duration) {
+	h.stopOnce.Do(func() {
+		h.proc.KillGroup(grace)
+		// Reap: nobody else owns Wait, and an interactive session may respawn
+		// several times over its life.
+		go func() { _ = h.proc.Wait() }()
+	})
+}
+
+// writeLine sends one NDJSON message to the CLI. Turns and the permission
+// answering goroutine both write, hence the mutex.
+func (h *procHandle) writeLine(v any) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	if h.trace != nil {
+		h.trace("app→cli", b)
+	}
+	h.stdinMu.Lock()
+	defer h.stdinMu.Unlock()
+	_, err = h.proc.Stdin.Write(append(b, '\n'))
+	return err
 }
 
 // New creates a bridge. SetConn must be called before the first Prompt.
@@ -83,13 +177,32 @@ func (b *Bridge) KillAll(grace time.Duration) {
 	}
 	b.mu.Unlock()
 	for _, s := range sessions {
-		s.mu.Lock()
-		proc := s.proc
-		s.mu.Unlock()
-		if proc != nil {
-			proc.KillGroup(grace)
+		if h := s.takeHandle(); h != nil {
+			h.stop(grace)
 		}
 	}
+}
+
+// takeHandle detaches the session's subprocess handle, returning it to the
+// caller for teardown. Returns nil when no subprocess is live.
+func (s *session) takeHandle() *procHandle {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	h := s.h
+	s.h = nil
+	return h
+}
+
+// dropHandle tears down h and detaches it, but only if it is still the
+// session's current subprocess — a later turn may already have respawned one.
+// The next turn resumes the conversation instead of starting a fresh one.
+func (s *session) dropHandle(h *procHandle) {
+	s.mu.Lock()
+	if s.h == h {
+		s.h = nil
+	}
+	s.mu.Unlock()
+	h.stop(2 * time.Second)
 }
 
 // ---- acp.Agent ----
@@ -111,7 +224,8 @@ func (b *Bridge) NewSession(ctx context.Context, params acp.NewSessionRequest) (
 
 // Cancel is invoked by the SDK when the client sends session/cancel. The
 // prompt context is cancelled by the SDK as well; killing the process here
-// guarantees the 2-second stop.
+// guarantees the 2-second stop. Killing is the only way to interrupt the CLI
+// mid-turn, so the conversation continues in a resumed subprocess next turn.
 func (b *Bridge) Cancel(ctx context.Context, params acp.CancelNotification) error {
 	b.mu.Lock()
 	s := b.sessions[params.SessionId]
@@ -121,10 +235,10 @@ func (b *Bridge) Cancel(ctx context.Context, params acp.CancelNotification) erro
 	}
 	s.mu.Lock()
 	s.cancelled = true
-	proc := s.proc
+	h := s.h
 	s.mu.Unlock()
-	if proc != nil {
-		go proc.KillGroup(2 * time.Second)
+	if h != nil {
+		go s.dropHandle(h)
 	}
 	return nil
 }
@@ -170,9 +284,20 @@ func (b *Bridge) SetSessionMode(ctx context.Context, params acp.SetSessionModeRe
 
 // ---- claude stream-json turn ----
 
-// runTurn spawns claude, feeds it the prompt and translates the NDJSON stream
-// into ACP session updates until the terminal "result" message.
-func (b *Bridge) runTurn(ctx context.Context, s *session, prompt string) (acp.PromptResponse, error) {
+// ensureProc returns the session's live subprocess, spawning one if needed.
+// The ACP session id is a UUID the bridge itself minted in NewSession, so the
+// CLI can be told to adopt it up front (--session-id) and to resume it after a
+// respawn (--resume) — a cancelled or crashed turn therefore does not cost the
+// conversation history.
+func (b *Bridge) ensureProc(ctx context.Context, s *session) (*procHandle, error) {
+	s.mu.Lock()
+	if h := s.h; h != nil {
+		s.mu.Unlock()
+		return h, nil
+	}
+	resume := s.started
+	s.mu.Unlock()
+
 	argv := append(append([]string(nil), b.opts.Launch...),
 		"--input-format", "stream-json",
 		"--output-format", "stream-json",
@@ -181,34 +306,45 @@ func (b *Bridge) runTurn(ctx context.Context, s *session, prompt string) (acp.Pr
 		"--permission-prompt-tool", "stdio",
 		"-p",
 	)
+	if resume {
+		argv = append(argv, "--resume", string(s.id))
+	} else {
+		argv = append(argv, "--session-id", string(s.id))
+	}
 	argv = append(argv, b.opts.ExtraArgs...)
 
 	// CLAUDECODE in the environment triggers the CLI's nested-session guard.
 	dropEnv := append([]string{"CLAUDECODE"}, b.opts.DropEnv...)
-	proc, err := procgroup.Spawn(ctx, argv, s.cwd, b.opts.Env, dropEnv...)
+	// The subprocess outlives the turn that spawned it; teardown goes through
+	// dropHandle/KillAll, never through the turn context.
+	proc, err := procgroup.Spawn(context.WithoutCancel(ctx), argv, s.cwd, b.opts.Env, dropEnv...)
 	if err != nil {
-		return acp.PromptResponse{}, fmt.Errorf("spawn claude: %w", err)
+		return nil, fmt.Errorf("spawn claude: %w", err)
 	}
-	s.mu.Lock()
-	s.proc = proc
-	s.mu.Unlock()
-	defer func() {
-		go proc.KillGroup(2 * time.Second)
-		s.mu.Lock()
-		s.proc = nil
-		s.mu.Unlock()
-	}()
+	scanner := bufio.NewScanner(proc.Stdout)
+	scanner.Buffer(make([]byte, 0, 1024*1024), 32*1024*1024)
+	h := &procHandle{proc: proc, scanner: scanner, trace: b.opts.Trace}
 
-	var stdinMu sync.Mutex
-	writeLine := func(v any) error {
-		b, err := json.Marshal(v)
-		if err != nil {
-			return err
-		}
-		stdinMu.Lock()
-		defer stdinMu.Unlock()
-		_, err = proc.Stdin.Write(append(b, '\n'))
-		return err
+	s.mu.Lock()
+	s.h = h
+	s.started = true
+	s.mu.Unlock()
+	return h, nil
+}
+
+// runTurn feeds the prompt to the session's claude subprocess and translates
+// the NDJSON stream into ACP session updates until the terminal "result"
+// message. The subprocess is left running for the next turn.
+func (b *Bridge) runTurn(ctx context.Context, s *session, prompt string) (acp.PromptResponse, error) {
+	// Cancellation is scoped to a turn: a session cancelled earlier must not
+	// report every later turn as cancelled too.
+	s.mu.Lock()
+	s.cancelled = false
+	s.mu.Unlock()
+
+	h, err := b.ensureProc(ctx, s)
+	if err != nil {
+		return acp.PromptResponse{}, err
 	}
 
 	userMsg := map[string]any{
@@ -218,7 +354,8 @@ func (b *Bridge) runTurn(ctx context.Context, s *session, prompt string) (acp.Pr
 			"content": []map[string]any{{"type": "text", "text": prompt}},
 		},
 	}
-	if err := writeLine(userMsg); err != nil {
+	if err := h.writeLine(userMsg); err != nil {
+		s.dropHandle(h)
 		return acp.PromptResponse{}, fmt.Errorf("send prompt: %w", err)
 	}
 
@@ -228,19 +365,25 @@ func (b *Bridge) runTurn(ctx context.Context, s *session, prompt string) (acp.Pr
 	}
 	resultCh := make(chan turnResult, 1)
 	go func() {
-		resp, err := b.consumeStream(ctx, s, proc.Stdout, writeLine)
+		resp, err := b.consumeStream(ctx, s, h)
 		resultCh <- turnResult{resp, err}
 	}()
 
 	select {
 	case r := <-resultCh:
+		if r.err != nil {
+			// The stream ended without a result: the CLI died or closed stdout,
+			// so the handle is useless. The next turn respawns with --resume.
+			s.dropHandle(h)
+		}
 		if s.isCancelled() {
 			return acp.PromptResponse{StopReason: acp.StopReasonCancelled}, nil
 		}
 		return r.resp, r.err
 	case <-ctx.Done():
-		// session/cancel or session timeout: stop claude, report cancelled.
-		proc.KillGroup(2 * time.Second)
+		// session/cancel or turn timeout: killing is the only way to interrupt
+		// the CLI mid-turn.
+		s.dropHandle(h)
 		<-resultCh
 		return acp.PromptResponse{StopReason: acp.StopReasonCancelled}, nil
 	}
@@ -290,15 +433,20 @@ type permRequest struct {
 	ToolUseID   string          `json:"tool_use_id"`
 }
 
-func (b *Bridge) consumeStream(ctx context.Context, s *session, stdout io.Reader, writeLine func(any) error) (acp.PromptResponse, error) {
-	scanner := bufio.NewScanner(stdout)
-	scanner.Buffer(make([]byte, 0, 1024*1024), 32*1024*1024)
+// consumeStream reads one turn off the session's subprocess. The scanner lives
+// on the handle, so leftovers buffered past this turn's "result" line stay
+// available to the next turn.
+func (b *Bridge) consumeStream(ctx context.Context, s *session, h *procHandle) (acp.PromptResponse, error) {
+	scanner := h.scanner
 
 	// index → tool call id for in-flight tool_use content blocks.
 	toolByIndex := map[int]string{}
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
+		if b.opts.Trace != nil {
+			b.opts.Trace("cli→app", line)
+		}
 		var msg streamLine
 		if err := json.Unmarshal(line, &msg); err != nil {
 			b.opts.Logger.Warn("claudebridge: unparsable line", "err", err)
@@ -317,7 +465,7 @@ func (b *Bridge) consumeStream(ctx context.Context, s *session, stdout io.Reader
 				// and the CLI keeps streaming independently.
 				req := *msg.Request
 				reqID := msg.RequestID
-				go b.answerPermission(ctx, s, reqID, req, writeLine)
+				go b.answerPermission(ctx, s, reqID, req, h.writeLine)
 			}
 		case "result":
 			if msg.IsError {
@@ -425,7 +573,7 @@ func (b *Bridge) handleToolResults(ctx context.Context, s *session, msg *streamL
 			continue
 		}
 		status := acp.ToolCallStatusCompleted
-		if c.IsError {
+		if c.IsError && !s.wasAnswered(c.ToolUseID) {
 			status = acp.ToolCallStatusFailed
 		}
 		_ = b.conn.SessionUpdate(ctx, acp.SessionNotification{
@@ -445,7 +593,61 @@ const (
 	optReject      = "reject"
 )
 
+// respondControl sends one control_response. request_id must be nested inside
+// "response" (see package doc).
+func (b *Bridge) respondControl(reqID any, payload map[string]any, writeLine func(any) error) {
+	out := map[string]any{
+		"type": "control_response",
+		"response": map[string]any{
+			"subtype":    "success",
+			"request_id": reqID,
+			"response":   payload,
+		},
+	}
+	if err := writeLine(out); err != nil {
+		b.opts.Logger.Warn("claudebridge: failed to answer control request", "err", err)
+	}
+}
+
+// answerQuestion handles AskUserQuestion, which is not a permission at all: the
+// agent is addressing the user. Its own picker cannot render in stream-json
+// mode, so the questions are shown by the client and the answers are handed
+// back through the deny message — the only field of this channel that carries
+// text to the model. Verified against claude 2.1.220: answers delivered this
+// way are used, while "allow" runs the tool with no way to reach anyone and the
+// model falls back to guessing (see cmd/acpspike/NOTES.md).
+func (b *Bridge) answerQuestion(ctx context.Context, s *session, reqID any, req permRequest, writeLine func(any) error) {
+	deny := func(message string) {
+		b.respondControl(reqID, map[string]any{"behavior": "deny", "message": message}, writeLine)
+	}
+	if b.opts.AskUser == nil {
+		deny("Спросить пользователя через этот инструмент нельзя. Задай вопросы обычным текстом в ответе.")
+		return
+	}
+	var payload struct {
+		Questions []Question `json:"questions"`
+	}
+	if err := json.Unmarshal(req.Input, &payload); err != nil || len(payload.Questions) == 0 {
+		deny("Не удалось разобрать вопросы. Задай их обычным текстом в ответе.")
+		return
+	}
+	answers, err := b.opts.AskUser(ctx, payload.Questions)
+	if err == nil {
+		s.markAnswered(req.ToolUseID)
+	}
+	if err != nil {
+		b.opts.Logger.Info("claudebridge: question not answered", "err", err)
+		deny(fmt.Sprintf("Ответа от пользователя нет (%s). Задай вопросы обычным текстом или продолжай, обозначив допущения.", err))
+		return
+	}
+	deny(answers)
+}
+
 func (b *Bridge) answerPermission(ctx context.Context, s *session, reqID any, req permRequest, writeLine func(any) error) {
+	if req.ToolName == askUserQuestionTool {
+		b.answerQuestion(ctx, s, reqID, req, writeLine)
+		return
+	}
 	var input any
 	_ = json.Unmarshal(req.Input, &input)
 	title := req.ToolName
@@ -480,18 +682,7 @@ func (b *Bridge) answerPermission(ctx context.Context, s *session, reqID any, re
 	} else {
 		payload = map[string]any{"behavior": "deny", "message": "Permission denied by Focalboard agent policy"}
 	}
-	// request_id must be nested inside "response" (see package doc).
-	out := map[string]any{
-		"type": "control_response",
-		"response": map[string]any{
-			"subtype":    "success",
-			"request_id": reqID,
-			"response":   payload,
-		},
-	}
-	if err := writeLine(out); err != nil {
-		b.opts.Logger.Warn("claudebridge: failed to answer permission", "err", err)
-	}
+	b.respondControl(reqID, payload, writeLine)
 }
 
 func truncate(s string, n int) string {
