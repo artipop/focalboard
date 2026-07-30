@@ -14,7 +14,7 @@ import Dialog from '../dialog'
 import {sendFlashMessage} from '../flashMessages'
 
 import {agentBindings} from './agentReposDialog'
-import {ProxyEntry} from './proxiesDialog'
+import ProxiesPanel, {ProxyEntry, isProxiesAvailable} from './proxiesPanel'
 
 import './agentsDialog.scss'
 
@@ -385,7 +385,7 @@ const AgentsDialog = (props: Props) => {
                         </label>
                         {proxies.length === 0 &&
                             <div className='AgentsDialog__hint'>
-                                {intl.formatMessage({id: 'Agents.proxy-hint', defaultMessage: 'Configurations are managed in the board menu → Proxy configurations…'})}
+                                {intl.formatMessage({id: 'Agents.proxy-hint', defaultMessage: 'Configurations are added under "Proxy configurations" at the bottom of this dialog.'})}
                             </div>}
                         <label>
                             {intl.formatMessage({id: 'Agents.env', defaultMessage: 'Environment (KEY=VALUE per line — e.g. CODEX_HOME, OPENAI_API_KEY)'})}
@@ -449,6 +449,16 @@ const AgentsDialog = (props: Props) => {
                         {intl.formatMessage({id: 'Agents.save-system-prompt', defaultMessage: 'Save system prompt'})}
                     </Button>
                 </div>
+
+                {/* Proxies exist only to be referenced by an agent, so they live
+                    here, folded away until someone needs one. */}
+                {isProxiesAvailable() &&
+                    <details className='AgentsDialog__proxies'>
+                        <summary>
+                            {intl.formatMessage({id: 'Proxies.title', defaultMessage: 'Proxy configurations'})}
+                        </summary>
+                        <ProxiesPanel onChange={refresh}/>
+                    </details>}
 
                 {error &&
                     <div className='AgentsDialog__error'>{error}</div>}

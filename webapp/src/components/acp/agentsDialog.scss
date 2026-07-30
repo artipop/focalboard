@@ -76,6 +76,18 @@
         padding-top: 4px;
     }
 
+    .AgentsDialog__proxies {
+        margin-top: 16px;
+        padding-top: 12px;
+        border-top: 1px solid rgba(var(--center-channel-color-rgb), 0.08);
+
+        > summary {
+            cursor: pointer;
+            font-weight: 600;
+            list-style-position: outside;
+        }
+    }
+
     .AgentsDialog__systemPrompt {
         display: flex;
         flex-direction: column;

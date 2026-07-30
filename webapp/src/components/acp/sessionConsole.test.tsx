@@ -213,9 +213,9 @@ describe('components/acp/sessionConsole', () => {
 
     test('offers a repository when the card does not name one', async () => {
         const bindings = bindingsWith([{id: 'sess-old', status: 'done'}])
-        bindings.StartCardSession = jest.fn()
-            .mockRejectedValueOnce(new Error('ни тег карточки, ни исходная колонка не совпали с репозиторием из реестра (NotBro, leadheat)'))
-            .mockResolvedValueOnce('sess-picked')
+        bindings.StartCardSession = jest.fn().
+            mockRejectedValueOnce(new Error('ни тег карточки, ни исходная колонка не совпали с репозиторием из реестра (NotBro, leadheat)')).
+            mockResolvedValueOnce('sess-picked')
         anyWindow.go = {main: {App: bindings}}
 
         render(wrapIntl(<SessionConsole cardId='card1'/>))

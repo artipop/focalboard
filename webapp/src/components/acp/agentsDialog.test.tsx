@@ -184,6 +184,36 @@ describe('components/acp/agentsDialog', () => {
         await waitFor(() => expect(bindings.SyncAgentUsers).toBeCalledTimes(2))
     })
 
+    test('carries the proxy registry in a folded-away section', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([{name: 'codex-a', kind: 'codex'}])),
+            ListProxies: jest.fn().mockResolvedValue(JSON.stringify([{name: 'office', proxy: 'http://proxy.example.com:8080'}])),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AddAgent: jest.fn(),
+            UpdateAgent: jest.fn(),
+            RemoveAgent: jest.fn(),
+            AddProxy: jest.fn(),
+            UpdateProxy: jest.fn(),
+            RemoveProxy: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByText('codex-a')).toBeInTheDocument())
+
+        // The proxies live behind a summary, in the dialog that references them.
+        const proxies = screen.getByText('Proxy configurations')
+        expect(proxies.tagName.toLowerCase()).toBe('summary')
+        await waitFor(() => expect(screen.getByText('office')).toBeInTheDocument())
+        expect(screen.getByRole('button', {name: 'Add configuration…'})).toBeInTheDocument()
+    })
+
     test('shows the registry even when provisioning fails', async () => {
         const bindings = {
             ListAgents: jest.fn().mockResolvedValue(JSON.stringify([{name: 'codex-a', kind: 'codex'}])),
