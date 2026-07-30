@@ -311,7 +311,7 @@ func DefaultConfig(dataDir string) Config {
 		// shell (tests, git, build), and a session with no console open has
 		// nobody to ask — every prompt would simply be rejected. Edit/Write are
 		// already allowed, so withholding the shell bought little in practice.
-		AutoAllowTools: []string{"Read", "Grep", "Glob", "Edit", "Write", "MultiEdit", "NotebookEdit", "TodoWrite", "Bash"},
+		AutoAllowTools: []string{"Read", "Grep", "Glob", "Edit", "Write", "MultiEdit", "NotebookEdit", "TodoWrite", "Bash", "Skill"},
 		WorktreeDir:    filepath.Join(dataDir, "worktrees"),
 	}
 }

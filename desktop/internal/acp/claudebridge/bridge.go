@@ -91,6 +91,27 @@ type session struct {
 	h         *procHandle
 	started   bool // a subprocess has already run for this session id
 	cancelled bool
+	// answered holds the tool_use_ids of questions the user actually answered.
+	// The answers travel in a deny, so the CLI reports those calls as errors —
+	// but from the user's side the question was answered, and a red FAILED next
+	// to their own answer is simply wrong.
+	answered map[string]bool
+}
+
+// markAnswered records that a question tool call was satisfied by the user.
+func (s *session) markAnswered(toolUseID string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.answered == nil {
+		s.answered = map[string]bool{}
+	}
+	s.answered[toolUseID] = true
+}
+
+func (s *session) wasAnswered(toolUseID string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.answered[toolUseID]
 }
 
 // procHandle is one live claude subprocess together with the reader and writer
@@ -541,7 +562,7 @@ func (b *Bridge) handleToolResults(ctx context.Context, s *session, msg *streamL
 			continue
 		}
 		status := acp.ToolCallStatusCompleted
-		if c.IsError {
+		if c.IsError && !s.wasAnswered(c.ToolUseID) {
 			status = acp.ToolCallStatusFailed
 		}
 		_ = b.conn.SessionUpdate(ctx, acp.SessionNotification{
@@ -584,7 +605,7 @@ func (b *Bridge) respondControl(reqID any, payload map[string]any, writeLine fun
 // text to the model. Verified against claude 2.1.220: answers delivered this
 // way are used, while "allow" runs the tool with no way to reach anyone and the
 // model falls back to guessing (see cmd/acpspike/NOTES.md).
-func (b *Bridge) answerQuestion(ctx context.Context, reqID any, req permRequest, writeLine func(any) error) {
+func (b *Bridge) answerQuestion(ctx context.Context, s *session, reqID any, req permRequest, writeLine func(any) error) {
 	deny := func(message string) {
 		b.respondControl(reqID, map[string]any{"behavior": "deny", "message": message}, writeLine)
 	}
@@ -600,6 +621,9 @@ func (b *Bridge) answerQuestion(ctx context.Context, reqID any, req permRequest,
 		return
 	}
 	answers, err := b.opts.AskUser(ctx, payload.Questions)
+	if err == nil {
+		s.markAnswered(req.ToolUseID)
+	}
 	if err != nil {
 		b.opts.Logger.Info("claudebridge: question not answered", "err", err)
 		deny(fmt.Sprintf("Ответа от пользователя нет (%s). Задай вопросы обычным текстом или продолжай, обозначив допущения.", err))
@@ -610,7 +634,7 @@ func (b *Bridge) answerQuestion(ctx context.Context, reqID any, req permRequest,
 
 func (b *Bridge) answerPermission(ctx context.Context, s *session, reqID any, req permRequest, writeLine func(any) error) {
 	if req.ToolName == askUserQuestionTool {
-		b.answerQuestion(ctx, reqID, req, writeLine)
+		b.answerQuestion(ctx, s, reqID, req, writeLine)
 		return
 	}
 	var input any
