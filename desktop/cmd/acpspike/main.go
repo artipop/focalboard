@@ -132,7 +132,7 @@ func (c *spikeClient) RequestPermission(ctx context.Context, params acp.RequestP
 	if params.ToolCall.Title != nil {
 		title = *params.ToolCall.Title
 	}
-	fmt.Printf("\n🔐 RequestPermission: tool=%q options=%d\n", title, len(params.Options))
+	fmt.Printf("\npermission request: tool=%q options=%d\n", title, len(params.Options))
 	for _, opt := range params.Options {
 		fmt.Printf("   option id=%s name=%q kind=%s\n", opt.OptionId, opt.Name, opt.Kind)
 	}
@@ -162,18 +162,18 @@ func (c *spikeClient) SessionUpdate(ctx context.Context, params acp.SessionNotif
 		}
 	case u.AgentThoughtChunk != nil:
 		if t := u.AgentThoughtChunk.Content.Text; t != nil {
-			fmt.Printf("\n💭 %s\n", t.Text)
+			fmt.Printf("\nthought: %s\n", t.Text)
 		}
 	case u.ToolCall != nil:
-		fmt.Printf("\n🔧 tool_call %s title=%q status=%s\n", u.ToolCall.ToolCallId, u.ToolCall.Title, u.ToolCall.Status)
+		fmt.Printf("\ntool_call %s title=%q status=%s\n", u.ToolCall.ToolCallId, u.ToolCall.Title, u.ToolCall.Status)
 	case u.ToolCallUpdate != nil:
 		status := ""
 		if u.ToolCallUpdate.Status != nil {
 			status = string(*u.ToolCallUpdate.Status)
 		}
-		fmt.Printf("\n🔧 tool_call_update %s status=%s\n", u.ToolCallUpdate.ToolCallId, status)
+		fmt.Printf("\ntool_call_update %s status=%s\n", u.ToolCallUpdate.ToolCallId, status)
 	case u.Plan != nil:
-		fmt.Printf("\n🗺  plan (%d entries)\n", len(u.Plan.Entries))
+		fmt.Printf("\nplan (%d entries)\n", len(u.Plan.Entries))
 	default:
 		raw, _ := json.Marshal(u)
 		fmt.Printf("\n[update] %s\n", raw)
@@ -182,7 +182,7 @@ func (c *spikeClient) SessionUpdate(ctx context.Context, params acp.SessionNotif
 }
 
 func (c *spikeClient) ReadTextFile(ctx context.Context, params acp.ReadTextFileRequest) (acp.ReadTextFileResponse, error) {
-	fmt.Printf("\n📖 fs/read %s\n", params.Path)
+	fmt.Printf("\nfs/read %s\n", params.Path)
 	b, err := os.ReadFile(params.Path)
 	if err != nil {
 		return acp.ReadTextFileResponse{}, err
@@ -191,7 +191,7 @@ func (c *spikeClient) ReadTextFile(ctx context.Context, params acp.ReadTextFileR
 }
 
 func (c *spikeClient) WriteTextFile(ctx context.Context, params acp.WriteTextFileRequest) (acp.WriteTextFileResponse, error) {
-	fmt.Printf("\n✍️  fs/write %s (%d bytes)\n", params.Path, len(params.Content))
+	fmt.Printf("\nfs/write %s (%d bytes)\n", params.Path, len(params.Content))
 	if err := os.WriteFile(params.Path, []byte(params.Content), 0o644); err != nil {
 		return acp.WriteTextFileResponse{}, err
 	}
@@ -250,13 +250,13 @@ func runLib(ctx context.Context, cwd, prompt string) error {
 		return fmt.Errorf("initialize: %w", err)
 	}
 	caps, _ := json.MarshalIndent(initResp, "", "  ")
-	fmt.Printf("✅ initialize ok, protocol v%v\nagent response dump:\n%s\n", initResp.ProtocolVersion, caps)
+	fmt.Printf("initialize ok, protocol v%v\nagent response dump:\n%s\n", initResp.ProtocolVersion, caps)
 
 	sess, err := conn.NewSession(ctx, acp.NewSessionRequest{Cwd: cwd, McpServers: []acp.McpServer{}})
 	if err != nil {
 		return fmt.Errorf("session/new: %w", err)
 	}
-	fmt.Printf("📝 session %s\n💬 prompt: %s\n\n", sess.SessionId, prompt)
+	fmt.Printf("session %s\nprompt: %s\n\n", sess.SessionId, prompt)
 
 	resp, err := conn.Prompt(ctx, acp.PromptRequest{
 		SessionId: sess.SessionId,
@@ -265,10 +265,10 @@ func runLib(ctx context.Context, cwd, prompt string) error {
 	if err != nil {
 		return fmt.Errorf("session/prompt: %w", err)
 	}
-	fmt.Printf("\n\n✅ prompt done, stopReason=%s\n", resp.StopReason)
+	fmt.Printf("\n\nprompt done, stopReason=%s\n", resp.StopReason)
 
 	if _, err := os.Stat(filepath.Join(cwd, "hello.txt")); err == nil {
-		fmt.Println("✅ hello.txt exists in cwd")
+		fmt.Println("hello.txt exists in cwd")
 	}
 	return nil
 }
@@ -300,13 +300,13 @@ func runBridge(ctx context.Context, cwd, prompt string) error {
 	if err != nil {
 		return fmt.Errorf("initialize: %w", err)
 	}
-	fmt.Printf("✅ initialize ok, protocol v%v\n", initResp.ProtocolVersion)
+	fmt.Printf("initialize ok, protocol v%v\n", initResp.ProtocolVersion)
 
 	sess, err := conn.NewSession(ctx, acp.NewSessionRequest{Cwd: cwd, McpServers: []acp.McpServer{}})
 	if err != nil {
 		return fmt.Errorf("session/new: %w", err)
 	}
-	fmt.Printf("📝 session %s\n💬 prompt: %s\n\n", sess.SessionId, prompt)
+	fmt.Printf("session %s\nprompt: %s\n\n", sess.SessionId, prompt)
 
 	resp, err := conn.Prompt(ctx, acp.PromptRequest{
 		SessionId: sess.SessionId,
@@ -315,9 +315,9 @@ func runBridge(ctx context.Context, cwd, prompt string) error {
 	if err != nil {
 		return fmt.Errorf("session/prompt: %w", err)
 	}
-	fmt.Printf("\n\n✅ prompt done, stopReason=%s\n", resp.StopReason)
+	fmt.Printf("\n\nprompt done, stopReason=%s\n", resp.StopReason)
 	if _, err := os.Stat(filepath.Join(cwd, "hello.txt")); err == nil {
-		fmt.Println("✅ hello.txt exists in cwd")
+		fmt.Println("hello.txt exists in cwd")
 	}
 	return nil
 }
@@ -457,10 +457,10 @@ func runMultiturn(ctx context.Context, cwd, agent, strategy string) error {
 // verdict reports whether the recall answer actually contains the planted token.
 func verdict(answer string) error {
 	if strings.Contains(answer, memoryToken) {
-		fmt.Printf("\n✅ CONTEXT RETAINED — turn 2 recalled %s\n", memoryToken)
+		fmt.Printf("\nCONTEXT RETAINED — turn 2 recalled %s\n", memoryToken)
 		return nil
 	}
-	fmt.Printf("\n❌ CONTEXT LOST — turn 2 did not recall %s\n", memoryToken)
+	fmt.Printf("\nCONTEXT LOST — turn 2 did not recall %s\n", memoryToken)
 	return fmt.Errorf("context not retained across turns")
 }
 
@@ -618,7 +618,7 @@ func multiturnClaudeResume(ctx context.Context, cwd string) error {
 		return fmt.Errorf("turn 1: %w", err)
 	}
 	if seen != sessionID {
-		fmt.Printf("⚠️  session_id mismatch: asked for %s, CLI reported %s\n", sessionID, seen)
+		fmt.Printf("session_id mismatch: asked for %s, CLI reported %s\n", sessionID, seen)
 	}
 
 	fmt.Println("\n-- turn 2 in a FRESH process with --resume --")
@@ -668,7 +668,7 @@ func multiturnClaudeBridge(ctx context.Context, cwd string) error {
 	if err != nil {
 		return fmt.Errorf("session/new: %w", err)
 	}
-	fmt.Printf("📝 session %s\n", sess.SessionId)
+	fmt.Printf("session %s\n", sess.SessionId)
 
 	turn := func(n int, prompt string) error {
 		fmt.Printf("\n-- ACP turn %d --\n→ %s\n", n, prompt)
@@ -820,7 +820,7 @@ func (c *chunkClock) report() {
 	fmt.Printf("text chunks : %d (%d bytes)\n", len(c.arrivals), c.bytes)
 	fmt.Printf("thought chunks: %d\n", c.thoughts)
 	if len(c.arrivals) == 0 {
-		fmt.Println("❌ nothing arrived")
+		fmt.Println("nothing arrived")
 		return
 	}
 	var maxGap time.Duration
@@ -836,11 +836,11 @@ func (c *chunkClock) report() {
 	fmt.Printf("largest gap : %s\n", maxGap.Round(time.Millisecond))
 	switch {
 	case len(c.arrivals) == 1:
-		fmt.Println("❌ the whole answer arrived as ONE chunk — not streamed")
+		fmt.Println("the whole answer arrived as ONE chunk — not streamed")
 	case c.arrivals[0] > 10*time.Second:
-		fmt.Println("⚠️  streamed, but the first chunk took a long time (thinking is invisible unless showThoughts is on)")
+		fmt.Println("streamed, but the first chunk took a long time (thinking is invisible unless showThoughts is on)")
 	default:
-		fmt.Println("✅ streamed incrementally")
+		fmt.Println("streamed incrementally")
 	}
 }
 
@@ -991,7 +991,7 @@ func runAsk(ctx context.Context, cwd, behavior string) error {
 				if msg.Request.Subtype != "can_use_tool" {
 					continue
 				}
-				fmt.Printf("\n\n🔐 %s → отвечаем %q\n", msg.Request.ToolName, behavior)
+				fmt.Printf("\n\npermission %s -> отвечаем %q\n", msg.Request.ToolName, behavior)
 				var payload map[string]any
 				if behavior == "allow" {
 					// Try to smuggle the answers in as updated input.

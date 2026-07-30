@@ -117,7 +117,7 @@ func (m *Manager) recover() {
 			m.log.Warn("acp: recovery update failed", "session", r.ID, "err", err)
 			continue
 		}
-		m.commentCard(r.CardID, "⚠️ Сессия агента была прервана перезапуском приложения.")
+		m.commentCard(r.CardID, "Сессия агента была прервана перезапуском приложения.")
 	}
 }
 

@@ -213,14 +213,14 @@ func (m *Manager) prepareWorkdir(s *Session) error {
 		if err := m.store.UpdateSession(s.ID, StatusRunning, "", wt.Path, wt.Path, wt.Branch, "", nil); err != nil {
 			m.log.Warn("acp: failed to persist worktree info", "session", s.ID, "err", err)
 		}
-		m.comment(s, fmt.Sprintf("🤖 Агент запущен.\nWorktree: `%s`\nВетка: `%s` (от `%s`)", wt.Path, wt.Branch, wt.BaseRef))
+		m.comment(s, fmt.Sprintf("Агент запущен.\nWorktree: `%s`\nВетка: `%s` (от `%s`)", wt.Path, wt.Branch, wt.BaseRef))
 		return nil
 	}
 	s.Worktree = WorktreeInfo{Path: s.RepoPath, BaseRef: "HEAD"}
 	if err := m.store.UpdateSession(s.ID, StatusRunning, "", s.RepoPath, "", "", "", nil); err != nil {
 		m.log.Warn("acp: failed to persist session cwd", "session", s.ID, "err", err)
 	}
-	m.comment(s, fmt.Sprintf("🤖 Агент запущен прямо в репозитории `%s`.", s.RepoPath))
+	m.comment(s, fmt.Sprintf("Агент запущен прямо в репозитории `%s`.", s.RepoPath))
 	return nil
 }
 
@@ -650,7 +650,7 @@ func (s *Session) wasCancelled() bool {
 
 func doneComment(s *Session, finalText string) string {
 	var b strings.Builder
-	b.WriteString("✅ Агент завершил работу.\n\n")
+	b.WriteString("Агент завершил работу.\n\n")
 	if t := strings.TrimSpace(finalText); t != "" {
 		b.WriteString(truncateRunes(t, 4000))
 		b.WriteString("\n\n")
@@ -668,7 +668,7 @@ func doneComment(s *Session, finalText string) string {
 func failComment(s *Session, reason string) string {
 	reason = s.Net.redactProxySecret(reason)
 	var b strings.Builder
-	fmt.Fprintf(&b, "❌ Сессия агента завершилась с ошибкой: %s", truncateRunes(reason, 1500))
+	fmt.Fprintf(&b, "Сессия агента завершилась с ошибкой: %s", truncateRunes(reason, 1500))
 	// 407 arrives as a bare status code from the CLI, with no hint that the
 	// proxy — not the model API — refused the request.
 	if s.Net.Proxy != "" && strings.Contains(reason, "407") {
@@ -681,7 +681,7 @@ func failComment(s *Session, reason string) string {
 }
 
 func cancelComment(s *Session) string {
-	return "🛑 Сессия агента отменена."
+	return "Сессия агента отменена."
 }
 
 // closeComment closes out an interactive session. Turns after the first are not
@@ -691,13 +691,13 @@ func closeComment(s *Session) string {
 	turns := s.turnNo
 	s.mu.Unlock()
 	if turns <= 1 {
-		return "💬 Интерактивная сессия закрыта."
+		return "Интерактивная сессия закрыта."
 	}
-	return fmt.Sprintf("💬 Интерактивная сессия закрыта, ходов: %d.", turns)
+	return fmt.Sprintf("Интерактивная сессия закрыта, ходов: %d.", turns)
 }
 
 func idleComment(s *Session, idle time.Duration) string {
-	return fmt.Sprintf("💤 Сессия закрыта: без сообщений дольше %s.", idle)
+	return fmt.Sprintf("Сессия закрыта: без сообщений дольше %s.", idle)
 }
 
 func truncateRunes(s string, n int) string {
