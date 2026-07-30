@@ -36,6 +36,7 @@ function bindingsWith(sessions: any[], events: any[] = []) {
         CloseSession: jest.fn().mockResolvedValue(undefined),
         CancelSession: jest.fn().mockResolvedValue(true),
         AnswerQuestion: jest.fn().mockResolvedValue(undefined),
+        StartCardDeploy: jest.fn().mockResolvedValue('sess-deploy'),
     }
 }
 
@@ -250,5 +251,61 @@ describe('components/acp/sessionConsole', () => {
 
         unmount()
         expect(bindings.DetachSession).toBeCalledWith('sess-5')
+    })
+
+    test('shows the session branch and deploys it', async () => {
+        const handlers = fakeRuntime()
+        const bindings = bindingsWith([{id: 'sess-1', status: 'running'}])
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(<SessionConsole cardId='card1'/>))
+        await waitFor(() => expect(bindings.GetCardSessions).toBeCalled())
+
+        // A session without a worktree yet has no branch to show or publish.
+        expect(screen.queryByRole('button', {name: 'Deploy'})).not.toBeInTheDocument()
+
+        // The branch arrives with the event the worktree creation emits.
+        handlers['acp:session']({
+            sessionId: 'sess-1',
+            cardId: 'card1',
+            status: 'running',
+            branch: 'acp/login-via-sso-1a2b3c4d',
+            worktreePath: '/tmp/wt/repo-1a2b3c4d',
+        })
+        await waitFor(() => expect(screen.getByText('acp/login-via-sso-1a2b3c4d')).toBeInTheDocument())
+
+        userEvent.click(screen.getByRole('button', {name: 'Deploy'}))
+        await waitFor(() => expect(bindings.StartCardDeploy).toBeCalledWith('card1', 'acp/login-via-sso-1a2b3c4d'))
+    })
+
+    test('a deploy session reports separately and does not take over the console', async () => {
+        const handlers = fakeRuntime()
+        const bindings = bindingsWith([{id: 'sess-1', status: 'running', branch: 'acp/task-1a2b3c4d'}])
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(<SessionConsole cardId='card1'/>))
+        await waitFor(() => expect(screen.getByText('acp/task-1a2b3c4d')).toBeInTheDocument())
+
+        handlers['acp:session']({sessionId: 'sess-deploy', cardId: 'card1', status: 'running', deploy: true, branch: 'acp/task-1a2b3c4d'})
+        handlers['acp:chunk']({sessionId: 'sess-deploy', cardId: 'card1', text: 'pushing to dokku'})
+
+        await waitFor(() => expect(screen.getByText(/deploy: running/)).toBeInTheDocument())
+
+        // The card's own session is still the one being attached to and shown.
+        expect(screen.queryByText('pushing to dokku')).not.toBeInTheDocument()
+        expect(bindings.AttachSession).not.toBeCalledWith('sess-deploy')
+    })
+
+    test('surfaces a failed deploy start', async () => {
+        fakeRuntime()
+        const bindings = bindingsWith([{id: 'sess-1', status: 'running', branch: 'acp/task-1a2b3c4d'}])
+        bindings.StartCardDeploy = jest.fn().mockRejectedValue(new Error('не настроено ни одной цели деплоя'))
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(<SessionConsole cardId='card1'/>))
+        await waitFor(() => expect(screen.getByRole('button', {name: 'Deploy'})).toBeInTheDocument())
+
+        userEvent.click(screen.getByRole('button', {name: 'Deploy'}))
+        await waitFor(() => expect(screen.getByText(/не настроено ни одной цели/)).toBeInTheDocument())
     })
 })

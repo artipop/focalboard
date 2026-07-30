@@ -176,8 +176,10 @@ func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error
 		return nil, err
 	}
 	// Without worktrees, two agents must never share one working tree
-	// (spec §7): reject while another live session uses the same repo.
-	if !m.cfg.UseWorktrees() {
+	// (spec §7): reject while another live session uses the same repo. A deploy
+	// session is exempt for the same reason a planning one is — it only pushes
+	// an existing branch and never touches the checkout.
+	if !m.cfg.UseWorktrees() && !opts.deploy {
 		m.mu.Lock()
 		var busyCard string
 		for _, other := range m.active {
@@ -207,6 +209,7 @@ func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error
 	s := &Session{
 		ID:           uuid.NewString(),
 		CardID:       ev.CardID,
+		Title:        ev.Title,
 		BoardID:      ev.BoardID,
 		RepoPath:     repoPath,
 		BaseBranch:   ev.Props["branch"],
@@ -239,7 +242,12 @@ func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error
 
 	m.mu.Lock()
 	m.active[s.ID] = s
-	m.byCard[s.CardID] = s
+	// byCard is the card's *own* session — the one its console talks to and the
+	// one leaving the column cancels. A deploy started from the card while that
+	// session is alive must not take its place.
+	if live := m.byCard[s.CardID]; live == nil || !opts.deploy {
+		m.byCard[s.CardID] = s
+	}
 	m.mu.Unlock()
 	m.emitSession(s, "")
 
@@ -300,6 +308,34 @@ func (m *Manager) StartSessionForCard(cardID, repoName string) (*Session, error)
 		return nil, err
 	}
 	return s, nil
+}
+
+// StartDeployForCard publishes a card's branch without moving the card into the
+// deploy column — the "Deploy" button next to the branch the card is working on.
+// branch overrides the card's own "branch" property, which is how the session's
+// worktree branch (the one the agent is actually committing to) gets deployed;
+// empty falls back to the card property and then to the checked-out branch.
+//
+// The branch lives in the repository's shared object store even when it was
+// created in a worktree, so pushing it from the repository itself — which is
+// where a deploy session always runs — reaches it.
+func (m *Manager) StartDeployForCard(cardID, branch string) (*Session, error) {
+	if m.reader == nil {
+		return nil, fmt.Errorf("чтение карточек недоступно")
+	}
+	ctx, cancel := context.WithTimeout(m.rootCtx, 10*time.Second)
+	defer cancel()
+	ev, err := m.reader.CardByID(ctx, cardID)
+	if err != nil {
+		return nil, fmt.Errorf("не удалось прочитать карточку: %w", err)
+	}
+	if b := strings.TrimSpace(branch); b != "" {
+		if ev.Props == nil {
+			ev.Props = map[string]string{}
+		}
+		ev.Props["branch"] = b
+	}
+	return m.startSession(ev, startOptions{deploy: true})
 }
 
 // StartPlanningSession opens a card-less session for talking a task through
@@ -689,12 +725,18 @@ func (m *Manager) emitSession(s *Session, errText string) {
 	status, interactive, turn := s.status, s.interactive, s.turnNo
 	s.mu.Unlock()
 	m.ui.Emit(EventSession, map[string]any{
-		"sessionId":   s.ID,
-		"cardId":      s.CardID,
-		"status":      string(status),
-		"error":       errText,
-		"interactive": interactive,
-		"turn":        turn,
+		"sessionId": s.ID,
+		"cardId":    s.CardID,
+		"status":    string(status),
+		"error":     errText,
+		// The branch is what the card displays and what its deploy button
+		// publishes; deploy tells a card's own session apart from the deploy
+		// it started, which shares the card id but not the console.
+		"branch":       s.recordedBranch(),
+		"worktreePath": s.Worktree.Path,
+		"deploy":       s.Deploy != nil,
+		"interactive":  interactive,
+		"turn":         turn,
 	})
 }
 

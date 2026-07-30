@@ -314,6 +314,21 @@ func (a *App) StartCardSession(cardID, repoName string) (string, error) {
 	return s.ID, nil
 }
 
+// StartCardDeploy publishes a card's branch to its Dokku target without moving
+// the card into the deploy column, and returns the deploy session's id. branch
+// is the one the card is working on (its session's worktree branch); empty lets
+// the card property or the checked-out branch decide.
+func (a *App) StartCardDeploy(cardID, branch string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	s, err := a.mgr.StartDeployForCard(cardID, branch)
+	if err != nil {
+		return "", err
+	}
+	return s.ID, nil
+}
+
 // StartPlanningSession opens a card-less session for talking a task through
 // before it exists, and returns its session id. repoName/agentName may be empty
 // when the corresponding registry holds exactly one entry.

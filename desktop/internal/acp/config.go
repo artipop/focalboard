@@ -317,9 +317,10 @@ type Config struct {
 	// (repository, branch, target, expected URL) are appended to it.
 	DeployPrompt string `json:"deployPrompt"`
 
-	// WorktreeMode controls where sessions run: "never" (default) — directly
-	// in the repository working tree, with concurrent sessions per repo
-	// rejected; "always" — a dedicated git worktree per session. A smarter
+	// WorktreeMode controls where sessions run: "always" (default) — a
+	// dedicated git worktree per session, which is what gives a card its own
+	// branch to show and to deploy; "never" — directly in the repository
+	// working tree, with concurrent sessions per repo rejected. A smarter
 	// "auto" (escalate to a worktree when the repo is busy/dirty) may come later.
 	WorktreeMode string `json:"worktreeMode"`
 
@@ -367,7 +368,7 @@ func DefaultConfig(dataDir string) Config {
 		Proxies:                  []ProxyEntry{},
 		Deploys:                  []DeployEntry{},
 		DeployPrompt:             DefaultDeployPrompt,
-		WorktreeMode:             "never",
+		WorktreeMode:             "always",
 		MaxConcurrent:            3,
 		SessionTimeoutMinutes:    15,
 		SessionIdleMinutes:       30,

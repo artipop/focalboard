@@ -314,6 +314,8 @@
   "SessionConsole.cancel": "Cancel turn",
   "SessionConsole.choose-repo": "Choose a repository…",
   "SessionConsole.close": "Close session",
+  "SessionConsole.deploy": "Deploy",
+  "SessionConsole.deploy-status": "deploy: {status}",
   "SessionConsole.open": "Open session",
   "SessionConsole.open-here": "Open here",
   "SessionConsole.placeholder": "Message the agent — Enter to send, Shift+Enter for a new line",

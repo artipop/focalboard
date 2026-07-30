@@ -365,3 +365,85 @@ func TestDeployWithoutTargetsCommentsOnTheCard(t *testing.T) {
 		t.Errorf("no session should have started: %v", sessions)
 	}
 }
+
+func TestStartDeployForCardPublishesTheGivenBranch(t *testing.T) {
+	m, writer, _, repo, emitter := testManagerWithEmitter(t, fakeClaudeHappy, func(c *Config) {
+		c.Deploys = []DeployEntry{{Name: "prod", Target: dokku.Target{SSHHost: "dokku.example.com"}}}
+	})
+
+	s, err := m.StartDeployForCard("cardD", "acp/login-via-sso-1a2b3c4d")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The button's branch wins over the card property and the checked-out one:
+	// it is the worktree branch the agent has been committing to.
+	if s.DeployBranch != "acp/login-via-sso-1a2b3c4d" {
+		t.Errorf("deploy branch %q", s.DeployBranch)
+	}
+	if s.Deploy == nil || s.Deploy.Name != "prod" {
+		t.Fatalf("deploy target: %+v", s.Deploy)
+	}
+	// The app is named after the repository, and the host doubles as the domain.
+	if want := dokku.AppLabel(filepath.Base(repo)); s.Deploy.BaseApp != want {
+		t.Errorf("base app %q, want %q", s.Deploy.BaseApp, want)
+	}
+	if s.RepoPath != repo {
+		t.Errorf("a deploy must run in the repository itself, ran in %q", s.RepoPath)
+	}
+
+	waitFor(t, 15*time.Second, "deploy session done", func() bool {
+		return len(writer.cardComments("cardD")) >= 2
+	})
+	if got := writer.cardComments("cardD")[0]; !strings.Contains(got, "acp/login-via-sso-1a2b3c4d") {
+		t.Errorf("first comment should name the branch being published: %q", got)
+	}
+
+	// The card is told this is a deploy, so its console does not mistake the
+	// session for its own.
+	emitter.mu.Lock()
+	defer emitter.mu.Unlock()
+	var sawDeploy bool
+	for i, name := range emitter.events {
+		if name == EventSession && emitter.payloads[i]["deploy"] == true {
+			sawDeploy = true
+		}
+	}
+	if !sawDeploy {
+		t.Error("no session event marked as a deploy")
+	}
+}
+
+func TestDeployRunsAlongsideTheCardsOwnSession(t *testing.T) {
+	// Worktrees off is the strict case: the repo-busy rule would otherwise
+	// refuse, even though a deploy only pushes an existing branch.
+	m, _, events, repo := testManager(t, fakeClaudeHang, func(c *Config) {
+		c.WorktreeMode = "never"
+		c.Deploys = []DeployEntry{{Name: "prod", Target: dokku.Target{SSHHost: "dokku.example.com"}}}
+	})
+
+	events.ch <- moveEvent("cardE", repo, "opt-backlog", "opt-agent")
+	waitFor(t, 10*time.Second, "agent session running", func() bool {
+		sessions, _, err := m.store.SessionsForCard("cardE")
+		return err == nil && len(sessions) == 1 && sessions[0].Status == StatusRunning
+	})
+
+	m.mu.Lock()
+	agentSession := m.byCard["cardE"]
+	m.mu.Unlock()
+
+	deploy, err := m.StartDeployForCard("cardE", "acp/whatever-1a2b3c4d")
+	if err != nil {
+		t.Fatalf("deploy refused while the card's session runs: %v", err)
+	}
+
+	// The card's console keeps talking to the agent, not to the deploy.
+	m.mu.Lock()
+	still := m.byCard["cardE"]
+	m.mu.Unlock()
+	if still != agentSession {
+		t.Error("the deploy took over the card's own session")
+	}
+	if deploy.ID == agentSession.ID {
+		t.Error("expected a separate deploy session")
+	}
+}

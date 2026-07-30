@@ -37,8 +37,11 @@ type turnOutcome struct {
 // console is attached to stays alive between turns so the user can keep
 // talking to the agent.
 type Session struct {
-	ID         string
-	CardID     string
+	ID     string
+	CardID string
+	// Title is the card's own title, which is what the session's worktree
+	// branch is named after — and therefore what a preview address reads like.
+	Title      string
 	BoardID    string
 	RepoPath   string
 	BaseBranch string
@@ -223,7 +226,7 @@ func (m *Manager) prepareWorkdir(s *Session) error {
 	// nothing, and a deploy session publishes an existing branch rather than
 	// writing code, so a throwaway branch is not the one anybody deploys.
 	if m.cfg.UseWorktrees() && !s.Planning && s.Deploy == nil {
-		wt, err := CreateWorktree(m.rootCtx, s.RepoPath, s.BaseBranch, s.CardID, s.ID, m.cfg.WorktreeDir)
+		wt, err := CreateWorktree(m.rootCtx, s.RepoPath, s.BaseBranch, s.Title, s.CardID, s.ID, m.cfg.WorktreeDir)
 		if err != nil {
 			return fmt.Errorf("не удалось создать git worktree: %w", err)
 		}
@@ -233,6 +236,9 @@ func (m *Manager) prepareWorkdir(s *Session) error {
 			m.log.Warn("acp: failed to persist worktree info", "session", s.ID, "err", err)
 		}
 		m.comment(s, fmt.Sprintf("Агент запущен.\nWorktree: `%s`\nВетка: `%s` (от `%s`)", wt.Path, wt.Branch, wt.BaseRef))
+		// The card shows the branch and offers to deploy it, and this is the
+		// first moment it exists.
+		m.emitSession(s, "")
 		return nil
 	}
 	s.Worktree = WorktreeInfo{Path: s.RepoPath, BaseRef: "HEAD"}

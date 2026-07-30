@@ -52,6 +52,8 @@ export type SessionRecord = {
     id: string
     status: SessionStatus
     errorText?: string
+    branch?: string
+    worktreePath?: string
 }
 
 export type StoredEvent = {
@@ -140,7 +142,7 @@ export type SessionStream = {
     setError: React.Dispatch<React.SetStateAction<string>>
 }
 
-export function useSessionStream(match: StreamMatch, onSession?: (payload: any) => void): SessionStream {
+export function useSessionStream(match: StreamMatch, onSession?: (payload: any) => void, onDeploy?: (payload: any) => void): SessionStream {
     const [entries, setEntries] = useState<Entry[]>([])
     const [session, setSession] = useState<SessionRecord | null>(null)
     const [error, setError] = useState('')
@@ -151,6 +153,12 @@ export function useSessionStream(match: StreamMatch, onSession?: (payload: any) 
     // from being torn down and rebuilt every time, which would drop events.
     const onSessionRef = useRef(onSession)
     onSessionRef.current = onSession
+    const onDeployRef = useRef(onDeploy)
+    onDeployRef.current = onDeploy
+
+    // A deploy started from the card shares its card id but not its console:
+    // its events must not become the card's session or land in the transcript.
+    const deployIds = useRef<Set<string>>(new Set())
 
     useEffect(() => {
         const runtime = (window as any).runtime
@@ -161,10 +169,16 @@ export function useSessionStream(match: StreamMatch, onSession?: (payload: any) 
             return undefined
         }
         const mine = (payload: any) => Boolean(payload) &&
-            (cardId ? payload.cardId === cardId : payload.sessionId === sessionId)
+            (cardId ? payload.cardId === cardId : payload.sessionId === sessionId) &&
+            !deployIds.current.has(payload.sessionId)
 
         const offs = [
             runtime.EventsOn('acp:session', (payload: any) => {
+                if (payload?.deploy && cardId && payload.cardId === cardId) {
+                    deployIds.current.add(payload.sessionId)
+                    onDeployRef.current?.(payload)
+                    return
+                }
                 if (!mine(payload)) {
                     return
                 }
@@ -172,6 +186,8 @@ export function useSessionStream(match: StreamMatch, onSession?: (payload: any) 
                     id: payload.sessionId,
                     status: payload.status,
                     errorText: payload.error || prev?.errorText,
+                    branch: payload.branch || prev?.branch,
+                    worktreePath: payload.worktreePath || prev?.worktreePath,
                 }))
                 if (payload.error) {
                     setError(payload.error)

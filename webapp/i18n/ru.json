@@ -313,6 +313,8 @@
   "SessionConsole.cancel": "Прервать ход",
   "SessionConsole.choose-repo": "Выберите репозиторий…",
   "SessionConsole.close": "Закрыть сессию",
+  "SessionConsole.deploy": "Деплой",
+  "SessionConsole.deploy-status": "деплой: {status}",
   "SessionConsole.open": "Открыть сессию",
   "SessionConsole.open-here": "Открыть здесь",
   "SessionConsole.placeholder": "Сообщение агенту — Enter отправляет, Shift+Enter переносит строку",
