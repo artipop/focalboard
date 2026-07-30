@@ -103,15 +103,17 @@ func (m *Manager) AgentUsers() []AgentUser {
 
 // SyncAgentUsers gives every registered agent a board account and makes it a
 // member of the board, so a card can be assigned to an agent in a person
-// property. Accounts are never removed: a card may still name one long after
-// the registry entry is gone.
+// property. Idempotent, and a no-op on an empty registry — the UI runs it
+// whenever the registry or the board it is looking at changes, not on demand.
+// Accounts are never removed: a card may still name one long after the registry
+// entry is gone.
 func (m *Manager) SyncAgentUsers(ctx context.Context, boardID string) ([]AgentUser, error) {
 	if m.users == nil {
 		return nil, fmt.Errorf("создание пользователей-агентов недоступно")
 	}
 	agents := m.AgentUsers()
 	if len(agents) == 0 {
-		return nil, fmt.Errorf("реестр агентов пуст: сначала добавьте агента")
+		return nil, nil
 	}
 	return m.users.EnsureAgentUsers(ctx, boardID, agents)
 }

@@ -148,14 +148,14 @@ describe('components/acp/agentsDialog', () => {
         expect(payload).toMatchObject({name: 'junie-a', kind: 'junie', command: []})
     })
 
-    test('gives agents board accounts so they can be assigned', async () => {
+    test('keeps every agent assignable without being asked', async () => {
         const bindings = {
             ListAgents: jest.fn().mockResolvedValue(JSON.stringify([{name: 'Codex Acct1', kind: 'codex'}])),
             GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
             SetAgentSystemPrompt: jest.fn(),
-            AddAgent: jest.fn(),
+            AddAgent: jest.fn().mockResolvedValue(JSON.stringify({name: 'claude', kind: 'claude'})),
             UpdateAgent: jest.fn(),
-            RemoveAgent: jest.fn(),
+            RemoveAgent: jest.fn().mockResolvedValue(undefined),
             SyncAgentUsers: jest.fn().mockResolvedValue(JSON.stringify([
                 {name: 'Codex Acct1', username: 'codex-acct1', userId: 'uid-1', created: true},
             ])),
@@ -168,10 +168,43 @@ describe('components/acp/agentsDialog', () => {
                 onClose={jest.fn()}
             />,
         ))
+
+        // Opening the dialog is enough: the accounts and board memberships are
+        // provisioned for the board being looked at.
+        await waitFor(() => expect(bindings.SyncAgentUsers).toBeCalledWith(board.id))
         await waitFor(() => expect(screen.getByText('Codex Acct1')).toBeInTheDocument())
 
-        userEvent.click(screen.getByRole('button', {name: 'Make assignable'}))
-        await waitFor(() => expect(bindings.SyncAgentUsers).toBeCalledWith(board.id))
+        // And a newly registered agent is provisioned right after it is saved.
+        userEvent.click(screen.getByRole('button', {name: 'Add agent…'}))
+        await waitFor(() => expect(screen.getAllByRole('combobox')).toHaveLength(2))
+        userEvent.type(screen.getByPlaceholderText('Name (matches the "Agent" option)'), 'claude')
+        userEvent.click(screen.getByRole('button', {name: 'Save'}))
+
+        await waitFor(() => expect(bindings.AddAgent).toBeCalled())
+        await waitFor(() => expect(bindings.SyncAgentUsers).toBeCalledTimes(2))
+    })
+
+    test('shows the registry even when provisioning fails', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([{name: 'codex-a', kind: 'codex'}])),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AddAgent: jest.fn(),
+            UpdateAgent: jest.fn(),
+            RemoveAgent: jest.fn(),
+            SyncAgentUsers: jest.fn().mockRejectedValue('board app is not ready'),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+
+        await waitFor(() => expect(screen.getByText('codex-a')).toBeInTheDocument())
+        await waitFor(() => expect(screen.getByText('board app is not ready')).toBeInTheDocument())
     })
 
     test('creates an Agent select field and adds missing options', async () => {

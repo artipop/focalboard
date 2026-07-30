@@ -347,11 +347,13 @@ func TestSyncAgentUsers(t *testing.T) {
 		t.Errorf("provisioning result not returned: %+v", got[0])
 	}
 
-	// An empty registry has nothing to provision, and says so.
+	// An empty registry is a no-op, not an error: the UI syncs on every change,
+	// including the ones that leave nothing to provision.
 	empty := agentManager(t, "")
-	empty.SetBoardUsers(users)
-	if _, err := empty.SyncAgentUsers(context.Background(), "board1"); err == nil {
-		t.Error("expected an error for an empty registry")
+	empty.SetBoardUsers(&fakeBoardUsers{})
+	synced, err := empty.SyncAgentUsers(context.Background(), "board1")
+	if err != nil || len(synced) != 0 {
+		t.Errorf("empty registry sync = %+v, err = %v", synced, err)
 	}
 }
 

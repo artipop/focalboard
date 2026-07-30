@@ -130,8 +130,34 @@ const AgentsDialog = (props: Props) => {
             }
         } catch (e) {
             setError(String(e))
+            return
         }
-    }, [bindings])
+
+        // Every registered agent is kept assignable on the board being looked
+        // at: the accounts and memberships are created here, so a person field
+        // can name an agent. Idempotent, so it rides along with every refresh —
+        // opening the dialog, adding, editing or removing an agent — and stays
+        // quiet unless an account actually appears. A failure is reported but
+        // never hides the registry itself.
+        if (!bindings.SyncAgentUsers) {
+            return
+        }
+        try {
+            const synced = (JSON.parse(await bindings.SyncAgentUsers(board.id)) || []) as Array<{created?: boolean}>
+            const created = synced.filter((u) => u.created).length
+            if (created > 0) {
+                sendFlashMessage({
+                    content: intl.formatMessage(
+                        {id: 'Agents.users-synced', defaultMessage: 'Created {created} agent account(s); agents can now be assigned to cards'},
+                        {created},
+                    ),
+                    severity: 'normal',
+                })
+            }
+        } catch (e) {
+            setError(String(e))
+        }
+    }, [bindings, board.id, intl])
 
     useEffect(() => {
         refresh()
@@ -251,29 +277,6 @@ const AgentsDialog = (props: Props) => {
             setError(String(e))
         }
     }, [board, intl, agents])
-
-    // syncToUsers gives every registered agent a board account and adds it to
-    // the board's members, so it can be picked in a person field ("Assignee")
-    // like a teammate. The store needs no nudge: the added members arrive over
-    // the websocket like any other membership change.
-    const syncToUsers = useCallback(async () => {
-        if (!bindings?.SyncAgentUsers) {
-            return
-        }
-        setError('')
-        try {
-            const synced = (JSON.parse(await bindings.SyncAgentUsers(board.id)) || []) as Array<{created?: boolean}>
-            sendFlashMessage({
-                content: intl.formatMessage(
-                    {id: 'Agents.users-synced', defaultMessage: '{count} agent(s) can now be assigned ({created} account(s) created)'},
-                    {count: synced.length, created: synced.filter((u) => u.created).length},
-                ),
-                severity: 'normal',
-            })
-        } catch (e) {
-            setError(String(e))
-        }
-    }, [bindings, board.id, intl])
 
     const updateForm = (patch: Partial<AgentEntry>) => setForm((f) => (f ? {...f, ...patch} : f))
 
@@ -426,15 +429,11 @@ const AgentsDialog = (props: Props) => {
                             <Button onClick={syncToBoard}>
                                 {intl.formatMessage({id: 'Agents.sync', defaultMessage: 'Sync to board'})}
                             </Button>}
-                        {agents.length > 0 && Boolean(bindings?.SyncAgentUsers) &&
-                            <Button onClick={syncToUsers}>
-                                {intl.formatMessage({id: 'Agents.sync-users', defaultMessage: 'Make assignable'})}
-                            </Button>}
                     </div>}
 
                 {!form && agents.length > 0 && Boolean(bindings?.SyncAgentUsers) &&
                     <div className='AgentsDialog__hint'>
-                        {intl.formatMessage({id: 'Agents.sync-users-hint', defaultMessage: '"Make assignable" gives each agent a board account named after it, so you can pick it in a person field such as "Assignee".'})}
+                        {intl.formatMessage({id: 'Agents.assignable-hint', defaultMessage: 'Every agent above is a member of this board under its own name, so you can pick it in a person field such as "Assignee".'})}
                     </div>}
 
                 <div className='AgentsDialog__systemPrompt'>
