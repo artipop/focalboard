@@ -34,6 +34,10 @@ type BoardMeta interface {
 // SetBoardMeta supplies the board-property reader.
 func (m *Manager) SetBoardMeta(b BoardMeta) { m.meta = b }
 
+// SeedBoard takes a board's own automation into the registry on demand — what
+// the first card move would do anyway, asked for early by the setup wizard.
+func (m *Manager) SeedBoard(boardID string) { m.seedFromBoard(boardID) }
+
 // seedFromBoard imports whatever automation a board carries. It runs once per
 // board per run: the import is idempotent anyway (anything already registered
 // is left alone), and the point of the flag is to not read the board on every
@@ -53,7 +57,13 @@ func (m *Manager) seedFromBoard(boardID string) {
 	m.seeded[boardID] = true
 	m.seededMu.Unlock()
 
-	ctx, cancel := context.WithTimeout(m.rootCtx, 10*time.Second)
+	// The wizard may ask before the trigger loop has started, and a nil parent
+	// context is a panic rather than a timeout.
+	parent := m.rootCtx
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parent, 10*time.Second)
 	props, err := m.meta.BoardProperties(ctx, boardID)
 	cancel()
 	if err != nil {

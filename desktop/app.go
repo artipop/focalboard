@@ -421,6 +421,18 @@ func (a *App) GetCardFlow(cardID string) (string, error) {
 	return string(out), nil
 }
 
+// SeedBoardAutomation takes the columns and routes a board carries of its own
+// into the registry now, rather than waiting for the first card to be moved.
+// The setup wizard calls it, so what the board can do is visible as soon as it
+// is configured. Idempotent: anything already registered is left alone.
+func (a *App) SeedBoardAutomation(boardID string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	a.mgr.SeedBoard(boardID)
+	return nil
+}
+
 // GetBoardFlowOverview returns where the board's cards stand on each route:
 // per stage, how many are there, how many are working and how many wait.
 func (a *App) GetBoardFlowOverview(boardID string) (string, error) {

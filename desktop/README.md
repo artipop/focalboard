@@ -75,6 +75,11 @@ runtime).
   gets a directory under `artifactsDir` (default
   `<dataDir>/artifacts/<session-id>`) where the agent is asked to save its
   screenshots and write `result.json` — that verdict is what moves the card.
+- **First run**: a board made from the template opens a setup wizard by itself
+  when the registries are still empty — a repository and an agent are asked for
+  (nothing runs without them), Dokku and a browser MCP server are offered and
+  skippable. It can be reopened from the board menu (*Set up this board…*), and
+  closing it is remembered for that board.
 - **Columns** (column menu → *Agents in this column…*) say what happens when a
   card lands in one: the action, the crew of agents who work it, and how many of
   them at once. A card without an agent of its own goes to whoever of the crew is

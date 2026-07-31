@@ -21,6 +21,7 @@ import AgentsDialog, {isAgentsAvailable} from '../acp/agentsDialog'
 import DeployTargetsDialog, {isDeployTargetsAvailable} from '../acp/deployTargetsDialog'
 import WorkflowsDialog, {isWorkflowsAvailable} from '../acp/workflowsDialog'
 import PlanningDialog, {isPlanningAvailable} from '../acp/planningDialog'
+import BoardSetupWizard, {isBoardSetupAvailable} from '../acp/boardSetupWizard'
 
 type Props = {
     board: Board
@@ -107,6 +108,7 @@ const ViewHeaderActionsMenu = (props: Props) => {
     const [showDeployTargets, setShowDeployTargets] = useState(false)
     const [showWorkflows, setShowWorkflows] = useState(false)
     const [showPlanning, setShowPlanning] = useState(false)
+    const [showSetup, setShowSetup] = useState(false)
 
     return (
         <ModalWrapper>
@@ -131,6 +133,14 @@ const ViewHeaderActionsMenu = (props: Props) => {
                             id='planTask'
                             name={intl.formatMessage({id: 'ViewHeader.plan-task', defaultMessage: 'Plan a task…'})}
                             onClick={() => setShowPlanning(true)}
+                        />,
+                    ] : []}
+                    {isBoardSetupAvailable() ? [
+                        <Menu.Text
+                            key='boardSetup'
+                            id='boardSetup'
+                            name={intl.formatMessage({id: 'ViewHeader.board-setup', defaultMessage: 'Set up this board…'})}
+                            onClick={() => setShowSetup(true)}
                         />,
                     ] : []}
                     {isAgentReposAvailable() ? [
@@ -209,6 +219,11 @@ const ViewHeaderActionsMenu = (props: Props) => {
                 <WorkflowsDialog
                     board={board}
                     onClose={() => setShowWorkflows(false)}
+                />}
+            {showSetup &&
+                <BoardSetupWizard
+                    board={board}
+                    onClose={() => setShowSetup(false)}
                 />}
             {showPlanning &&
                 <PlanningDialog

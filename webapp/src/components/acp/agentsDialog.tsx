@@ -66,6 +66,17 @@ const commandPlaceholders: {[kind: string]: string} = {
     acp: 'gemini --acp',
 }
 
+// The agent kinds the manager knows, in the order they are offered. Exported
+// because the setup wizard asks the same question.
+export const AGENT_KINDS = [
+    {value: 'claude', label: 'Claude'},
+    {value: 'codex', label: 'Codex'},
+    {value: 'antigravity', label: 'Antigravity'},
+    {value: 'copilot', label: 'GitHub Copilot'},
+    {value: 'junie', label: 'JetBrains Junie'},
+    {value: 'acp', label: 'ACP (other)'},
+]
+
 export function isAgentsAvailable(): boolean {
     return Boolean(agentBindings()?.ListAgents)
 }
@@ -401,12 +412,12 @@ const AgentsDialog = (props: Props) => {
                                 value={form.kind}
                                 onChange={(e) => updateForm({kind: e.target.value})}
                             >
-                                <option value='claude'>{'Claude'}</option>
-                                <option value='codex'>{'Codex'}</option>
-                                <option value='antigravity'>{'Antigravity'}</option>
-                                <option value='copilot'>{'GitHub Copilot'}</option>
-                                <option value='junie'>{'JetBrains Junie'}</option>
-                                <option value='acp'>{'ACP (other)'}</option>
+                                {AGENT_KINDS.map((kind) => (
+                                    <option
+                                        key={kind.value}
+                                        value={kind.value}
+                                    >{kind.label}</option>
+                                ))}
                             </select>
                         </label>
                         <label>

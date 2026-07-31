@@ -17,7 +17,11 @@ export enum UserSettingKey {
     RandomIcons = 'randomIcons',
     MobileWarningClosed = 'mobileWarningClosed',
     WelcomePageViewed = 'welcomePageViewed',
-    NameFormat = 'nameFormat'
+    NameFormat = 'nameFormat',
+
+    // Boards whose setup wizard has been closed: a refusal is per board, not
+    // once for all of them.
+    AcpSetupDismissed = 'acpSetupDismissed'
 }
 
 export class UserSettings {
@@ -35,6 +39,21 @@ export class UserSettings {
             localStorage.setItem(key, value)
         }
         notifySettingsChanged(key)
+    }
+
+    static get acpSetupDismissed(): {[key: string]: string} {
+        const rawData = UserSettings.get(UserSettingKey.AcpSetupDismissed) || '{}'
+        try {
+            return JSON.parse(rawData)
+        } catch {
+            return {}
+        }
+    }
+
+    static setAcpSetupDismissed(boardId: string): void {
+        const settings = UserSettings.acpSetupDismissed
+        settings[boardId] = '1'
+        UserSettings.set(UserSettingKey.AcpSetupDismissed, JSON.stringify(settings))
     }
 
     static get language(): string | null {
