@@ -128,3 +128,75 @@ func (m *Manager) columnByName(property, column string) (ColumnSpec, bool) {
 	}
 	return ColumnSpec{}, false
 }
+
+// FlowStageCount is how busy one stage of a route is right now.
+type FlowStageCount struct {
+	NodeID  string `json:"nodeId"`
+	Cards   int    `json:"cards"`   // cards standing on this stage
+	Running int    `json:"running"` // of those, being worked on now
+	Queued  int    `json:"queued"`  // of those, waiting for a place in the column
+}
+
+// FlowOverview is one route and where the board's cards are along it.
+type FlowOverview struct {
+	Flow   string           `json:"flow"`
+	Stages []FlowStageCount `json:"stages"`
+	Cards  int              `json:"cards"`
+}
+
+// BoardFlowOverview answers "where is everything right now" for a board: for
+// each route it may use, how many cards stand on each of its stages and which
+// of them are moving. It is the map the workflow view draws — the same data the
+// engine runs on, rather than a second bookkeeping of it.
+func (m *Manager) BoardFlowOverview(boardID string) ([]FlowOverview, error) {
+	flows := m.BoardFlows(boardID)
+	if len(flows) == 0 {
+		return nil, nil
+	}
+	states, err := m.flowStates()
+	if err != nil {
+		return nil, err
+	}
+
+	// One pass over the live sessions, rather than one lookup per card.
+	m.mu.Lock()
+	running := make(map[string]bool, len(m.active))
+	for cardID := range m.byCard {
+		running[cardID] = true
+	}
+	m.mu.Unlock()
+
+	out := make([]FlowOverview, 0, len(flows))
+	for _, flow := range flows {
+		view := FlowOverview{Flow: flow.Name}
+		counts := make(map[string]*FlowStageCount, len(flow.Nodes))
+		for _, n := range flow.Nodes {
+			counts[n.ID] = &FlowStageCount{NodeID: n.ID}
+		}
+		for _, st := range states {
+			if !strings.EqualFold(st.Flow, flow.Name) {
+				continue
+			}
+			if boardID != "" && st.BoardID != "" && st.BoardID != boardID {
+				continue
+			}
+			count, ok := counts[st.NodeID]
+			if !ok {
+				continue // the card stands on a stage the route no longer has
+			}
+			count.Cards++
+			view.Cards++
+			switch {
+			case running[st.CardID]:
+				count.Running++
+			case m.cardIsQueued(st.CardID):
+				count.Queued++
+			}
+		}
+		for _, n := range flow.Nodes {
+			view.Stages = append(view.Stages, *counts[n.ID])
+		}
+		out = append(out, view)
+	}
+	return out, nil
+}

@@ -48,6 +48,7 @@ export interface IAppWindow extends Window {
                 RemoveBoardColumn(boardId: string, optionId: string, column: string): Promise<void>
                 GetWorktreeMode(): Promise<string>
                 GetCardFlow(cardId: string): Promise<string>
+                GetBoardFlowOverview(boardId: string): Promise<string>
                 AddFlow(entryJSON: string): Promise<string>
                 UpdateFlow(entryJSON: string): Promise<string>
                 RemoveFlow(name: string): Promise<void>

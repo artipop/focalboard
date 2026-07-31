@@ -306,3 +306,34 @@ func TestFlowEntryJSONRoundTrip(t *testing.T) {
 		t.Fatalf("round trip lost data: %+v", back)
 	}
 }
+
+// The builder puts a stage where the reader wants it, and that has to survive
+// the round trip — otherwise the canvas silently rearranges itself on reload.
+func TestFlowNodeKeepsWhereItWasPut(t *testing.T) {
+	f := sampleFlow()
+	f.Nodes[0].X, f.Nodes[0].Y = 420, 80
+
+	encoded, err := json.Marshal(f)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(encoded), `"x":420`) {
+		t.Fatalf("the position was not written: %s", encoded)
+	}
+	var back FlowEntry
+	if err := json.Unmarshal(encoded, &back); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := validateFlow(back, nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.Nodes[0].X != 420 || saved.Nodes[0].Y != 80 {
+		t.Fatalf("validation lost the position: %+v", saved.Nodes[0])
+	}
+	// A stage nobody placed stays unplaced, so it is laid out rather than
+	// pinned to the top-left corner.
+	if saved.Nodes[1].X != 0 || saved.Nodes[1].Y != 0 {
+		t.Fatalf("an unplaced stage gained a position: %+v", saved.Nodes[1])
+	}
+}

@@ -335,3 +335,45 @@ func TestBoardBringsItsOwnAutomation(t *testing.T) {
 		t.Fatalf("board1 lost its own routes: %+v", got)
 	}
 }
+
+// The map the workflow view draws: where the board's cards actually are.
+func TestBoardFlowOverviewCountsWhereTheCardsAre(t *testing.T) {
+	m, _, events, repo := flowManager(t, fakeClaudeHang, sampleFlow())
+
+	events.ch <- flowEvent("cardOverview", repo, "Backlog", "To Agent")
+	waitFor(t, 20*time.Second, "the card is working on the first stage", func() bool {
+		st, ok, _ := m.store.FlowStateForCard("cardOverview")
+		return ok && st.NodeID == "work"
+	})
+
+	overview, err := m.BoardFlowOverview("board1")
+	if err != nil || len(overview) != 1 {
+		t.Fatalf("overview: %+v, %v", overview, err)
+	}
+	if overview[0].Flow != "feature" || overview[0].Cards != 1 {
+		t.Fatalf("overview: %+v", overview[0])
+	}
+	var work FlowStageCount
+	for _, s := range overview[0].Stages {
+		if s.NodeID == "work" {
+			work = s
+		}
+	}
+	if work.Cards != 1 {
+		t.Fatalf("the card is not counted on its stage: %+v", overview[0].Stages)
+	}
+	waitFor(t, 10*time.Second, "the session shows as running", func() bool {
+		o, _ := m.BoardFlowOverview("board1")
+		for _, s := range o[0].Stages {
+			if s.NodeID == "work" && s.Running == 1 {
+				return true
+			}
+		}
+		return false
+	})
+
+	// A board that has no such route is told nothing rather than everything.
+	if got, err := m.BoardFlowOverview("другая-доска"); err != nil || len(got) != 1 || got[0].Cards != 0 {
+		t.Fatalf("another board sees this one's cards: %+v, %v", got, err)
+	}
+}

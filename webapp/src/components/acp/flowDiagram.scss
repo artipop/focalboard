@@ -43,6 +43,26 @@
         text-overflow: ellipsis;
     }
 
+    // The map's half: how many cards stand here, and how many are moving.
+    .FlowDiagram__count {
+        position: absolute;
+        top: 6px;
+        right: 8px;
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        padding: 0 6px;
+        border-radius: 9px;
+        font-size: 11px;
+        line-height: 16px;
+        color: rgba(var(--center-channel-bg-rgb), 1);
+        background: rgba(var(--center-channel-color-rgb), 0.72);
+    }
+
+    .FlowDiagram__stage {
+        position: relative;
+    }
+
     .FlowDiagram__action {
         font-size: 11px;
         color: rgba(var(--center-channel-color-rgb), 0.56);
@@ -50,8 +70,35 @@
 
     // React Flow's own chrome follows the board's theme rather than its
     // built-in light one.
+    // A route being read has no outputs to pull from; one being built shows
+    // them, and their colour is what the arrow will be.
     .react-flow__handle {
         opacity: 0;
+    }
+
+    &.FlowDiagram--editable {
+        .react-flow__handle {
+            opacity: 1;
+            width: 8px;
+            height: 8px;
+            border: 0;
+        }
+
+        .FlowDiagram__out--success {
+            background: #3db887;
+        }
+
+        .FlowDiagram__out--failure {
+            background: #d24b4e;
+        }
+
+        .FlowDiagram__out--event {
+            background: #8b8d94;
+        }
+
+        .react-flow__handle-left {
+            background: rgba(var(--center-channel-color-rgb), 0.32);
+        }
     }
 
     .react-flow__edge-textbg {

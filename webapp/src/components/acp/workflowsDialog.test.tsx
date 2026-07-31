@@ -70,6 +70,14 @@ function stubBindings(overrides: Record<string, unknown> = {}) {
         ListFlows: jest.fn().mockResolvedValue(JSON.stringify([featureFlow])),
         ListFlowTriggers: jest.fn().mockResolvedValue(JSON.stringify(triggers)),
         ListFlowTemplates: jest.fn().mockResolvedValue(JSON.stringify(shippedFlows)),
+        GetBoardFlowOverview: jest.fn().mockResolvedValue(JSON.stringify([{
+            flow: 'feature',
+            cards: 2,
+            stages: [
+                {nodeId: 'n1', cards: 2, running: 1, queued: 0},
+                {nodeId: 'n2', cards: 0, running: 0, queued: 0},
+            ],
+        }])),
         AddFlow: jest.fn().mockResolvedValue('{}'),
         UpdateFlow: jest.fn().mockResolvedValue('{}'),
         RemoveFlow: jest.fn().mockResolvedValue(undefined),
@@ -101,7 +109,16 @@ describe('components/acp/workflowsDialog', () => {
         ))
 
         await waitFor(() => expect(screen.getByText('feature')).toBeInTheDocument())
-        expect(screen.getByText('To Agent → Review')).toBeInTheDocument()
+
+        // The route is drawn rather than spelled out, and it says where the
+        // board's cards are standing on it.
+        for (const stage of featureFlow.nodes) {
+            expect(screen.getByText(stage.column)).toBeInTheDocument()
+        }
+        expect(screen.getByText('2 cards on this route')).toBeInTheDocument()
+
+        // Two of them on the first stage, one of those working.
+        expect(screen.getByText('2')).toBeInTheDocument()
     })
 
     test('edits a route: stages, outcomes and an awaited event', async () => {

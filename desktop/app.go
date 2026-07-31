@@ -421,6 +421,23 @@ func (a *App) GetCardFlow(cardID string) (string, error) {
 	return string(out), nil
 }
 
+// GetBoardFlowOverview returns where the board's cards stand on each route:
+// per stage, how many are there, how many are working and how many wait.
+func (a *App) GetBoardFlowOverview(boardID string) (string, error) {
+	if a.mgr == nil {
+		return "[]", nil
+	}
+	overview, err := a.mgr.BoardFlowOverview(boardID)
+	if err != nil {
+		return "", err
+	}
+	out, err := json.Marshal(overview)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
 // GetWorktreeMode reports where sessions run ("always" or "never"). The column
 // editor asks, because a crew of several agents in one repository only works
 // when each session gets its own worktree.

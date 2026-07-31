@@ -113,6 +113,11 @@ type FlowNode struct {
 
 	// DeployName overrides the column's deploy target for this stage.
 	DeployName string `json:"deployName,omitempty"`
+
+	// X and Y are where the builder left the stage on its canvas. Absent means
+	// "lay it out for me" — a route written by hand never has to place anything.
+	X float64 `json:"x,omitempty"`
+	Y float64 `json:"y,omitempty"`
 }
 
 // Crew is the agents this stage may run on, if it names any.

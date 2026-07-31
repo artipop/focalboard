@@ -100,7 +100,11 @@ runtime).
   and what that stage is waiting for. Routes belong to the board they were made
   on, and a board made from the "My Project Tasks" template arrives with them:
   the template carries its columns and routes in the board's own properties, and
-  the first card moved on it takes them into the registry.
+  the first card moved on it takes them into the registry. The Workflows dialog
+  is both the map and the builder: it draws each route with the number of cards
+  standing on every stage, and editing one turns the same canvas into the place
+  the graph is drawn — stages are dragged, and pulling from a stage's right edge
+  joins it to another.
 
 ## Develop
 

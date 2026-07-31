@@ -7,7 +7,7 @@ import '@testing-library/jest-dom'
 import {wrapIntl} from '../../testUtils'
 import {setupReactFlowEnvironment} from '../../test/reactFlowEnvironment'
 
-import FlowDiagram, {depths, layout, edgeKind, NODE_WIDTH} from './flowDiagram'
+import FlowDiagram, {depths, layout, edgeKind, connectEdge, HANDLE_EVENT, HANDLE_FAILURE, HANDLE_SUCCESS, NODE_WIDTH} from './flowDiagram'
 import {SUCCESS, FAILURE} from './workflowsDialog'
 
 setupReactFlowEnvironment()
@@ -108,5 +108,79 @@ describe('components/acp/flowDiagram', () => {
             />,
         ))
         expect(container).toBeEmptyDOMElement()
+    })
+})
+
+describe('components/acp/flowDiagram builder', () => {
+    const waitTriggers = [
+        {kind: 'branch.merged', source: 'git', label: 'ветка влита в основную'},
+        {kind: 'pr.merged', source: 'github', label: 'pull request смержен'},
+    ]
+
+    test('the handle a connection is pulled from is what the transition means', () => {
+        expect(connectEdge([], 'a', 'b', HANDLE_SUCCESS, waitTriggers)).toEqual([{from: 'a', to: 'b', on: SUCCESS}])
+        expect(connectEdge([], 'a', 'b', HANDLE_FAILURE, waitTriggers)).toEqual([{from: 'a', to: 'b', on: FAILURE}])
+
+        // An event connection takes the first trigger the stage does not
+        // already wait for, so pulling twice does not overwrite the first.
+        const first = connectEdge([], 'a', 'b', HANDLE_EVENT, waitTriggers)
+        expect(first).toEqual([{from: 'a', to: 'b', on: 'branch.merged'}])
+        expect(connectEdge(first, 'a', 'c', HANDLE_EVENT, waitTriggers)).toEqual([
+            {from: 'a', to: 'b', on: 'branch.merged'},
+            {from: 'a', to: 'c', on: 'pr.merged'},
+        ])
+    })
+
+    test('a stage may have only one transition per event, and none to itself', () => {
+        const existing = [{from: 'a', to: 'b', on: SUCCESS}]
+        expect(connectEdge(existing, 'a', 'c', HANDLE_SUCCESS, waitTriggers)).toEqual([{from: 'a', to: 'c', on: SUCCESS}])
+        expect(connectEdge(existing, 'a', 'a', HANDLE_SUCCESS, waitTriggers)).toBe(existing)
+        expect(connectEdge(existing, '', 'c', HANDLE_SUCCESS, waitTriggers)).toBe(existing)
+    })
+
+    test('a stage placed by hand stays where it was put', () => {
+        const placed = [
+            {id: 'a', column: 'A', action: 'agent', x: 400, y: 40},
+            {id: 'b', column: 'B', action: 'none'},
+        ]
+        const positions = layout(placed, [{from: 'a', to: 'b', on: SUCCESS}])
+        expect(positions.get('a')).toEqual({x: 400, y: 40})
+
+        // And one that was never placed is still laid out for the reader.
+        expect(positions.get('b')).toBeDefined()
+    })
+
+    test('an editable canvas shows the outputs a route is drawn from', () => {
+        const {container, rerender} = render(wrapIntl(
+            <FlowDiagram
+                nodes={nodes}
+                edges={edges}
+                triggers={triggers}
+            />,
+        ))
+        expect(container.querySelector('.FlowDiagram--editable')).toBeNull()
+
+        rerender(wrapIntl(
+            <FlowDiagram
+                nodes={nodes}
+                edges={edges}
+                triggers={triggers}
+                onChange={jest.fn()}
+            />,
+        ))
+        expect(container.querySelector('.FlowDiagram--editable')).not.toBeNull()
+        expect(container.querySelectorAll('.FlowDiagram__out--success').length).toBe(nodes.length)
+    })
+
+    test('the map says how many cards stand on a stage', async () => {
+        render(wrapIntl(
+            <FlowDiagram
+                nodes={nodes}
+                edges={edges}
+                triggers={triggers}
+                counts={[{nodeId: 'agent', cards: 3, running: 1, queued: 1}]}
+            />,
+        ))
+        expect(screen.getByText('3')).toBeInTheDocument()
     })
 })

@@ -12,7 +12,7 @@ import Button from '../../widgets/buttons/button'
 import Dialog from '../dialog'
 
 import {agentBindings} from './agentReposDialog'
-import FlowDiagram from './flowDiagram'
+import FlowDiagram, {StageCount} from './flowDiagram'
 
 import './workflowsDialog.scss'
 
@@ -22,9 +22,20 @@ import './workflowsDialog.scss'
 export type FlowNode = {
     id: string
     column: string
+
+    // The option the stage stands on, so renaming the column on the board
+    // changes nothing. Empty in a route written before columns had ids.
+    optionId?: string
+
+    // Empty means "whatever the column does"; 'none' means the stage runs
+    // nothing and waits for an event.
     action: string
-    agentName?: string
+    agentNames?: string[]
     deployName?: string
+
+    // Where the stage was left on the canvas. Absent means "lay it out for me".
+    x?: number
+    y?: number
 }
 
 export type FlowEdge = {
@@ -44,6 +55,13 @@ export type Flow = {
 
 // FlowTrigger is one transition kind the engine implements. The list comes from
 // Go, so the editor can never offer a transition that does nothing.
+// FlowOverview is where the board's cards stand on one route.
+export type FlowOverview = {
+    flow: string
+    cards: number
+    stages: StageCount[]
+}
+
 export type FlowTrigger = {
     kind: string
     source: string
@@ -88,6 +106,7 @@ const WorkflowsDialog = (props: Props) => {
     const bindings = agentBindings()
 
     const [flows, setFlows] = useState<Flow[]>([])
+    const [overview, setOverview] = useState<FlowOverview[]>([])
     const [templates, setTemplates] = useState<Flow[]>([])
     const [triggers, setTriggers] = useState<FlowTrigger[]>([])
     const [form, setForm] = useState<Flow | null>(null)
@@ -117,6 +136,9 @@ const WorkflowsDialog = (props: Props) => {
             }
             if (bindings.ListFlowTemplates) {
                 setTemplates(JSON.parse(await bindings.ListFlowTemplates()) || [])
+            }
+            if (bindings.GetBoardFlowOverview) {
+                setOverview(JSON.parse(await bindings.GetBoardFlowOverview(board.id)) || [])
             }
         } catch (e) {
             setError(String(e))
@@ -244,23 +266,37 @@ const WorkflowsDialog = (props: Props) => {
                         {intl.formatMessage({id: 'Workflows.empty', defaultMessage: 'No flows yet.'})}
                     </div>}
 
-                {!form && flows.map((flow) => (
-                    <div
-                        className='WorkflowsDialog__row'
-                        key={flow.name}
-                    >
-                        <span className='WorkflowsDialog__name'>{flow.name}</span>
-                        <span className='WorkflowsDialog__route'>
-                            {(flow.nodes || []).map((n) => n.column).join(' → ')}
-                        </span>
-                        <Button onClick={() => startEdit(flow)}>
-                            {intl.formatMessage({id: 'Workflows.edit', defaultMessage: 'Edit'})}
-                        </Button>
-                        <Button onClick={() => removeFlow(flow.name)}>
-                            {intl.formatMessage({id: 'Workflows.remove', defaultMessage: 'Remove'})}
-                        </Button>
-                    </div>
-                ))}
+                {!form && flows.map((flow) => {
+                    const stages = overview.find((o) => o.flow === flow.name)
+                    return (
+                        <div
+                            className='WorkflowsDialog__flow'
+                            key={flow.name}
+                        >
+                            <div className='WorkflowsDialog__row'>
+                                <span className='WorkflowsDialog__name'>{flow.name}</span>
+                                <span className='WorkflowsDialog__route'>
+                                    {stages && stages.cards > 0 ?
+                                        intl.formatMessage({id: 'Workflows.cards-on-route', defaultMessage: '{count} cards on this route'}, {count: stages.cards}) :
+                                        intl.formatMessage({id: 'Workflows.no-cards', defaultMessage: 'no cards on this route'})}
+                                </span>
+                                <Button onClick={() => startEdit(flow)}>
+                                    {intl.formatMessage({id: 'Workflows.edit', defaultMessage: 'Edit'})}
+                                </Button>
+                                <Button onClick={() => removeFlow(flow.name)}>
+                                    {intl.formatMessage({id: 'Workflows.remove', defaultMessage: 'Remove'})}
+                                </Button>
+                            </div>
+                            <FlowDiagram
+                                nodes={flow.nodes || []}
+                                edges={flow.edges || []}
+                                triggers={triggers}
+                                counts={stages?.stages}
+                                height={220}
+                            />
+                        </div>
+                    )
+                })}
 
                 {form &&
                     <div className='WorkflowsDialog__form'>
@@ -302,7 +338,11 @@ const WorkflowsDialog = (props: Props) => {
                             nodes={form.nodes}
                             edges={form.edges}
                             triggers={triggers}
+                            onChange={(nodes, edges) => updateForm({nodes, edges})}
                         />
+                        <div className='WorkflowsDialog__hint'>
+                            {intl.formatMessage({id: 'Workflows.canvas-hint', defaultMessage: 'Drag a stage to move it; pull from its right side to join stages (upper point — on success, lower — on failure), from the bottom point to wait for an event. Delete removes what is selected.'})}
+                        </div>
 
                         {form.nodes.map((node) => (
                             <div
