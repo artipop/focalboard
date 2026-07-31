@@ -143,6 +143,25 @@ func (b *EventsBackend) CardByID(ctx context.Context, cardID string) (acp.CardMo
 	}, nil
 }
 
+// BoardProperties returns the board's own free-form properties, where a
+// template leaves the automation it ships (see acp.BoardPropColumns/Flows).
+func (b *EventsBackend) BoardProperties(_ context.Context, boardID string) (map[string]any, error) {
+	b.mu.Lock()
+	a := b.app
+	b.mu.Unlock()
+	if a == nil {
+		return nil, fmt.Errorf("board app is not ready")
+	}
+	board, err := a.GetBoard(boardID)
+	if err != nil {
+		return nil, fmt.Errorf("get board %s: %w", boardID, err)
+	}
+	if board == nil {
+		return nil, nil
+	}
+	return board.Properties, nil
+}
+
 func column(def model.PropDef, optionID string) acp.Column {
 	name := ""
 	if opt, ok := def.Options[optionID]; ok {

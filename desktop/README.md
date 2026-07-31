@@ -97,7 +97,10 @@ runtime).
   no `Workflow` option takes none, and the trigger columns work as they always
   did. The editor draws the route as a graph and offers whichever shipped route
   the registry is missing. A card shows its own route: which stage it stands on
-  and what that stage is waiting for.
+  and what that stage is waiting for. Routes belong to the board they were made
+  on, and a board made from the "My Project Tasks" template arrives with them:
+  the template carries its columns and routes in the board's own properties, and
+  the first card moved on it takes them into the registry.
 
 ## Develop
 

@@ -157,6 +157,25 @@ describe('components/acp/workflowsDialog', () => {
         await waitFor(() => expect(screen.getByText(/два перехода по событию/)).toBeInTheDocument())
     })
 
+    test('asks for the routes of the board it was opened on, and saves them to it', async () => {
+        const bindings = stubBindings()
+        const board = boardWithColumns()
+        render(wrapIntl(
+            <WorkflowsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(bindings.ListFlows).toBeCalledWith(board.id))
+
+        userEvent.click(screen.getByRole('button', {name: 'Edit'}))
+        await waitFor(() => expect(screen.getByDisplayValue('feature')).toBeInTheDocument())
+        userEvent.click(screen.getByRole('button', {name: 'Save'}))
+
+        await waitFor(() => expect(bindings.UpdateFlow).toBeCalled())
+        expect(JSON.parse(bindings.UpdateFlow.mock.calls[0][0]).boardId).toBe(board.id)
+    })
+
     test('offers the shipped routes the registry is missing, and only those', async () => {
         stubBindings()
         render(wrapIntl(

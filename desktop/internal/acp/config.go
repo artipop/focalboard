@@ -637,7 +637,11 @@ func (c Config) TestTimeout() time.Duration {
 func LoadConfig(path, dataDir string) (Config, error) {
 	b, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		cfg := withTemplateFlows(withColumns(DefaultConfig(dataDir)))
+		// A new install seeds no routes: the board brings its own (the "My
+		// Project Tasks" template ships them), and the editor offers the same
+		// ones to a board that does not. Columns are still derived from the
+		// trigger-column keys, so a hand-made board behaves as it always did.
+		cfg := withColumns(DefaultConfig(dataDir))
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return cfg, err
 		}
@@ -675,7 +679,9 @@ func LoadConfig(path, dataDir string) (Config, error) {
 	if probe.Columns == nil {
 		cfg = withColumns(cfg)
 	}
-	if probe.Flows == nil {
+	if probe.Flows == nil && len(cfg.Columns) > 0 {
+		// An install that predates flows keeps the routes it would have been
+		// given then; a fresh one gets them from its board instead.
 		cfg = withTemplateFlows(cfg)
 	}
 	return cfg, nil

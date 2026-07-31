@@ -283,13 +283,14 @@ func (a *App) RemoveDeployTarget(name string) error {
 	return a.mgr.RemoveDeploy(name)
 }
 
-// ListFlows returns the flow registry as JSON: the routes cards take across the
-// board, each a graph of nodes (column + action) and edges (event + target).
-func (a *App) ListFlows() (string, error) {
+// ListFlows returns the routes a board may use as JSON — its own, plus any tied
+// to no board in particular — each a graph of nodes (a column) and edges (an
+// event and where it leads).
+func (a *App) ListFlows(boardID string) (string, error) {
 	if a.mgr == nil {
 		return "[]", nil
 	}
-	out, err := json.Marshal(a.mgr.Flows())
+	out, err := json.Marshal(a.mgr.BoardFlows(boardID))
 	if err != nil {
 		return "", err
 	}

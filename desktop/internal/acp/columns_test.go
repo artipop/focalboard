@@ -1,6 +1,8 @@
 package acp
 
 import (
+	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -256,5 +258,80 @@ func TestCardFlowDescribesWhereTheCardStands(t *testing.T) {
 	// A card that is on no route says nothing at all, rather than erroring.
 	if got, err := m.CardFlowFor("cardNobodyKnows"); got != nil || err != nil {
 		t.Fatalf("a card with no route: %+v, %v", got, err)
+	}
+}
+
+// fakeBoardMeta is a board that carries its own automation, the way the
+// template does.
+type fakeBoardMeta struct{ props map[string]any }
+
+func (f *fakeBoardMeta) BoardProperties(context.Context, string) (map[string]any, error) {
+	return f.props, nil
+}
+
+// A board made from the template works before anything is configured: it brings
+// the columns it runs and the routes across it, and they are taken once.
+func TestBoardBringsItsOwnAutomation(t *testing.T) {
+	m := agentManager(t, "")
+	m.cfg.Columns = nil
+	m.cfg.Flows = nil
+	m.rootCtx = context.Background()
+
+	automation, err := json.Marshal(BoardAutomation{
+		Columns: []ColumnSpec{{
+			PropertyID: "p", OptionID: "opt-work", Property: "Status",
+			Column: "In Progress", Action: FlowActionAgent, MaxRunning: 2,
+		}},
+		Flows: []FlowEntry{{
+			Name: "Feature", Property: "Status",
+			Nodes: []FlowNode{
+				{ID: "work", Column: "In Progress", OptionID: "opt-work"},
+				{ID: "review", Column: "In Review", OptionID: "opt-review", Action: FlowActionNone},
+			},
+			Edges: []FlowEdge{{From: "work", To: "review", On: TriggerSuccess}},
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var props map[string]any
+	if err := json.Unmarshal(automation, &props); err != nil {
+		t.Fatal(err)
+	}
+	m.SetBoardMeta(&fakeBoardMeta{props: props})
+
+	m.seedFromBoard("board1")
+	if len(m.cfg.Columns) != 1 || m.cfg.Columns[0].BoardID != "board1" || m.cfg.Columns[0].MaxRunning != 2 {
+		t.Fatalf("columns not taken from the board: %+v", m.cfg.Columns)
+	}
+	if len(m.cfg.Flows) != 1 || m.cfg.Flows[0].BoardID != "board1" {
+		t.Fatalf("routes not taken from the board: %+v", m.cfg.Flows)
+	}
+
+	// The stage inherits its column, which is the whole point of shipping both.
+	spec, ok := m.columnFor("board1", Column{PropertyID: "p", PropertyName: "Status", OptionID: "opt-work", Name: "In Progress"})
+	if !ok || spec.Action != FlowActionAgent {
+		t.Fatalf("column: %+v, %v", spec, ok)
+	}
+
+	// Reading the board again changes nothing, and an edit made since is kept.
+	m.cfg.Columns[0].MaxRunning = 5
+	m.seededMu.Lock()
+	m.seeded = nil
+	m.seededMu.Unlock()
+	m.seedFromBoard("board1")
+	if len(m.cfg.Columns) != 1 || m.cfg.Columns[0].MaxRunning != 5 {
+		t.Fatalf("a second import overwrote what the user changed: %+v", m.cfg.Columns)
+	}
+	if len(m.cfg.Flows) != 1 {
+		t.Fatalf("routes duplicated on a second import: %+v", m.cfg.Flows)
+	}
+
+	// Another board does not see this one's routes.
+	if got := m.BoardFlows("board2"); len(got) != 0 {
+		t.Fatalf("board2 sees board1's routes: %+v", got)
+	}
+	if got := m.BoardFlows("board1"); len(got) != 1 {
+		t.Fatalf("board1 lost its own routes: %+v", got)
 	}
 }

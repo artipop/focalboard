@@ -28,6 +28,7 @@ type Manager struct {
 	writer  BoardWriter
 	reader  BoardReader // optional; enables opening a console on a card
 	users   BoardUsers  // optional; enables assigning cards to an agent
+	meta    BoardMeta   // optional; lets a board bring its own columns and routes
 	ui      UIEmitter
 	log     *slog.Logger
 	tr      *Tracer
@@ -35,6 +36,9 @@ type Manager struct {
 	mu     sync.Mutex
 	active map[string]*Session // session ID → session
 	byCard map[string]*Session // card ID → live (non-terminal) session
+
+	seededMu sync.Mutex
+	seeded   map[string]bool // boards whose own settings have been imported
 
 	permMu sync.Mutex
 	perms  map[string]pendingPermission // request ID → prompt awaiting a human

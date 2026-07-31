@@ -24,6 +24,10 @@ func (m *Manager) triggerLoop(ch <-chan CardMoved) {
 }
 
 func (m *Manager) handleEvent(ev CardMoved) {
+	// A board may ship its own columns and routes (the template does); take
+	// them once, before anything asks what this column does.
+	m.seedFromBoard(ev.BoardID)
+
 	// A card with a route is driven by its flow; a card without one still gets
 	// whatever its column does — the flow adds transitions, not behaviour.
 	if m.handleFlowMove(ev) {

@@ -35,6 +35,7 @@ export type FlowEdge = {
 
 export type Flow = {
     name: string
+    boardId?: string
     repoName?: string
     property?: string
     nodes: FlowNode[]
@@ -110,7 +111,7 @@ const WorkflowsDialog = (props: Props) => {
             return
         }
         try {
-            setFlows(JSON.parse(await bindings.ListFlows()) || [])
+            setFlows(JSON.parse(await bindings.ListFlows(board.id)) || [])
             if (bindings.ListFlowTriggers) {
                 setTriggers(JSON.parse(await bindings.ListFlowTriggers()) || [])
             }
@@ -120,7 +121,7 @@ const WorkflowsDialog = (props: Props) => {
         } catch (e) {
             setError(String(e))
         }
-    }, [bindings])
+    }, [bindings, board.id])
 
     useEffect(() => {
         refresh()
@@ -157,7 +158,7 @@ const WorkflowsDialog = (props: Props) => {
         }
         setError('')
         try {
-            const entry = {...form, name: form.name.trim()}
+            const entry = {...form, name: form.name.trim(), boardId: form.boardId || board.id}
             if (editingName) {
                 await bindings.UpdateFlow!(JSON.stringify(entry))
             } else {

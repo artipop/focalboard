@@ -76,6 +76,12 @@ var FlowTriggers = []FlowTrigger{
 type FlowEntry struct {
 	Name string `json:"name"` // registry key; matches the card "Flow" option
 
+	// BoardID is the board the route belongs to. A route that came from a
+	// board's own settings carries it, so two boards can hold routes of the
+	// same name and not see each other's. Empty means every board, which is
+	// what a route configured before boards were told apart means.
+	BoardID string `json:"boardId,omitempty"`
+
 	// RepoName ties the flow to an entry of the repo registry, so a card that
 	// only names its repository still finds its route.
 	RepoName string `json:"repoName,omitempty"`
@@ -224,6 +230,25 @@ func (m *Manager) Flows() []FlowEntry {
 	m.cfgMu.RLock()
 	defer m.cfgMu.RUnlock()
 	return append([]FlowEntry(nil), m.cfg.Flows...)
+}
+
+// BoardFlows returns the routes a board may use: its own, plus those tied to no
+// board in particular. It is what the editor lists, so one board never offers
+// another's routes.
+func (m *Manager) BoardFlows(boardID string) []FlowEntry {
+	m.cfgMu.RLock()
+	defer m.cfgMu.RUnlock()
+	return boardFlows(m.cfg.Flows, boardID)
+}
+
+func boardFlows(flows []FlowEntry, boardID string) []FlowEntry {
+	out := make([]FlowEntry, 0, len(flows))
+	for _, f := range flows {
+		if f.BoardID == "" || boardID == "" || f.BoardID == boardID {
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 // validateFlow normalizes and checks one route. repos/agents/deploys are the
@@ -378,7 +403,7 @@ func (m *Manager) RemoveFlow(name string) error {
 // trigger columns keep working for it.
 func (m *Manager) resolveFlow(ev CardMoved, repoPath string) *FlowEntry {
 	m.cfgMu.RLock()
-	flows := append([]FlowEntry(nil), m.cfg.Flows...)
+	flows := boardFlows(m.cfg.Flows, ev.BoardID)
 	repos := append([]RepoEntry(nil), m.cfg.Repos...)
 	m.cfgMu.RUnlock()
 
