@@ -2,12 +2,13 @@ package acp
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/mattermost/focalboard/desktop/internal/webtest"
+	"time"
 )
 
 // testSession builds a manager with a writable artifacts directory and a
@@ -28,24 +29,40 @@ func testSession(t *testing.T, mutate func(*Config)) (*Manager, *fakeWriter, *Se
 	return m, w, s
 }
 
-// writeRun fakes what the MCP server leaves behind: screenshots and a verdict.
-func writeRun(t *testing.T, dir string, res webtest.Result, shots ...string) {
+// writeRun fakes what a test session leaves behind: screenshots saved by the
+// agent's browser server and the result.json the agent is asked to write.
+func writeRun(t *testing.T, dir string, res TestResult, shots ...string) {
 	t.Helper()
-	art := webtest.NewArtifacts(dir)
-	for _, name := range shots {
-		if _, err := art.SaveScreenshot(name, []byte("\x89PNG"+name)); err != nil {
+	if len(shots) > 0 {
+		if err := os.MkdirAll(filepath.Join(dir, ScreenshotDir), 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
-	if err := art.WriteResult(res); err != nil {
+	for i, name := range shots {
+		path := filepath.Join(dir, ScreenshotDir, fmt.Sprintf("%02d-%s.png", i+1, name))
+		if err := os.WriteFile(path, []byte("\x89PNG"+name), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if res.At.IsZero() {
+		res.At = time.Now()
+	}
+	out, err := json.MarshalIndent(res, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ResultFile), out, 0o644); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func TestReportTestRunPassMovesTheCardAndAttachsEvidence(t *testing.T) {
 	m, w, s := testSession(t, nil)
-	writeRun(t, s.Test.Artifacts, webtest.Result{
-		Verdict: webtest.VerdictPass,
+	writeRun(t, s.Test.Artifacts, TestResult{
+		Verdict: VerdictPass,
 		Summary: "Оформление заказа работает",
 		Steps:   []string{"открыл каталог", "оформил заказ"},
 	}, "catalog", "checkout")
@@ -85,8 +102,8 @@ func TestReportTestRunPassMovesTheCardAndAttachsEvidence(t *testing.T) {
 
 func TestReportTestRunFailListsBugsAndMovesToFailed(t *testing.T) {
 	m, w, s := testSession(t, nil)
-	writeRun(t, s.Test.Artifacts, webtest.Result{
-		Verdict: webtest.VerdictFail,
+	writeRun(t, s.Test.Artifacts, TestResult{
+		Verdict: VerdictFail,
 		Summary: "Корзина не открывается",
 		Bugs:    []string{"Клик по «Купить» ничего не делает; в консоли TypeError"},
 	}, "broken")
@@ -106,8 +123,8 @@ func TestReportTestRunFailListsBugsAndMovesToFailed(t *testing.T) {
 
 func TestReportTestRunBlockedLeavesTheCardAlone(t *testing.T) {
 	m, w, s := testSession(t, nil)
-	writeRun(t, s.Test.Artifacts, webtest.Result{
-		Verdict: webtest.VerdictBlocked,
+	writeRun(t, s.Test.Artifacts, TestResult{
+		Verdict: VerdictBlocked,
 		Summary: "Превью не открывается: 502",
 	})
 
@@ -124,8 +141,8 @@ func TestReportTestRunBlockedLeavesTheCardAlone(t *testing.T) {
 func TestReportTestRunWithoutAVerdict(t *testing.T) {
 	m, w, s := testSession(t, nil)
 	// The agent took a screenshot but never called report_result.
-	writeRun(t, s.Test.Artifacts, webtest.Result{Verdict: webtest.VerdictPass})
-	if err := os.Remove(filepath.Join(s.Test.Artifacts, webtest.ResultFile)); err != nil {
+	writeRun(t, s.Test.Artifacts, TestResult{Verdict: VerdictPass})
+	if err := os.Remove(filepath.Join(s.Test.Artifacts, ResultFile)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -146,8 +163,8 @@ func TestReportTestRunWithoutAVerdict(t *testing.T) {
 
 func TestReportTestRunOnABrokenOffTurnStillReports(t *testing.T) {
 	m, w, s := testSession(t, nil)
-	writeRun(t, s.Test.Artifacts, webtest.Result{
-		Verdict: webtest.VerdictFail,
+	writeRun(t, s.Test.Artifacts, TestResult{
+		Verdict: VerdictFail,
 		Summary: "Не дошёл до конца",
 		Bugs:    []string{"страница висит"},
 	}, "hang")
@@ -165,7 +182,7 @@ func TestReportTestRunOnABrokenOffTurnStillReports(t *testing.T) {
 
 func TestReportTestRunHonoursUnconfiguredColumns(t *testing.T) {
 	m, w, s := testSession(t, func(c *Config) { c.TestPassColumn = "" })
-	writeRun(t, s.Test.Artifacts, webtest.Result{Verdict: webtest.VerdictPass, Summary: "ок"})
+	writeRun(t, s.Test.Artifacts, TestResult{Verdict: VerdictPass, Summary: "ок"})
 
 	m.reportTestRun(s, "", nil)
 
@@ -180,7 +197,7 @@ func TestReportTestRunCapsAttachments(t *testing.T) {
 	for i := range shots {
 		shots[i] = "step"
 	}
-	writeRun(t, s.Test.Artifacts, webtest.Result{Verdict: webtest.VerdictPass, Summary: "ок"}, shots...)
+	writeRun(t, s.Test.Artifacts, TestResult{Verdict: VerdictPass, Summary: "ок"}, shots...)
 
 	m.reportTestRun(s, "", nil)
 

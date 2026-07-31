@@ -3,11 +3,11 @@ package acp
 import (
 	"fmt"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/mattermost/focalboard/desktop/internal/dokku"
-	"github.com/mattermost/focalboard/desktop/internal/webtest"
 )
 
 // The test column points a session at a running preview instead of at the
@@ -40,6 +40,9 @@ func (m *Manager) resolveTestRun(ev CardMoved, repoPath, sessionID string, test 
 	run := &TestRun{URL: previewURL, Branch: branch}
 	if strings.TrimSpace(root) != "" {
 		run.Artifacts = filepath.Join(root, sessionID)
+		if err := os.MkdirAll(run.Artifacts, 0o755); err != nil {
+			return nil, fmt.Errorf("не удалось создать каталог артефактов: %w", err)
+		}
 	}
 	return run, nil
 }
@@ -105,30 +108,16 @@ func composeTestPrompt(ev CardMoved, agent AgentEntry, systemPrompt, testPrompt 
 	if run.Branch != "" {
 		b = fmt.Appendf(b, "Ветка: %s\n", run.Branch)
 	}
+	if run.Artifacts != "" {
+		// The report is a file now, so the agent has to be told where to put it
+		// and its evidence.
+		b = fmt.Appendf(b, "Отчёт: %s\nСкриншоты складывай в: %s\n",
+			filepath.Join(run.Artifacts, ResultFile), filepath.Join(run.Artifacts, ScreenshotDir))
+	}
 	if ev.Body != "" {
 		b = fmt.Appendf(b, "\nЧто должно работать (описание карточки):\n%s\n", ev.Body)
 	} else {
 		b = fmt.Appendf(b, "\nОписания у карточки нет — пройди основные сценарии приложения и проверь, что ничего не сломано.\n")
 	}
 	return string(b)
-}
-
-// testTools are the browser tools a test session may use without asking. A
-// card-triggered session has no console watching, and asking nobody means
-// rejecting — the same reasoning that put the dokku tools on the auto-allow
-// list. They are seeded per session rather than into DefaultConfig.AutoAllowTools
-// so that installs with an existing config.json get them too. eval_js is left
-// off: running arbitrary script in the page is worth a human answer when there
-// is one to be had.
-func testTools() map[string]bool {
-	names := []string{
-		"open_page", "snapshot", "click", "fill", "fill_secret", "select_option",
-		"hover", "press_key", "wait_for", "screenshot", "console_log", "network_log",
-		"report_result",
-	}
-	allow := make(map[string]bool, len(names))
-	for _, n := range names {
-		allow["mcp__"+webtest.ServerName+"__"+n] = true
-	}
-	return allow
 }

@@ -66,12 +66,14 @@ runtime).
 - **Linux installers**: `nfpm` for `.deb` (`go install
   github.com/goreleaser/nfpm/v2/cmd/nfpm@latest`); the AppImage script downloads
   `appimagetool` if it isn't already on `PATH`.
-- **Browser-testing sessions** (the "To Test" column, `internal/webtest`) drive a
-  real browser over CDP: an installed Chrome/Chromium/Edge is used when there is
-  one, otherwise rod downloads a managed Chromium into its own cache on first
-  run. Set `browserPath` in the agent config to pin a binary, and
-  `browserHeadless: false` to watch the run. Screenshots and `result.json` of
-  each run land in `artifactsDir` (default `<dataDir>/artifacts/<session-id>`).
+- **Browser-testing sessions** (the "To Test" column) need a browser MCP server
+  on the agent — `playwright = npx -y @playwright/mcp@latest --headless
+  --browser chrome` under *Agents → MCP servers*, for instance. The app ships no
+  browser driver of its own and stays Node-free; the server is the user's
+  choice, and a test session refuses to start for an agent without one. Each run
+  gets a directory under `artifactsDir` (default
+  `<dataDir>/artifacts/<session-id>`) where the agent is asked to save its
+  screenshots and write `result.json` — that verdict is what moves the card.
 
 ## Develop
 

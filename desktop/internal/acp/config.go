@@ -350,14 +350,11 @@ type Config struct {
 	// card's own description (which is the scenario) are appended to it.
 	TestPrompt string `json:"testPrompt"`
 
-	// Browser settings for test sessions. BrowserPath is an explicit binary;
-	// empty means an installed Chrome, else a managed Chromium downloaded once.
 	// TestTimeoutMinutes replaces SessionTimeoutMinutes for a test turn, which
-	// clicks through a whole scenario and needs longer than a code edit.
-	BrowserPath        string `json:"browserPath,omitempty"`
-	BrowserHeadless    *bool  `json:"browserHeadless,omitempty"`
-	BrowserViewport    string `json:"browserViewport,omitempty"`
-	TestTimeoutMinutes int    `json:"testTimeoutMinutes"`
+	// clicks through a whole scenario and needs longer than a code edit. How the
+	// browser itself is launched — headless, which binary, what viewport — is
+	// the business of the MCP server the agent carries, not of this config.
+	TestTimeoutMinutes int `json:"testTimeoutMinutes"`
 
 	// ArtifactsDir is where screenshots and result.json of test runs are kept.
 	ArtifactsDir string `json:"artifactsDir"`
@@ -462,20 +459,27 @@ app_logs показывает логи сборки и приложения, dep
 const DefaultTestPrompt = `Задача: проверить в браузере превью этой карточки — вместо ручного тестировщика.
 
 Сценарий бери из описания карточки: что должно было измениться, то и проверяй,
-плюс убедись, что рядом ничего не развалилось. Работай только инструментами
-mcp__webtest__*: open_page открывает страницу, snapshot показывает её текстом
-со ссылками [e12], дальше click/fill/select_option по этим ссылкам. После
-любого действия, меняющего страницу, делай новый snapshot — старые ссылки
-протухают.
+плюс убедись, что рядом ничего не развалилось. Браузер води инструментами
+браузерного MCP-сервера, который у тебя есть (mcp__…__browser_navigate,
+browser_snapshot, browser_click, browser_type и прочие): snapshot показывает
+страницу текстом со ссылками на элементы, действия делаются по этим ссылкам.
+После действия, меняющего страницу, бери новый snapshot — ссылки протухают.
 
-Обязательно посмотри console_log и network_log: ошибки JS и упавшие запросы —
-это дефекты, даже если внешне всё нарисовалось. Делай screenshot на ключевых
-шагах и на каждом найденном дефекте: скриншоты попадут в карточку.
+Открывай только адрес превью, указанный ниже, и страницы под ним — на другие
+хосты не ходи. Посмотри консоль и сетевые запросы: ошибки JS и упавшие запросы
+— это дефекты, даже если внешне всё нарисовалось. Делай скриншоты на ключевых
+шагах и на каждом найденном дефекте, сохраняя их в каталог screenshots рядом
+с отчётом: они попадут в карточку.
 
-Ничего не чини и не меняй код — ты тестируешь. В самом конце вызови
-report_result: pass — сценарий прошёл, fail — есть дефекты (перечисли их
-в bugs: что ожидалось и что произошло), blocked — проверить не удалось
-(превью не открывается, нет доступа).`
+Ничего не чини и не меняй код — ты тестируешь. В самом конце запиши отчёт
+в файл result.json (путь указан ниже) — без него результат прогона не
+засчитывается:
+
+{"verdict": "pass|fail|blocked", "summary": "итог в одну-две фразы",
+ "steps": ["что проделал, по шагам"], "bugs": ["что ожидалось и что произошло"]}
+
+pass — сценарий прошёл, fail — есть дефекты (перечисли их в bugs),
+blocked — проверить не удалось (превью не открывается, нет доступа).`
 
 // TestTimeout bounds one test turn. A browser scenario takes much longer than a
 // code edit, so it has its own budget instead of SessionTimeoutMinutes.
@@ -484,13 +488,6 @@ func (c Config) TestTimeout() time.Duration {
 		return c.SessionTimeout()
 	}
 	return time.Duration(c.TestTimeoutMinutes) * time.Minute
-}
-
-// HeadlessBrowser reports whether test runs hide the browser window. It is a
-// pointer in the config so an existing file without the key still gets the
-// default rather than "false".
-func (c Config) HeadlessBrowser() bool {
-	return c.BrowserHeadless == nil || *c.BrowserHeadless
 }
 
 // LoadConfig reads path, creating it with defaults when absent.

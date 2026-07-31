@@ -5,8 +5,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"github.com/mattermost/focalboard/desktop/internal/webtest"
 )
 
 func TestResolvePreviewURL(t *testing.T) {
@@ -60,7 +58,8 @@ func TestResolvePreviewURL(t *testing.T) {
 
 func TestResolveTestRunUsesAPerSessionArtifactsDir(t *testing.T) {
 	m := agentManager(t, "")
-	m.cfg.ArtifactsDir = "/data/artifacts"
+	root := t.TempDir()
+	m.cfg.ArtifactsDir = root
 	ev := CardMoved{Props: map[string]string{"preview_url": "https://feat-x.example.com"}}
 
 	// An ordinary session resolves nothing, so the launch path can call this
@@ -73,8 +72,13 @@ func TestResolveTestRunUsesAPerSessionArtifactsDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if run.Artifacts != filepath.Join("/data/artifacts", "sess-1") {
+	if run.Artifacts != filepath.Join(root, "sess-1") {
 		t.Fatalf("artifacts dir: %q", run.Artifacts)
+	}
+	// The agent is told to write its report there, so the directory has to
+	// exist before it tries.
+	if info, err := os.Stat(run.Artifacts); err != nil || !info.IsDir() {
+		t.Fatalf("artifacts dir not created: %v", err)
 	}
 
 	// No configured root means no artifacts, not a broken path.
@@ -95,7 +99,7 @@ func TestComposeTestPromptCarriesTheScenario(t *testing.T) {
 	for _, want := range []string{
 		"Отвечай по-русски.",          // board system prompt
 		"Ты работаешь в проекте Shop", // agent prompt
-		"report_result",              // the default tester instructions
+		ResultFile,                   // the default tester instructions
 		"https://feat-x.example.com", // what to open
 		"feat/x",
 		"Кнопка «Купить»", // the card body is the scenario
@@ -108,7 +112,7 @@ func TestComposeTestPromptCarriesTheScenario(t *testing.T) {
 	// A configured prompt replaces the default; a card without a description
 	// still gets a job.
 	prompt = composeTestPrompt(CardMoved{Title: "Смоук"}, AgentEntry{}, "", "Проверь только главную.", run)
-	if strings.Contains(prompt, "report_result") || !strings.Contains(prompt, "Проверь только главную.") {
+	if strings.Contains(prompt, "browser_snapshot") || !strings.Contains(prompt, "Проверь только главную.") {
 		t.Fatalf("custom prompt not used:\n%s", prompt)
 	}
 	if !strings.Contains(prompt, "Описания у карточки нет") {
@@ -116,45 +120,46 @@ func TestComposeTestPromptCarriesTheScenario(t *testing.T) {
 	}
 }
 
-func TestTestSessionGetsTheBrowserToolsWithoutAsking(t *testing.T) {
-	allow := testTools()
-	if !allow["mcp__webtest__click"] || !allow["mcp__webtest__report_result"] {
-		t.Fatalf("browser tools not pre-allowed: %v", allow)
-	}
-	// Running arbitrary script in the page is still worth a human answer.
-	if allow["mcp__webtest__eval_js"] {
-		t.Fatal("eval_js must not be auto-allowed")
-	}
-	// The dokku tools are not part of this deal.
-	if allow["mcp__dokku__deploy_branch"] {
-		t.Fatal("a test session should not get deploy tools")
-	}
-}
-
 func TestSessionMCPServersForATestSession(t *testing.T) {
 	cfg := DefaultConfig(t.TempDir())
-	cfg.BrowserViewport = "1440x900"
-	headless := false
-	cfg.BrowserHeadless = &headless
+	agent := AgentEntry{Name: "jojo", Kind: "junie", MCPServers: []AgentMCPServer{
+		{Name: "playwright", Command: []string{"npx", "-y", "@playwright/mcp@latest", "--headless"}},
+	}}
+	s := &Session{RepoPath: "/repo", Agent: agent, Test: &TestRun{URL: "https://feat-x.example.com", Artifacts: "/data/run"}}
 
-	s := &Session{RepoPath: "/repo", Test: &TestRun{URL: "https://feat-x.example.com", Artifacts: "/data/run"}}
 	specs, err := sessionMCPServers(s, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(specs) != 1 || specs[0].Name != "webtest" {
+	// The browser is the agent's own server; we add nothing of our own to a
+	// test run any more.
+	if len(specs) != 1 || specs[0].Name != "playwright" || specs[0].Command != "npx" {
 		t.Fatalf("specs: %+v", specs)
 	}
-	self, _ := os.Executable()
-	if specs[0].Command != self || strings.Join(specs[0].Args, " ") != "mcp webtest" {
-		t.Fatalf("the server must be this binary: %+v", specs[0])
+	// Its tools are allowed by prefix: their names only exist at run time, and
+	// a card-triggered run has no console to ask.
+	if !s.toolPrefixAllowed("mcp__playwright__browser_click") {
+		t.Error("browser tools should run unasked")
 	}
-	env := specs[0].Env
-	if env[webtest.EnvBaseURL] != s.Test.URL || env[webtest.EnvArtifacts] != s.Test.Artifacts {
-		t.Fatalf("env: %+v", env)
+	if s.toolAllowed("mcp__dokku__deploy_branch") {
+		t.Error("a test session should not get deploy tools")
 	}
-	if env[webtest.EnvHeadless] != "0" || env[webtest.EnvViewport] != "1440x900" {
-		t.Fatalf("browser settings not passed: %+v", env)
+}
+
+func TestTestSessionNeedsABrowserServer(t *testing.T) {
+	repo := initTestRepo(t)
+	m := agentManager(t, "", AgentEntry{Name: "bare", Kind: "claude"})
+	m.cfg.Deploys = []DeployEntry{deployEntry("prod")}
+	m.cfg.Repos = []RepoEntry{{Name: "webapp", Path: repo}}
+
+	ev := CardMoved{CardID: "cardT", Title: "Проверить", Props: map[string]string{"repo_path": repo, "branch": "feat/x"}}
+	_, err := m.startSession(ev, startOptions{test: true})
+	if err == nil {
+		t.Fatal("a test session without a browser server should not start")
+	}
+	// The message has to say what to do, since nothing else will notice.
+	if !strings.Contains(err.Error(), "MCP-сервер браузера") {
+		t.Errorf("unhelpful error: %v", err)
 	}
 }
 
@@ -190,12 +195,12 @@ func TestDefaultConfigShipsTheTestColumn(t *testing.T) {
 	if cfg.TestTimeout() <= cfg.SessionTimeout() {
 		t.Fatalf("test timeout %s should exceed the session timeout %s", cfg.TestTimeout(), cfg.SessionTimeout())
 	}
-	if !cfg.HeadlessBrowser() {
-		t.Fatal("the browser should be headless by default")
+	// How the browser runs is the business of the agent's own MCP server, so
+	// the config carries nothing about it.
+	if strings.Contains(DefaultTestPrompt, "mcp__webtest__") {
+		t.Error("the prompt still names a browser server we no longer ship")
 	}
-	// An old config file without the key keeps the default rather than false.
-	loaded := DefaultConfig(t.TempDir())
-	if !loaded.HeadlessBrowser() {
-		t.Fatal("a config without browserHeadless must stay headless")
+	if !strings.Contains(DefaultTestPrompt, ResultFile) {
+		t.Error("the prompt must tell the agent to write the report file")
 	}
 }

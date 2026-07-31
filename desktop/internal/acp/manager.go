@@ -191,6 +191,12 @@ func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error
 	if err != nil {
 		return nil, err
 	}
+	// A test session is an agent clicking through a browser it brings itself:
+	// without a browser MCP server on the agent there is nothing to test with,
+	// and finding that out mid-turn costs a whole session.
+	if test != nil && len(agent.MCPServers) == 0 {
+		return nil, fmt.Errorf("агенту %q не задан MCP-сервер браузера — тестировать нечем (меню доски → Агенты → «MCP-серверы»)", agent.Name)
+	}
 	// Without worktrees, two agents must never share one working tree
 	// (spec §7): reject while another live session uses the same repo. A deploy
 	// session is exempt for the same reason a planning one is — it only pushes
@@ -222,15 +228,14 @@ func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error
 	case test != nil:
 		prompt = composeTestPrompt(ev, agent, systemPrompt, testPrompt, *test)
 	}
-	// The tools of a server we configure ourselves are allowed up front: nobody
-	// is watching a card-triggered run, and an unanswered prompt is a rejected
-	// one. Seeding the session rather than DefaultConfig.AutoAllowTools also
-	// reaches installs whose config.json predates either feature.
+	// The tools of the deploy server are allowed up front: nobody is watching a
+	// card-triggered run, and an unanswered prompt is a rejected one. Seeding
+	// the session rather than DefaultConfig.AutoAllowTools also reaches installs
+	// whose config.json predates the feature. A test session drives a browser
+	// through a server the agent carries, whose tools are allowed by prefix
+	// (agentMCPServers) since their names only exist at run time.
 	allowTools := make(map[string]bool)
-	switch {
-	case test != nil:
-		allowTools = testTools()
-	case deploy != nil:
+	if deploy != nil {
 		allowTools = deployTools()
 	}
 	s := &Session{

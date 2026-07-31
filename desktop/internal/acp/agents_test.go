@@ -477,7 +477,6 @@ func TestAgentMCPServersValidation(t *testing.T) {
 		{"без команды", AgentMCPServer{Name: "playwright"}},
 		{"имя не годится в префикс инструмента", AgentMCPServer{Name: "play wright", Command: []string{"npx"}}},
 		{"имя занято встроенным сервером", AgentMCPServer{Name: "dokku", Command: []string{"npx"}}},
-		{"имя занято встроенным сервером", AgentMCPServer{Name: "webtest", Command: []string{"npx"}}},
 	}
 	for _, c := range bad {
 		if _, err := validateAgent(AgentEntry{Name: "a", Kind: "claude", MCPServers: []AgentMCPServer{c.server}}); err == nil {
@@ -519,13 +518,14 @@ func TestAgentMCPServersTravelWithEverySession(t *testing.T) {
 		t.Error("only the configured server's tools may be allowed")
 	}
 
-	// A test session keeps ours first and appends the agent's.
-	testSession := &Session{RepoPath: "/repo", Agent: agent, Test: &TestRun{URL: "http://preview.example.com", Artifacts: t.TempDir()}}
-	specs, err = sessionMCPServers(testSession, cfg)
+	// A deploy session keeps ours first and appends the agent's.
+	target := deployEntry("prod")
+	deploySession := &Session{RepoPath: "/repo", Agent: agent, Deploy: &target, DeployBranch: "feat/x"}
+	specs, err = sessionMCPServers(deploySession, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(specs) != 2 || specs[0].Name != "webtest" || specs[1].Name != "playwright" {
-		t.Fatalf("test session specs: %+v", specs)
+	if len(specs) != 2 || specs[0].Name != "dokku" || specs[1].Name != "playwright" {
+		t.Fatalf("deploy session specs: %+v", specs)
 	}
 }

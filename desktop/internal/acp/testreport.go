@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/mattermost/focalboard/desktop/internal/webtest"
 )
 
 // What a finished test session leaves on the card: the verdict as a comment,
@@ -34,24 +32,24 @@ func (m *Manager) reportTestRun(s *Session, finalText string, turnErr error) {
 }
 
 // readTestResult loads what the agent reported. A missing file is not an error
-// in the code — it is the agent having skipped report_result — so it is told
-// apart from a broken one.
-func (m *Manager) readTestResult(s *Session) (webtest.Result, error) {
+// in the code — it is the agent having skipped the report — so it is told apart
+// from a broken one.
+func (m *Manager) readTestResult(s *Session) (TestResult, error) {
 	if s.Test == nil || s.Test.Artifacts == "" {
-		return webtest.Result{}, fmt.Errorf("каталог артефактов не задан")
+		return TestResult{}, fmt.Errorf("каталог артефактов не задан")
 	}
-	res, err := webtest.ReadResult(s.Test.Artifacts)
+	res, err := ReadTestResult(s.Test.Artifacts)
 	if os.IsNotExist(err) {
-		return webtest.Result{}, fmt.Errorf("агент не вызвал report_result — вердикта нет")
+		return TestResult{}, fmt.Errorf("агент не оставил result.json — вердикта нет")
 	}
 	if err != nil {
-		return webtest.Result{}, err
+		return TestResult{}, err
 	}
 	return res, nil
 }
 
 // testComment is what a person reads on the card.
-func testComment(s *Session, res webtest.Result, resErr error, finalText string, turnErr error) string {
+func testComment(s *Session, res TestResult, resErr error, finalText string, turnErr error) string {
 	var b strings.Builder
 	switch {
 	case resErr != nil:
@@ -59,7 +57,7 @@ func testComment(s *Session, res webtest.Result, resErr error, finalText string,
 		fmt.Fprintf(&b, "%s\n\n", resErr)
 	case res.Passed():
 		b.WriteString("Тест пройден.\n\n")
-	case res.Verdict == webtest.VerdictBlocked:
+	case res.Verdict == VerdictBlocked:
 		b.WriteString("🚧 Протестировать не удалось.\n\n")
 	default:
 		b.WriteString("Тест не пройден.\n\n")
@@ -103,13 +101,13 @@ func testComment(s *Session, res webtest.Result, resErr error, finalText string,
 // attachTestArtifacts puts the screenshots on the card. Failures are logged and
 // not surfaced: the verdict is already there, and a card that cannot take an
 // attachment is not a test result.
-func (m *Manager) attachTestArtifacts(s *Session, res webtest.Result) {
+func (m *Manager) attachTestArtifacts(s *Session, res TestResult) {
 	if s.Test == nil || s.Test.Artifacts == "" {
 		return
 	}
 	shots := res.Screenshots
 	if len(shots) == 0 {
-		found, err := webtest.ListScreenshots(s.Test.Artifacts)
+		found, err := ListScreenshots(s.Test.Artifacts)
 		if err != nil {
 			m.log.Warn("acp: cannot list test screenshots", "session", s.ID, "err", err)
 			return
@@ -142,16 +140,16 @@ func (m *Manager) attachTestArtifacts(s *Session, res webtest.Result) {
 // moveAfterTest advances the card according to the verdict. A blocked run and
 // an unconfigured column both leave the card where it is: there is nothing to
 // say beyond the comment.
-func (m *Manager) moveAfterTest(s *Session, res webtest.Result) {
+func (m *Manager) moveAfterTest(s *Session, res TestResult) {
 	m.cfgMu.RLock()
 	property, pass, fail := m.cfg.TriggerProperty, m.cfg.TestPassColumn, m.cfg.TestFailColumn
 	m.cfgMu.RUnlock()
 
 	var column string
 	switch res.Verdict {
-	case webtest.VerdictPass:
+	case VerdictPass:
 		column = strings.TrimSpace(pass)
-	case webtest.VerdictFail:
+	case VerdictFail:
 		column = strings.TrimSpace(fail)
 	}
 	if column == "" {

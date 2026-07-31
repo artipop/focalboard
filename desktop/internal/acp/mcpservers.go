@@ -11,7 +11,6 @@ import (
 	acpsdk "github.com/coder/acp-go-sdk"
 
 	"github.com/mattermost/focalboard/desktop/internal/dokku"
-	"github.com/mattermost/focalboard/desktop/internal/webtest"
 )
 
 // A session can offer its agent extra tools through MCP servers. There are two
@@ -31,28 +30,24 @@ type mcpServerSpec struct {
 	Env     map[string]string
 }
 
-// sessionMCPServers returns the MCP servers a session runs with. Only the
-// deploy and test columns have any: an ordinary card task gets the agent's own
-// configuration untouched.
-func sessionMCPServers(s *Session, cfg Config) ([]mcpServerSpec, error) {
+// sessionMCPServers returns the MCP servers a session runs with: the deploy
+// server we spawn ourselves for a deploy column, plus whatever the agent
+// carries of its own — which is what a test session drives the browser with.
+func sessionMCPServers(s *Session, _ Config) ([]mcpServerSpec, error) {
 	// The agent's own servers travel with every session it runs, whatever the
 	// column started it: they are part of how that agent works, not of what
 	// this particular card is for.
-	own := agentMCPServers(s)
-	if s.Deploy == nil && s.Test == nil {
-		return own, nil
-	}
-	self, err := os.Executable()
-	if err != nil {
-		return nil, fmt.Errorf("не удалось определить путь к приложению для MCP-сервера: %w", err)
-	}
+	specs := agentMCPServers(s)
 	if s.Deploy != nil {
+		self, err := os.Executable()
+		if err != nil {
+			return nil, fmt.Errorf("не удалось определить путь к приложению для MCP-сервера: %w", err)
+		}
 		target, err := json.Marshal(s.Deploy.Target)
 		if err != nil {
 			return nil, fmt.Errorf("не удалось сериализовать цель деплоя: %w", err)
 		}
-		s.markMCPConfigured()
-		return append([]mcpServerSpec{{
+		specs = append([]mcpServerSpec{{
 			Name:    dokku.ServerName,
 			Command: self,
 			Args:    []string{"mcp", dokku.ServerName},
@@ -61,27 +56,14 @@ func sessionMCPServers(s *Session, cfg Config) ([]mcpServerSpec, error) {
 				dokku.EnvRepo:   s.RepoPath,
 				dokku.EnvBranch: s.DeployBranch,
 			},
-		}}, own...), nil
+		}}, specs...)
 	}
-
-	env := map[string]string{
-		webtest.EnvBaseURL:   s.Test.URL,
-		webtest.EnvArtifacts: s.Test.Artifacts,
-		webtest.EnvHeadless:  boolEnv(cfg.HeadlessBrowser()),
+	if len(specs) > 0 {
+		// Whoever configured a server — us or the user — consented to it being
+		// launched, so the agent's "may I start MCP?" prompt is ours to answer.
+		s.markMCPConfigured()
 	}
-	if cfg.BrowserPath != "" {
-		env[webtest.EnvBrowser] = cfg.BrowserPath
-	}
-	if cfg.BrowserViewport != "" {
-		env[webtest.EnvViewport] = cfg.BrowserViewport
-	}
-	s.markMCPConfigured()
-	return append([]mcpServerSpec{{
-		Name:    webtest.ServerName,
-		Command: self,
-		Args:    []string{"mcp", webtest.ServerName},
-		Env:     env,
-	}}, own...), nil
+	return specs, nil
 }
 
 // agentMCPServers turns the agent's registry entries into specs and records
@@ -101,20 +83,9 @@ func agentMCPServers(s *Session) []mcpServerSpec {
 		})
 		s.allowToolPrefix("mcp__" + srv.Name + "__")
 	}
-	s.markMCPConfigured()
 	return specs
 }
 
-func boolEnv(v bool) string {
-	if v {
-		return "1"
-	}
-	return "0"
-}
-
-// claudeMCPArgs renders the servers as claude's --mcp-config payload, which
-// accepts inline JSON as well as a file. --strict-mcp-config is deliberately
-// not passed: the user's own MCP servers should keep working.
 func claudeMCPArgs(specs []mcpServerSpec) ([]string, error) {
 	if len(specs) == 0 {
 		return nil, nil

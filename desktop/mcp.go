@@ -14,7 +14,6 @@ import (
 	"syscall"
 
 	"github.com/mattermost/focalboard/desktop/internal/dokku"
-	"github.com/mattermost/focalboard/desktop/internal/webtest"
 )
 
 // maybeRunMCP handles `<binary> mcp <server>`: the same executable doubles as
@@ -27,17 +26,15 @@ func maybeRunMCP(args []string) {
 		return
 	}
 	if len(args) < 2 {
-		fmt.Fprintf(os.Stderr, "usage: focalboard mcp %s|%s\n", dokku.ServerName, webtest.ServerName)
+		fmt.Fprintf(os.Stderr, "usage: focalboard mcp %s\n", dokku.ServerName)
 		os.Exit(2)
 	}
 	var err error
 	switch args[1] {
 	case dokku.ServerName:
 		err = runDokkuMCP()
-	case webtest.ServerName:
-		err = runWebtestMCP()
 	default:
-		fmt.Fprintf(os.Stderr, "неизвестный MCP-сервер %q (есть %q и %q)\n", args[1], dokku.ServerName, webtest.ServerName)
+		fmt.Fprintf(os.Stderr, "неизвестный MCP-сервер %q (есть только %q)\n", args[1], dokku.ServerName)
 		os.Exit(2)
 	}
 	if err != nil {
@@ -78,23 +75,3 @@ func runDokkuMCP() error {
 // rather than on the first tool call: a session whose browser cannot start is
 // better off failing at once, with the reason on the card, than half-way
 // through a scenario.
-func runWebtestMCP() error {
-	cfg, err := webtest.ConfigFromEnv()
-	if err != nil {
-		return err
-	}
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	browser, err := webtest.Launch(ctx, cfg)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = browser.Close() }()
-
-	if err := webtest.ServeStdio(ctx, cfg, browser, webtest.NewArtifacts(cfg.Artifacts)); err != nil &&
-		!errors.Is(err, context.Canceled) && !errors.Is(err, io.EOF) {
-		return err
-	}
-	return nil
-}

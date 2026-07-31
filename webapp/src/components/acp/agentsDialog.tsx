@@ -443,7 +443,7 @@ const AgentsDialog = (props: Props) => {
                             />
                         </label>
                         <div className='AgentsDialog__hint'>
-                            {intl.formatMessage({id: 'Agents.mcp-servers-hint', defaultMessage: 'Their tools run without asking: wiring a server here is consent to use it. The built-in deploy and test servers are added by the card itself.'})}
+                            {intl.formatMessage({id: 'Agents.mcp-servers-hint', defaultMessage: 'Their tools run without asking: wiring a server here is consent to use it. A browser server (Playwright, say) is what the "To Test" column runs on.'})}
                         </div>
                         <label>
                             {intl.formatMessage({id: 'Agents.args', defaultMessage: 'Extra CLI args (space-separated)'})}

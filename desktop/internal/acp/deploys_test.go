@@ -233,14 +233,15 @@ func TestDeploySessionMayUseItsOwnTools(t *testing.T) {
 	if _, err := sessionMCPServers(deploySession, cfg); err != nil {
 		t.Fatal(err)
 	}
-	testSession := &Session{RepoPath: "/repo", Test: &TestRun{URL: "http://preview.example.com", Artifacts: t.TempDir()}}
-	if _, err := sessionMCPServers(testSession, cfg); err != nil {
-		t.Fatal(err)
+	if !deploySession.usesOurMCP() {
+		t.Error("the deploy session should know it was given an MCP server")
 	}
-	for name, s := range map[string]*Session{"deploy": deploySession, "test": testSession} {
-		if !s.usesOurMCP() {
-			t.Errorf("the %s session should know it was given an MCP server", name)
-		}
+	// A test session brings its own browser server; without one it is given
+	// nothing, and startSession refuses it before it can start.
+	testSession := &Session{RepoPath: "/repo", Test: &TestRun{URL: "http://preview.example.com", Artifacts: t.TempDir()}}
+	specs, err := sessionMCPServers(testSession, cfg)
+	if err != nil || len(specs) != 0 {
+		t.Errorf("a test session without a browser server: %+v, %v", specs, err)
 	}
 
 	// An ordinary session gets neither.

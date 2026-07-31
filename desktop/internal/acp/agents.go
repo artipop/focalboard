@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/mattermost/focalboard/desktop/internal/dokku"
-	"github.com/mattermost/focalboard/desktop/internal/webtest"
 )
 
 // Agent registry: named coding agents (claude/codex with their own prompt,
@@ -73,8 +72,8 @@ func validateMCPServers(servers []AgentMCPServer) ([]AgentMCPServer, error) {
 		if !validMCPName(srv.Name) {
 			return nil, fmt.Errorf("имя MCP-сервера %q может состоять только из латиницы, цифр, дефиса и подчёркивания", srv.Name)
 		}
-		if srv.Name == dokku.ServerName || srv.Name == webtest.ServerName {
-			return nil, fmt.Errorf("имя %q занято встроенным сервером", srv.Name)
+		if srv.Name == dokku.ServerName {
+			return nil, fmt.Errorf("имя %q занято встроенным сервером деплоя", srv.Name)
 		}
 		if seen[strings.ToLower(srv.Name)] {
 			return nil, fmt.Errorf("MCP-сервер с именем %q уже задан", srv.Name)
