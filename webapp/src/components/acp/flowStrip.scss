@@ -1,0 +1,56 @@
+.FlowStrip {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 8px 0;
+
+    .FlowStrip__head {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        font-size: 12px;
+
+        .FlowStrip__name {
+            font-weight: 600;
+            color: rgba(var(--center-channel-color-rgb), 1);
+        }
+
+        .FlowStrip__branch {
+            font-family: monospace;
+            color: rgba(var(--center-channel-color-rgb), 0.56);
+        }
+    }
+
+    .FlowStrip__stages {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .FlowStrip__stage {
+        padding: 2px 8px;
+        border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+        border-radius: 10px;
+        font-size: 12px;
+        color: rgba(var(--center-channel-color-rgb), 0.56);
+        white-space: nowrap;
+    }
+
+    .FlowStrip__stage--done {
+        color: rgba(var(--center-channel-color-rgb), 0.4);
+        text-decoration: line-through;
+    }
+
+    .FlowStrip__stage--current {
+        border-color: rgba(var(--link-color-rgb), 1);
+        color: rgba(var(--center-channel-color-rgb), 1);
+        font-weight: 600;
+        text-decoration: none;
+    }
+
+    .FlowStrip__status {
+        font-size: 12px;
+        color: rgba(var(--center-channel-color-rgb), 0.56);
+    }
+}

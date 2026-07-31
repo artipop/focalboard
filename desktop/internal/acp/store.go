@@ -111,6 +111,15 @@ CREATE TABLE IF NOT EXISTS flow_event (
 	created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_flow_event_card ON flow_event(card_id, id);
+CREATE TABLE IF NOT EXISTS stage_queue (
+	card_id TEXT PRIMARY KEY,
+	board_id TEXT NOT NULL DEFAULT '',
+	column_key TEXT NOT NULL,
+	flow TEXT NOT NULL DEFAULT '',
+	node_id TEXT NOT NULL DEFAULT '',
+	queued_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_stage_queue_column ON stage_queue(column_key, queued_at);
 CREATE TABLE IF NOT EXISTS vcs_seen (
 	repo TEXT NOT NULL,
 	branch TEXT NOT NULL,
@@ -412,4 +421,51 @@ func scanSession(rows *sql.Rows) (SessionRecord, error) {
 		r.FinishedAt = &t
 	}
 	return r, nil
+}
+
+// QueuedStage is a card waiting for its column to free up a place.
+type QueuedStage struct {
+	CardID    string    `json:"cardId"`
+	BoardID   string    `json:"boardId"`
+	ColumnKey string    `json:"columnKey"`
+	Flow      string    `json:"flow,omitempty"`
+	NodeID    string    `json:"nodeId,omitempty"`
+	QueuedAt  time.Time `json:"queuedAt"`
+}
+
+// EnqueueStage remembers that a card is waiting for a place in its column.
+// Queueing the same card again keeps its original position: waiting longer must
+// not cost it its turn.
+func (s *Store) EnqueueStage(q QueuedStage) (bool, error) {
+	res, err := s.db.Exec(`INSERT INTO stage_queue (card_id, board_id, column_key, flow, node_id, queued_at)
+		VALUES (?,?,?,?,?,?) ON CONFLICT(card_id) DO NOTHING`,
+		q.CardID, q.BoardID, q.ColumnKey, q.Flow, q.NodeID, time.Now().UnixMilli())
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+// NextQueuedStage is the card that has waited longest for this column.
+func (s *Store) NextQueuedStage(columnKey string) (QueuedStage, bool, error) {
+	row := s.db.QueryRow(`SELECT card_id, board_id, column_key, flow, node_id, queued_at
+		FROM stage_queue WHERE column_key=? ORDER BY queued_at LIMIT 1`, columnKey)
+	var q QueuedStage
+	var at int64
+	err := row.Scan(&q.CardID, &q.BoardID, &q.ColumnKey, &q.Flow, &q.NodeID, &at)
+	if err == sql.ErrNoRows {
+		return QueuedStage{}, false, nil
+	}
+	if err != nil {
+		return QueuedStage{}, false, err
+	}
+	q.QueuedAt = time.UnixMilli(at)
+	return q, true, nil
+}
+
+// DequeueStage forgets a waiting card — it started, or it left the column.
+func (s *Store) DequeueStage(cardID string) error {
+	_, err := s.db.Exec(`DELETE FROM stage_queue WHERE card_id=?`, cardID)
+	return err
 }

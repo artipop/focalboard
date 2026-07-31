@@ -75,6 +75,15 @@ runtime).
   gets a directory under `artifactsDir` (default
   `<dataDir>/artifacts/<session-id>`) where the agent is asked to save its
   screenshots and write `result.json` — that verdict is what moves the card.
+- **Columns** (column menu → *Agents in this column…*) say what happens when a
+  card lands in one: the action, the crew of agents who work it, and how many of
+  them at once. A card without an agent of its own goes to whoever of the crew is
+  free; when they are all busy, or the limit is reached, the card waits in place
+  and starts by itself as soon as a place frees up. The old
+  `triggerColumn`/`deployColumn`/`testColumn` keys are migrated into this
+  registry on first load, so nothing changes until you edit it. A crew of several
+  agents needs `worktreeMode: "always"` (the default) — without worktrees two
+  agents cannot share one repository, and the crew works one card at a time.
 - **Flows** (board "…" menu → *Workflows*) join those columns into a route and
   move cards along it. Repository events are polled from the branches parked
   cards wait on: plain git needs nothing, while `pr.*`, `review.approved` and
@@ -87,7 +96,8 @@ runtime).
   board runs them without any setup. Picking a route stays optional: a card with
   no `Workflow` option takes none, and the trigger columns work as they always
   did. The editor draws the route as a graph and offers whichever shipped route
-  the registry is missing.
+  the registry is missing. A card shows its own route: which stage it stands on
+  and what that stage is waiting for.
 
 ## Develop
 

@@ -1,0 +1,25 @@
+.ColumnBadge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 6px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+    line-height: 16px;
+    white-space: nowrap;
+    color: rgba(var(--center-channel-color-rgb), 0.72);
+    background: rgba(var(--center-channel-color-rgb), 0.08);
+    cursor: default;
+
+    .ColumnBadge__crew {
+        max-width: 90px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .ColumnBadge__limit {
+        padding-left: 4px;
+        border-left: 1px solid rgba(var(--center-channel-color-rgb), 0.24);
+    }
+}

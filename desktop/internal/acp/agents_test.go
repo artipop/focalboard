@@ -2,6 +2,7 @@ package acp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -532,5 +533,70 @@ func TestAgentMCPServersTravelWithEverySession(t *testing.T) {
 	}
 	if len(specs) != 2 || specs[0].Name != "dokku" || specs[1].Name != "playwright" {
 		t.Fatalf("deploy session specs: %+v", specs)
+	}
+}
+
+// The config file is edited by hand as often as by us, and the same MCP servers
+// are written differently in the wild. All the shapes that plainly mean the same
+// thing are read, because a config that cannot be parsed disables everything.
+func TestMCPServersReadEveryShapeThatMeansTheSame(t *testing.T) {
+	want := AgentMCPServer{Command: "npx", Args: []string{"-y", "@playwright/mcp@latest"}}
+
+	cases := map[string]string{
+		"object": `{"playwright": {"command": "npx", "args": ["-y", "@playwright/mcp@latest"]}}`,
+		"list of named servers": `[{"name": "playwright", "command": "npx",
+			"args": ["-y", "@playwright/mcp@latest"]}]`,
+		"a whole client file": `{"mcpServers": {"playwright": {"command": "npx",
+			"args": ["-y", "@playwright/mcp@latest"]}}}`,
+	}
+	for name, raw := range cases {
+		var entry AgentEntry
+		if err := json.Unmarshal([]byte(`{"name":"jojo","kind":"junie","mcpServers":`+raw+`}`), &entry); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		got, ok := entry.MCPServers["playwright"]
+		if !ok || got.Command != want.Command || len(got.Args) != len(want.Args) {
+			t.Fatalf("%s: %+v", name, entry.MCPServers)
+		}
+	}
+
+	// Absent and null stay absent rather than becoming an empty server.
+	var entry AgentEntry
+	if err := json.Unmarshal([]byte(`{"name":"a","kind":"claude","mcpServers":null}`), &entry); err != nil || entry.MCPServers != nil {
+		t.Fatalf("null: %+v, %v", entry.MCPServers, err)
+	}
+
+	// A list entry with no name has nothing to be called: say so, naming the field.
+	err := json.Unmarshal([]byte(`{"name":"a","kind":"claude","mcpServers":[{"command":"npx"}]}`), &entry)
+	if err == nil || !strings.Contains(err.Error(), "mcpServers") {
+		t.Fatalf("a nameless server should be refused with a helpful message: %v", err)
+	}
+
+	// And they survive the round trip in the canonical shape.
+	out, err := json.Marshal(entry2WithServers(want))
+	if err != nil || !strings.Contains(string(out), `"mcpServers":{"playwright":`) {
+		t.Fatalf("written shape: %s, %v", out, err)
+	}
+}
+
+func entry2WithServers(s AgentMCPServer) AgentEntry {
+	return AgentEntry{Name: "jojo", Kind: "junie", MCPServers: MCPServerSet{"playwright": s}}
+}
+
+// A flag never begins with a typographic dash: it is what an editor makes of
+// "--", and the server would fail with an unknown argument long after anybody
+// was watching.
+func TestTypographicDashInArgsIsRefused(t *testing.T) {
+	_, err := validateAgent(AgentEntry{Name: "jojo", Kind: "junie", MCPServers: MCPServerSet{
+		"pw": {Command: "npx", Args: []string{"-y", "@playwright/mcp@latest", "—headless"}},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "тире") {
+		t.Fatalf("a mangled flag should be refused with a helpful message: %v", err)
+	}
+
+	if _, err := validateAgent(AgentEntry{Name: "jojo", Kind: "junie", MCPServers: MCPServerSet{
+		"pw": {Command: "npx", Args: []string{"-y", "@playwright/mcp@latest", "--headless"}},
+	}}); err != nil {
+		t.Fatalf("a proper flag must pass: %v", err)
 	}
 }

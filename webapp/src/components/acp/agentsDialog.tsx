@@ -96,12 +96,27 @@ export function textToServers(text: string): AgentMCPServers {
         return {}
     }
     const parsed = JSON.parse(text)
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    if (!parsed || typeof parsed !== 'object') {
         throw new Error('mcpServers must be an object')
     }
-    const servers = parsed.mcpServers === undefined ? parsed : parsed.mcpServers
-    if (!servers || typeof servers !== 'object' || Array.isArray(servers)) {
+    const servers = (!Array.isArray(parsed) && parsed.mcpServers !== undefined) ? parsed.mcpServers : parsed
+    if (!servers || typeof servers !== 'object') {
         throw new Error('mcpServers must be an object')
+    }
+
+    // Some clients list the servers instead of keying them by name, and that is
+    // what somebody copying from one of them will paste. The config file reads
+    // both shapes, so the dialog does too.
+    if (Array.isArray(servers)) {
+        const named: AgentMCPServers = {}
+        for (const entry of servers) {
+            const {name, ...server} = entry || {}
+            if (!name) {
+                throw new Error('every server in the list needs a "name"')
+            }
+            named[name] = server
+        }
+        return named
     }
     return servers
 }

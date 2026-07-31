@@ -2,6 +2,7 @@ package acp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -69,7 +70,7 @@ func (m *Manager) enterNode(ev CardMoved, flow FlowEntry, node FlowNode, move bo
 				flow.Name, node.Column, err))
 			return
 		}
-		m.commentCard(ev.CardID, fmt.Sprintf("➡️ Флоу «%s»: карточка переведена в «%s» — %s.",
+		m.commentCard(ev.CardID, fmt.Sprintf("Флоу «%s»: карточка переведена в «%s» — %s.",
 			flow.Name, node.Column, detail))
 	}
 
@@ -119,9 +120,17 @@ func flowBranch(ev CardMoved, repoPath, previous string) string {
 // counts as a failed one, so the route can carry the card to its failure branch
 // instead of silently stalling.
 func (m *Manager) runNodeAction(ev CardMoved, flow FlowEntry, node FlowNode) {
-	opts := startOptions{flowName: flow.Name, flowNodeID: node.ID,
-		agentOverride: node.AgentName, deployOverride: node.DeployName}
-	switch node.Action {
+	// The stage stands on a column, and the column says who works it and how
+	// many at once. The stage overrides only what it names itself.
+	spec, _ := m.columnFor(ev.BoardID, node.asColumn(flow.PropertyOr(m.triggerProperty())))
+	opts := startOptions{flowName: flow.Name, flowNodeID: node.ID, column: spec,
+		deployOverride: node.DeployName, agentCrew: node.Crew()}
+
+	action := node.Action
+	if action == "" {
+		action = spec.Action // the stage does whatever its column does
+	}
+	switch action {
 	case FlowActionNone, "":
 		return
 	case FlowActionAgent:
@@ -130,7 +139,7 @@ func (m *Manager) runNodeAction(ev CardMoved, flow FlowEntry, node FlowNode) {
 	case FlowActionTest:
 		opts.test = true
 	default:
-		m.log.Warn("acp: unknown flow action", "flow", flow.Name, "node", node.ID, "action", node.Action)
+		m.log.Warn("acp: unknown flow action", "flow", flow.Name, "node", node.ID, "action", action)
 		return
 	}
 
@@ -138,13 +147,17 @@ func (m *Manager) runNodeAction(ev CardMoved, flow FlowEntry, node FlowNode) {
 	m.waitForCardIdle(ev.CardID)
 
 	s, err := m.startSession(ev, opts)
+	if errors.Is(err, errStageBusy) {
+		m.enqueueStage(ev, spec, flow.Name, node.ID)
+		return
+	}
 	if err != nil {
 		m.log.Warn("acp: flow action not started", "card", ev.CardID, "node", node.ID, "err", err)
 		m.commentCard(ev.CardID, fmt.Sprintf("Флоу «%s», стадия «%s»: шаг не запущен: %v", flow.Name, node.Column, err))
 		m.advanceFlow(ev.CardID, TriggerFailure, "шаг не удалось запустить")
 		return
 	}
-	m.log.Info("acp: flow action started", "session", s.ID, "card", ev.CardID, "action", node.Action)
+	m.log.Info("acp: flow action started", "session", s.ID, "card", ev.CardID, "action", action)
 }
 
 // advanceFlow moves a card along the edge matching an event.
@@ -169,7 +182,7 @@ func (m *Manager) advanceFlow(cardID, on, detail string) {
 		// stops here and somebody has to know why. VCS events are only polled
 		// for where an edge exists, so silence is correct for them.
 		if !IsVCSTrigger(on) {
-			m.commentCard(cardID, fmt.Sprintf("⏹ Флоу «%s»: у стадии «%s» нет перехода по событию «%s» — карточка осталась на месте.",
+			m.commentCard(cardID, fmt.Sprintf("Флоу «%s»: у стадии «%s» нет перехода по событию «%s» — карточка осталась на месте.",
 				flow.Name, node.Column, TriggerLabel(on)))
 		}
 		return

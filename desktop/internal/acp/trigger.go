@@ -1,8 +1,8 @@
 package acp
 
 import (
+	"errors"
 	"fmt"
-	"strings"
 )
 
 // triggerLoop consumes normalized card-move events and applies the trigger
@@ -24,66 +24,51 @@ func (m *Manager) triggerLoop(ch <-chan CardMoved) {
 }
 
 func (m *Manager) handleEvent(ev CardMoved) {
-	// A card with a route is driven by its flow; the standalone trigger columns
-	// below are the fallback for cards that have none.
+	// A card with a route is driven by its flow; a card without one still gets
+	// whatever its column does — the flow adds transitions, not behaviour.
 	if m.handleFlowMove(ev) {
 		return
 	}
-	switch {
-	case m.isTriggerColumn(ev.ToColumn):
-		m.handleEnter(ev)
-	case m.isDeployColumn(ev.ToColumn):
-		m.handleDeployEnter(ev)
-	case m.isTestColumn(ev.ToColumn):
-		m.handleTestEnter(ev)
-	case m.isTriggerColumn(ev.FromColumn), m.isDeployColumn(ev.FromColumn), m.isTestColumn(ev.FromColumn):
+	to, entered := m.columnFor(ev.BoardID, ev.ToColumn)
+	if entered && to.Action != FlowActionNone {
+		m.handleEnter(ev, to)
+		return
+	}
+	if from, left := m.columnFor(ev.BoardID, ev.FromColumn); left && from.Action != FlowActionNone {
+		// A card that leaves stops waiting for the column it left.
+		m.dequeueStage(ev.CardID)
 		if m.CancelSessionForCard(ev.CardID, "карточка убрана из триггерной колонки") {
 			m.log.Info("acp: session cancelled by card move", "card", ev.CardID)
 		}
 	}
 }
 
-func (m *Manager) handleEnter(ev CardMoved) {
-	if !m.claimMove(ev, "agent") {
+// handleEnter starts whatever the column does. The three kinds differ only in
+// the options they start the session with and in what they say when they fail,
+// so the guards, the idempotency key and the logging are shared.
+func (m *Manager) handleEnter(ev CardMoved, spec ColumnSpec) {
+	opts := startOptions{column: spec}
+	kind, failed := "agent", "Агент не запущен"
+	switch spec.Action {
+	case FlowActionDeploy:
+		opts.deploy, kind, failed = true, "deploy", "Деплой не запущен"
+	case FlowActionTest:
+		opts.test, kind, failed = true, "test", "Тестирование не запущено"
+	}
+	if !m.claimMove(ev, kind) {
 		return
 	}
-	s, err := m.StartSessionForEvent(ev)
+	s, err := m.startSession(ev, opts)
+	if errors.Is(err, errStageBusy) {
+		m.enqueueStage(ev, spec, "", "")
+		return
+	}
 	if err != nil {
-		m.log.Warn("acp: session not started", "card", ev.CardID, "err", err)
-		m.commentCard(ev.CardID, fmt.Sprintf("Агент не запущен: %v", err))
+		m.log.Warn("acp: session not started", "card", ev.CardID, "kind", kind, "err", err)
+		m.commentCard(ev.CardID, fmt.Sprintf("%s: %v", failed, err))
 		return
 	}
-	m.log.Info("acp: session started", "session", s.ID, "card", ev.CardID, "repo", s.RepoPath)
-}
-
-// handleDeployEnter is handleEnter for the deploy column: same guards, a session
-// pointed at publishing the card's branch instead of working on the card.
-func (m *Manager) handleDeployEnter(ev CardMoved) {
-	if !m.claimMove(ev, "deploy") {
-		return
-	}
-	s, err := m.StartDeploySessionForEvent(ev)
-	if err != nil {
-		m.log.Warn("acp: deploy session not started", "card", ev.CardID, "err", err)
-		m.commentCard(ev.CardID, fmt.Sprintf("Деплой не запущен: %v", err))
-		return
-	}
-	m.log.Info("acp: deploy session started", "session", s.ID, "card", ev.CardID, "repo", s.RepoPath, "branch", s.DeployBranch)
-}
-
-// handleTestEnter is handleEnter for the test column: a session pointed at the
-// card's deployed preview, checking it instead of writing it.
-func (m *Manager) handleTestEnter(ev CardMoved) {
-	if !m.claimMove(ev, "test") {
-		return
-	}
-	s, err := m.StartTestSessionForEvent(ev)
-	if err != nil {
-		m.log.Warn("acp: test session not started", "card", ev.CardID, "err", err)
-		m.commentCard(ev.CardID, fmt.Sprintf("Тестирование не запущено: %v", err))
-		return
-	}
-	m.log.Info("acp: test session started", "session", s.ID, "card", ev.CardID, "url", s.Test.URL)
+	m.log.Info("acp: session started", "session", s.ID, "card", ev.CardID, "kind", kind, "repo", s.RepoPath)
 }
 
 // claimIdempotent collapses the burst of patches one drag-and-drop produces
@@ -118,37 +103,4 @@ func (m *Manager) claimMove(ev CardMoved, kind string) bool {
 		return false
 	}
 	return true
-}
-
-// isTriggerColumn matches the configured trigger property/option by name,
-// case-insensitively.
-func (m *Manager) isTriggerColumn(c Column) bool {
-	return strings.EqualFold(c.PropertyName, m.cfg.TriggerProperty) &&
-		strings.EqualFold(c.Name, m.cfg.TriggerColumn)
-}
-
-// isDeployColumn matches the deploy column on the same property. An empty
-// deployColumn disables the trigger rather than matching every unnamed column.
-func (m *Manager) isDeployColumn(c Column) bool {
-	m.cfgMu.RLock()
-	property, column := m.cfg.TriggerProperty, m.cfg.DeployColumn
-	m.cfgMu.RUnlock()
-	if strings.TrimSpace(column) == "" {
-		return false
-	}
-	return strings.EqualFold(c.PropertyName, property) &&
-		strings.EqualFold(c.Name, column)
-}
-
-// isTestColumn matches the test column on the same property. As with deploy, an
-// empty testColumn disables the trigger rather than matching every unnamed one.
-func (m *Manager) isTestColumn(c Column) bool {
-	m.cfgMu.RLock()
-	property, column := m.cfg.TriggerProperty, m.cfg.TestColumn
-	m.cfgMu.RUnlock()
-	if strings.TrimSpace(column) == "" {
-		return false
-	}
-	return strings.EqualFold(c.PropertyName, property) &&
-		strings.EqualFold(c.Name, column)
 }

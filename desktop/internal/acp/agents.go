@@ -95,10 +95,27 @@ func validateMCPServers(servers map[string]AgentMCPServer) (map[string]AgentMCPS
 			}
 		}
 		srv.Args = args
+		if bad := typographicDash(srv.Args); bad != "" {
+			return nil, fmt.Errorf("у сервера %q аргумент %q начинается с типографского тире — почти наверняка это автозамена «--», и сервер его не поймёт", name, bad)
+		}
 		srv.Type = ""
 		out[name] = srv
 	}
 	return out, nil
+}
+
+// typographicDash finds an argument starting with an em or en dash. A CLI flag
+// never begins with one: it is what a text editor makes of "--", and the server
+// would fail with an unknown argument long after anybody was watching.
+func typographicDash(args []string) string {
+	for _, arg := range args {
+		for _, dash := range []string{"—", "–", "―"} {
+			if strings.HasPrefix(arg, dash) {
+				return arg
+			}
+		}
+	}
+	return ""
 }
 
 // validMCPName mirrors what a tool name may carry: the server name becomes the
@@ -266,21 +283,44 @@ func sameAgentName(name, entryName string) bool {
 	return folded != "" && folded == AgentUsername(entryName)
 }
 
-// resolveAgent maps a trigger event to an agent. Priority:
-//  1. explicit `agent` card property matching a registry entry;
-//  2. an assignee (person property) whose username matches a registry entry;
-//  3. a select option name (the "Agent" field) matching a registry entry;
-//  4. the single registered agent, when exactly one exists;
-//  5. a synthesized entry from the global AgentMode (backward compat: the
-//     built-in claude bridge, or an external acp-command agent).
+// resolveAgent maps a trigger event to an agent, with no stage to speak for
+// itself. See resolveSessionAgent for the whole rule.
 func (m *Manager) resolveAgent(ev CardMoved) (AgentEntry, error) {
+	a, _, err := m.resolveSessionAgent(ev, nil)
+	return a, err
+}
+
+// resolveSessionAgent picks who runs the session.
+//
+// roster is the stage's own crew — the flow node's, else the column's. It is
+// not a pin but a membership list: it says who may work this column at all, and
+// the card chooses among them. So an assignee who is on the crew gets the card,
+// an assignee who is not is passed over (the *Deploy* column is not worked by
+// the developer the card is assigned to), and a column with no crew leaves the
+// choice to the card exactly as before:
+//
+//  1. the card's own choice — the `agent` property, an assignee, an "Agent"
+//     option — narrowed to the crew when there is one;
+//  2. the crew itself: the first member with nothing else running;
+//  3. the single registered agent, when exactly one exists;
+//  4. a synthesized entry from the global AgentMode (backward compat: the
+//     built-in claude bridge, or an external acp-command agent).
+//
+// busy reports that a crew exists and every one of its members is already
+// working: the caller parks the card instead of piling a second session onto
+// the same agent.
+func (m *Manager) resolveSessionAgent(ev CardMoved, roster []string) (AgentEntry, bool, error) {
 	m.cfgMu.RLock()
 	agents := append([]AgentEntry(nil), m.cfg.Agents...)
 	mode := m.cfg.AgentMode
 	m.cfgMu.RUnlock()
 
+	crew, err := crewOf(roster, agents)
+	if err != nil {
+		return AgentEntry{}, false, err
+	}
 	find := func(name string) (AgentEntry, bool) {
-		for _, a := range agents {
+		for _, a := range crew {
 			if sameAgentName(name, a.Name) {
 				return a, true
 			}
@@ -290,29 +330,40 @@ func (m *Manager) resolveAgent(ev CardMoved) (AgentEntry, error) {
 
 	if explicit := strings.TrimSpace(ev.Props["agent"]); explicit != "" {
 		if a, ok := find(explicit); ok {
-			return a, nil
+			return a, false, nil
 		}
-		return AgentEntry{}, fmt.Errorf("агент %q из свойства карточки не найден в реестре (%s)", explicit, agentNames(agents))
+		if len(roster) == 0 {
+			return AgentEntry{}, false, fmt.Errorf("агент %q из свойства карточки не найден в реестре (%s)", explicit, agentNames(agents))
+		}
+		m.log.Info("acp: card agent is not on the column's crew, the crew decides",
+			"card", ev.CardID, "agent", explicit)
 	}
 
 	// An assignee is a deliberate choice on the card, so it outranks the tags.
 	for _, person := range ev.PersonNames {
 		if a, ok := find(person); ok {
-			return a, nil
+			return a, false, nil
 		}
 	}
 
 	for _, opt := range ev.OptionNames {
 		if a, ok := find(opt); ok {
-			return a, nil
+			return a, false, nil
 		}
 	}
 
+	if len(roster) > 0 {
+		if a, ok := m.freeAgent(crew); ok {
+			return a, false, nil
+		}
+		return AgentEntry{}, true, nil
+	}
+
 	if len(agents) == 1 {
-		return agents[0], nil
+		return agents[0], false, nil
 	}
 	if len(agents) > 1 {
-		return AgentEntry{}, fmt.Errorf("не удалось выбрать агента: назначьте агента исполнителем карточки или задайте поле \"Agent\" (доступно: %s)", agentNames(agents))
+		return AgentEntry{}, false, fmt.Errorf("не удалось выбрать агента: назначьте агента исполнителем карточки, задайте поле \"Agent\" или укажите состав колонки (доступно: %s)", agentNames(agents))
 	}
 
 	// Empty registry: fall back to the global AgentMode.
@@ -320,7 +371,50 @@ func (m *Manager) resolveAgent(ev CardMoved) (AgentEntry, error) {
 	if kind == "" {
 		kind = AgentKindClaude
 	}
-	return AgentEntry{Name: kind, Kind: kind}, nil
+	return AgentEntry{Name: kind, Kind: kind}, false, nil
+}
+
+// crewOf resolves the names of a stage's crew against the registry. Unknown
+// names are skipped — a registry edited after the column was configured should
+// not stop the board — but a crew where nobody is left is a mistake worth
+// reporting rather than quietly ignoring.
+func crewOf(roster []string, agents []AgentEntry) ([]AgentEntry, error) {
+	if len(roster) == 0 {
+		return agents, nil
+	}
+	crew := make([]AgentEntry, 0, len(roster))
+	for _, name := range roster {
+		for _, a := range agents {
+			if sameAgentName(name, a.Name) {
+				crew = append(crew, a)
+				break
+			}
+		}
+	}
+	if len(crew) == 0 {
+		return nil, fmt.Errorf("состав колонки (%s) не найден в реестре агентов (%s)",
+			strings.Join(roster, ", "), agentNames(agents))
+	}
+	return crew, nil
+}
+
+// freeAgent is the first member of the crew with no live session, in the order
+// the crew was listed — so the choice is repeatable and the first name in the
+// list is the one that normally works.
+func (m *Manager) freeAgent(crew []AgentEntry) (AgentEntry, bool) {
+	m.mu.Lock()
+	busy := make(map[string]bool, len(m.active))
+	for _, s := range m.active {
+		busy[strings.ToLower(s.Agent.Name)] = true
+	}
+	m.mu.Unlock()
+
+	for _, a := range crew {
+		if !busy[strings.ToLower(a.Name)] {
+			return a, true
+		}
+	}
+	return AgentEntry{}, false
 }
 
 func agentNames(agents []AgentEntry) string {

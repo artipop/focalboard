@@ -154,24 +154,6 @@ func (m *Manager) resolveDeployTargetNamed(ev CardMoved, name string) (DeployEnt
 	return DeployEntry{}, fmt.Errorf("цель деплоя %q не найдена в реестре (%s)", name, deployNames(deploys))
 }
 
-// resolvePinnedAgent is resolveAgent with a flow node's override on top: a
-// stage may name the agent it runs on, and that beats the card's own option.
-func (m *Manager) resolvePinnedAgent(ev CardMoved, override string) (AgentEntry, error) {
-	name := strings.TrimSpace(override)
-	if name == "" {
-		return m.resolveAgent(ev)
-	}
-	m.cfgMu.RLock()
-	agents := append([]AgentEntry(nil), m.cfg.Agents...)
-	m.cfgMu.RUnlock()
-	for _, a := range agents {
-		if strings.EqualFold(a.Name, name) {
-			return a, nil
-		}
-	}
-	return AgentEntry{}, fmt.Errorf("закреплённый агент %q не найден в реестре (%s)", name, agentNames(agents))
-}
-
 // deployAppName is what a target without an explicit base app names its apps
 // and its level of the hostname after: the repository's own name in the
 // registry, or the directory it sits in for a repository that is not registered.

@@ -364,6 +364,72 @@ func (a *App) RemoveFlow(name string) error {
 	return a.mgr.RemoveFlow(name)
 }
 
+// ListBoardColumns returns what each configured column of a board does: the
+// action, the crew that works it and how many of them at once.
+func (a *App) ListBoardColumns(boardID string) (string, error) {
+	if a.mgr == nil {
+		return "[]", nil
+	}
+	out, err := json.Marshal(a.mgr.BoardColumns(boardID))
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// SaveBoardColumn stores the settings of one column from a JSON-encoded
+// ColumnSpec and returns what was saved.
+func (a *App) SaveBoardColumn(specJSON string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	var spec acp.ColumnSpec
+	if err := json.Unmarshal([]byte(specJSON), &spec); err != nil {
+		return "", err
+	}
+	saved, err := a.mgr.SaveColumn(spec)
+	if err != nil {
+		return "", err
+	}
+	out, _ := json.Marshal(saved)
+	return string(out), nil
+}
+
+// RemoveBoardColumn forgets a column's settings. The column stays on the board.
+func (a *App) RemoveBoardColumn(boardID, optionID, column string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	return a.mgr.RemoveColumn(boardID, optionID, column)
+}
+
+// GetCardFlow describes where a card stands on its route: the stages, the one
+// it is on, what that stage waits for. Returns "null" for a card with no route.
+func (a *App) GetCardFlow(cardID string) (string, error) {
+	if a.mgr == nil {
+		return "null", nil
+	}
+	flow, err := a.mgr.CardFlowFor(cardID)
+	if err != nil {
+		return "", err
+	}
+	out, err := json.Marshal(flow)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// GetWorktreeMode reports where sessions run ("always" or "never"). The column
+// editor asks, because a crew of several agents in one repository only works
+// when each session gets its own worktree.
+func (a *App) GetWorktreeMode() (string, error) {
+	if a.mgr == nil {
+		return "", nil
+	}
+	return a.mgr.WorktreeMode(), nil
+}
+
 // GetAgentSystemPrompt returns the board/column-level system prompt.
 func (a *App) GetAgentSystemPrompt() (string, error) {
 	if a.mgr == nil {

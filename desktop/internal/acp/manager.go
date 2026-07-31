@@ -103,6 +103,14 @@ func (m *Manager) Start(ctx context.Context, events BoardEvents) error {
 		}
 	}
 
+	// A hand-edited config is never validated, so what the editor would have
+	// refused only surfaces when a server fails to start. Say it now instead.
+	for _, a := range m.cfg.Agents {
+		if _, err := validateAgent(a); err != nil {
+			m.log.Warn("acp: agent is configured in a way that will not work", "agent", a.Name, "err", err)
+		}
+	}
+
 	m.recover()
 	PruneStale(m.rootCtx, m.cfg.RepoWhitelist)
 
@@ -154,27 +162,28 @@ type startOptions struct {
 	// flowName/flowNodeID tie the session to the stage of a route that started
 	// it, so its outcome can move the card on.
 	flowName, flowNodeID string
-	// agentOverride/deployOverride let a flow node pin the agent or the deploy
-	// target for its stage only.
-	agentOverride, deployOverride string
+	// agentCrew/deployOverride let a flow node name the agents or the deploy
+	// target for its stage only, overriding the column's own.
+	agentCrew      []string
+	deployOverride string
+	// column is the column the card landed in: who works it, how many at once,
+	// and where it deploys to. What a flow node names wins over it.
+	column ColumnSpec
+}
+
+// crew is who may work this session: the stage's own list if it has one, else
+// the column's.
+func (o startOptions) crew() []string {
+	if len(o.agentCrew) > 0 {
+		return o.agentCrew
+	}
+	return o.column.Agents
 }
 
 // StartSessionForEvent creates and launches a session for a validated trigger
 // event. Callers must have passed idempotency/liveness checks.
 func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 	return m.startSession(ev, startOptions{})
-}
-
-// StartDeploySessionForEvent launches the session behind the deploy column: the
-// same machinery as a card task, pointed at publishing the card's branch.
-func (m *Manager) StartDeploySessionForEvent(ev CardMoved) (*Session, error) {
-	return m.startSession(ev, startOptions{deploy: true})
-}
-
-// StartTestSessionForEvent launches the session behind the test column: the
-// same machinery again, pointed at the card's deployed preview.
-func (m *Manager) StartTestSessionForEvent(ev CardMoved) (*Session, error) {
-	return m.startSession(ev, startOptions{test: true})
 }
 
 // startSession is the shared launch path. An interactive session survives its
@@ -189,7 +198,11 @@ func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error
 	if err != nil {
 		return nil, err
 	}
-	deploy, deployBranch, err := m.resolveDeploy(ev, repoPath, opts.deploy, opts.deployOverride)
+	deployName := opts.deployOverride
+	if deployName == "" {
+		deployName = opts.column.DeployName
+	}
+	deploy, deployBranch, err := m.resolveDeploy(ev, repoPath, opts.deploy, deployName)
 	if err != nil {
 		return nil, err
 	}
@@ -202,11 +215,20 @@ func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error
 	if err != nil {
 		return nil, err
 	}
-	// A deploy no longer pins its own agent: the card decides, as it does for
-	// every other kind of session — unless a flow node pinned one for its stage.
-	agent, err := m.resolvePinnedAgent(ev, opts.agentOverride)
+	// A deploy no longer pins its own agent: the card decides among the crew of
+	// the column it landed in — the flow node's crew, if the stage names one.
+	agent, busy, err := m.resolveSessionAgent(ev, opts.crew())
 	if err != nil {
 		return nil, err
+	}
+	if busy {
+		return nil, errStageBusy
+	}
+	// The column's own limit: how many of its crew may work it at once. It is
+	// checked here rather than at the trigger, so every way into a stage — a
+	// drag, a flow transition, the queue itself — obeys the same number.
+	if opts.column.MaxRunning > 0 && m.runningInColumn(opts.column.Key()) >= opts.column.MaxRunning {
+		return nil, errStageBusy
 	}
 	net, err := m.resolveNetwork(agent)
 	if err != nil {
@@ -270,6 +292,8 @@ func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error
 		Net:          net,
 		Deploy:       deploy,
 		DeployBranch: deployBranch,
+		ColumnKey:    opts.column.Key(),
+		ColumnName:   opts.column.Column,
 		Test:         test,
 		Artifacts:    artifacts,
 		FlowName:     opts.flowName,

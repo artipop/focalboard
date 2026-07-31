@@ -43,6 +43,11 @@ export interface IAppWindow extends Window {
                 ListFlows(): Promise<string>
                 ListFlowTriggers(): Promise<string>
                 ListFlowTemplates(): Promise<string>
+                ListBoardColumns(boardId: string): Promise<string>
+                SaveBoardColumn(specJSON: string): Promise<string>
+                RemoveBoardColumn(boardId: string, optionId: string, column: string): Promise<void>
+                GetWorktreeMode(): Promise<string>
+                GetCardFlow(cardId: string): Promise<string>
                 AddFlow(entryJSON: string): Promise<string>
                 UpdateFlow(entryJSON: string): Promise<string>
                 RemoveFlow(name: string): Promise<void>

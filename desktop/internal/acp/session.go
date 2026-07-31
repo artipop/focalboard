@@ -68,6 +68,12 @@ type Session struct {
 	// the test verdict, the deploy outcome. Empty disables recording.
 	Artifacts string
 
+	// ColumnKey/ColumnName are the column the card was in when the session
+	// started: what the column's limit is counted against, and what the queue
+	// of waiting cards is keyed by.
+	ColumnKey  string
+	ColumnName string
+
 	// FlowName/FlowNodeID are set when a flow stage started this session. Its
 	// outcome is then the event that moves the card on.
 	FlowName   string
@@ -276,8 +282,10 @@ func (s *Session) appendEvent(m *Manager, kind string, payload any) {
 // runSession is the whole session lifecycle; it runs on its own goroutine.
 func (m *Manager) runSession(s *Session) {
 	defer m.wg.Done()
-	// Deferred before releaseSession, so it runs after it: the next stage of a
-	// flow must not race the finished session for the repository.
+	// Deferred before releaseSession, so they run after it: the next stage of a
+	// flow, and the next card waiting for this column, must not race the
+	// finished session for the repository or for its own place.
+	defer m.drainColumn(s.ColumnKey)
 	defer m.flowAfterSession(s)
 	defer m.releaseSession(s)
 

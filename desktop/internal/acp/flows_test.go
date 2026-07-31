@@ -63,14 +63,20 @@ func TestValidateFlow(t *testing.T) {
 	// References that do exist are accepted, and an empty action defaults to none.
 	f := sampleFlow()
 	f.RepoName = "WEBAPP"
+	// A stage that named one agent becomes a stage with a crew of one.
 	f.Nodes[0].AgentName = "claude-1"
+	// And an empty action is kept as it is: the stage does whatever its column
+	// does, which is not the same as doing nothing.
 	f.Nodes[1].Action = ""
 	got, err := validateFlow(f, repos, agents, deploys)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Nodes[1].Action != FlowActionNone {
-		t.Fatalf("action not defaulted: %+v", got.Nodes[1])
+	if got.Nodes[1].Action != "" {
+		t.Fatalf("an empty action must stay empty: %+v", got.Nodes[1])
+	}
+	if len(got.Nodes[0].AgentNames) != 1 || got.Nodes[0].AgentNames[0] != "claude-1" || got.Nodes[0].AgentName != "" {
+		t.Fatalf("the old single agent was not folded into the crew: %+v", got.Nodes[0])
 	}
 }
 

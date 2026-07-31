@@ -160,23 +160,30 @@ func TestResolveDeployBranch(t *testing.T) {
 	}
 }
 
-// A stage of a flow may name the agent it runs on; without one the card
-// decides, exactly as it does for an ordinary task.
-func TestResolvePinnedAgentPrefersTheStagesOwn(t *testing.T) {
+// A stage names the crew that may work it; the card chooses among them, and an
+// agent who is not on the crew does not get the card.
+func TestResolveSessionAgentPrefersTheStagesCrew(t *testing.T) {
 	m := agentManager(t, "", AgentEntry{Name: "claude-1", Kind: "claude"}, AgentEntry{Name: "deployer", Kind: "codex"})
 
-	agent, err := m.resolvePinnedAgent(CardMoved{OptionNames: []string{"claude-1"}}, "deployer")
-	if err != nil || agent.Name != "deployer" {
-		t.Fatalf("pinned agent ignored: %+v, %v", agent, err)
+	agent, busy, err := m.resolveSessionAgent(CardMoved{OptionNames: []string{"claude-1"}}, []string{"deployer"})
+	if err != nil || busy || agent.Name != "deployer" {
+		t.Fatalf("the crew should decide: %+v, %v, %v", agent, busy, err)
 	}
 
-	agent, err = m.resolvePinnedAgent(CardMoved{OptionNames: []string{"claude-1"}}, "")
+	// On the crew, the card's own choice stands.
+	agent, _, err = m.resolveSessionAgent(CardMoved{OptionNames: []string{"claude-1"}}, []string{"claude-1", "deployer"})
 	if err != nil || agent.Name != "claude-1" {
 		t.Fatalf("card agent ignored: %+v, %v", agent, err)
 	}
 
-	if _, err := m.resolvePinnedAgent(CardMoved{}, "gone"); err == nil {
-		t.Error("a pin to an unregistered agent should fail")
+	// Without a crew the card decides, exactly as before.
+	agent, _, err = m.resolveSessionAgent(CardMoved{OptionNames: []string{"claude-1"}}, nil)
+	if err != nil || agent.Name != "claude-1" {
+		t.Fatalf("card agent ignored without a crew: %+v, %v", agent, err)
+	}
+
+	if _, _, err := m.resolveSessionAgent(CardMoved{}, []string{"gone"}); err == nil {
+		t.Error("a crew of unregistered agents should fail")
 	}
 }
 
