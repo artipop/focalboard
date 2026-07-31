@@ -27,7 +27,12 @@ The Go code is platform-agnostic — the same files build for every OS:
   bootstrap `<script>` into the served HTML that: seeds the single-user session
   token into `localStorage`; sets `window.webSocketBaseURL` to the real server;
   and wires `window.openInNewBrowser` to open external links in the system
-  browser.
+  browser. A capture-phase click handler sends **every** absolute http(s) anchor
+  there, same-origin ones excepted. It deliberately does not defer to the inline
+  `onclick` that `Utils.htmlFromMarkdown` puts on markdown links: when that
+  handler does not run, the click is simply lost — the webview cannot navigate
+  to an outside origin either — which is what made preview links in card
+  comments dead.
 
   **WebSockets do not go through this proxy.** On macOS (and Linux) Wails serves
   the page from a WebKit custom-scheme origin, and that scheme handler cannot

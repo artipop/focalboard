@@ -21,7 +21,16 @@ import (
 //     scheme cannot carry a WebSocket upgrade, and
 //   - wires window.openInNewBrowser (a hook the webapp already calls for
 //     external links, CSV export, etc.) to the bound App.OpenInBrowser method,
-//     plus a catch-all for plain target=_blank anchors.
+//     plus a catch-all that sends every outward link there.
+//
+// The catch-all runs in the capture phase and covers *every* absolute http(s)
+// anchor, not just target=_blank ones without an inline handler. Markdown links
+// (a card comment reporting a preview address, say) are rendered with an inline
+// onclick calling openInNewBrowser, and an earlier version deferred to it —
+// which left the link dead whenever that handler did not run, with nothing to
+// see: the webview cannot navigate to an outside origin either, so a click did
+// nothing at all. Capturing first and stopping propagation makes this the one
+// path out, inline handler or not.
 func bootstrapScript(serverURL, sessionToken string) string {
 	return fmt.Sprintf(`<script>
 (function () {
@@ -33,13 +42,20 @@ func bootstrapScript(serverURL, sessionToken string) string {
     }
   };
   document.addEventListener('click', function (e) {
-    var a = e.target.closest && e.target.closest('a[target="_blank"]');
-    // Markdown links already invoke openInNewBrowser via their inline onclick.
-    if (a && !a.getAttribute('onclick')) {
-      e.preventDefault();
-      window.openInNewBrowser(a.getAttribute('href'));
-    }
-  });
+    if (e.button !== 0 || e.defaultPrevented) { return; }
+    var a = e.target && e.target.closest && e.target.closest('a[href]');
+    if (!a) { return; }
+    var href = a.href || a.getAttribute('href') || '';
+    if (!/^https?:\/\//i.test(href)) { return; }
+    // In-app navigation is same-origin and stays in the webview; anything
+    // pointing outside is for the system browser.
+    try {
+      if (new URL(href, window.location.href).origin === window.location.origin) { return; }
+    } catch (err) {}
+    e.preventDefault();
+    e.stopPropagation();
+    window.openInNewBrowser(href);
+  }, true);
 })();
 </script>`, sessionToken, serverURL)
 }

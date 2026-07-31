@@ -7,6 +7,7 @@ replace github.com/mattermost/focalboard/server => ../server
 require (
 	github.com/beyond5959/acp-adapter v0.3.8
 	github.com/coder/acp-go-sdk v0.13.5
+	github.com/go-rod/rod v0.116.2
 	github.com/google/uuid v1.6.0
 	github.com/mattermost/focalboard/server v0.0.0-20230104182634-f909c2552e37
 	github.com/mattermost/mattermost/server/public v0.1.3
@@ -31,7 +32,6 @@ require (
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-asn1-ber/asn1-ber v1.5.7 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
-	github.com/go-rod/rod v0.116.2 // indirect
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
