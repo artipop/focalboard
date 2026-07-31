@@ -22,6 +22,8 @@
   "Agents.empty": "No agents registered yet.",
   "Agents.env": "Environment (KEY=VALUE per line — e.g. CODEX_HOME, OPENAI_API_KEY)",
   "Agents.kind": "Kind",
+  "Agents.mcp-servers": "MCP servers, one per line as “name = command” — offered to this agent in every session",
+  "Agents.mcp-servers-hint": "Their tools run without asking: wiring a server here is consent to use it. The built-in deploy and test servers are added by the card itself.",
   "Agents.model": "Model (optional)",
   "Agents.name": "Name",
   "Agents.name-placeholder": "Name (matches the \"Agent\" option)",

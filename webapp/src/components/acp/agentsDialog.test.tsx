@@ -269,4 +269,71 @@ describe('components/acp/agentsDialog', () => {
         expect(agentProp.type).toBe('select')
         expect(agentProp.options.map((o) => o.value)).toEqual(['claude', 'codex-a'])
     })
+
+    test('wires an MCP server of the agent\'s own and reloads it for editing', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([])),
+            ListProxies: jest.fn().mockResolvedValue('[]'),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AddAgent: jest.fn().mockResolvedValue(JSON.stringify({name: 'jojo', kind: 'junie'})),
+            UpdateAgent: jest.fn(),
+            RemoveAgent: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByRole('button', {name: 'Add agent…'})).toBeInTheDocument())
+        userEvent.click(screen.getByRole('button', {name: 'Add agent…'}))
+        await waitFor(() => expect(screen.getByPlaceholderText('Name (matches the "Agent" option)')).toBeInTheDocument())
+
+        userEvent.type(screen.getByPlaceholderText('Name (matches the "Agent" option)'), 'jojo')
+        userEvent.type(
+            screen.getByPlaceholderText('playwright = npx -y @playwright/mcp@latest --headless --browser chrome'),
+            'playwright = npx -y @playwright/mcp@latest --headless',
+        )
+
+        userEvent.click(screen.getByRole('button', {name: 'Save'}))
+        await waitFor(() => expect(bindings.AddAgent).toBeCalled())
+        expect(JSON.parse(bindings.AddAgent.mock.calls[0][0])).toMatchObject({
+            name: 'jojo',
+            mcpServers: [{name: 'playwright', command: ['npx', '-y', '@playwright/mcp@latest', '--headless']}],
+        })
+    })
+
+    test('round-trips the MCP server list through the form', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([
+                {name: 'jojo', kind: 'junie', mcpServers: [{name: 'playwright', command: ['npx', '-y', '@playwright/mcp@latest']}]},
+            ])),
+            ListProxies: jest.fn().mockResolvedValue('[]'),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AddAgent: jest.fn(),
+            UpdateAgent: jest.fn().mockResolvedValue('{}'),
+            RemoveAgent: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByText('jojo')).toBeInTheDocument())
+        userEvent.click(screen.getAllByRole('button', {name: 'Edit'})[0])
+
+        await waitFor(() => expect(screen.getByDisplayValue('playwright = npx -y @playwright/mcp@latest')).toBeInTheDocument())
+        userEvent.click(screen.getByRole('button', {name: 'Save'}))
+        await waitFor(() => expect(bindings.UpdateAgent).toBeCalled())
+        expect(JSON.parse(bindings.UpdateAgent.mock.calls[0][0])).toMatchObject({
+            mcpServers: [{name: 'playwright', command: ['npx', '-y', '@playwright/mcp@latest']}],
+        })
+    })
 })

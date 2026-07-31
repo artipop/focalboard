@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
+
+	"github.com/mattermost/focalboard/desktop/internal/dokku"
+	"github.com/mattermost/focalboard/desktop/internal/webtest"
 )
 
 // Agent registry: named coding agents (claude/codex with their own prompt,
@@ -44,8 +47,66 @@ func validateAgent(a AgentEntry) (AgentEntry, error) {
 	default:
 		return AgentEntry{}, fmt.Errorf("неизвестный тип агента %q (допустимо: %s)", a.Kind, strings.Join(AgentKinds, ", "))
 	}
+	servers, err := validateMCPServers(a.MCPServers)
+	if err != nil {
+		return AgentEntry{}, fmt.Errorf("агент %q: %w", a.Name, err)
+	}
+	a.MCPServers = servers
 	a.ProxyName = strings.TrimSpace(a.ProxyName)
 	return a, nil
+}
+
+// validateMCPServers normalizes the agent's own MCP servers. A name has to be
+// usable as a tool prefix and must not shadow one of ours, which the session
+// adds for a deploy or a test run.
+func validateMCPServers(servers []AgentMCPServer) ([]AgentMCPServer, error) {
+	if len(servers) == 0 {
+		return nil, nil
+	}
+	out := make([]AgentMCPServer, 0, len(servers))
+	seen := make(map[string]bool, len(servers))
+	for _, srv := range servers {
+		srv.Name = strings.TrimSpace(srv.Name)
+		if srv.Name == "" {
+			return nil, fmt.Errorf("у MCP-сервера не задано имя")
+		}
+		if !validMCPName(srv.Name) {
+			return nil, fmt.Errorf("имя MCP-сервера %q может состоять только из латиницы, цифр, дефиса и подчёркивания", srv.Name)
+		}
+		if srv.Name == dokku.ServerName || srv.Name == webtest.ServerName {
+			return nil, fmt.Errorf("имя %q занято встроенным сервером", srv.Name)
+		}
+		if seen[strings.ToLower(srv.Name)] {
+			return nil, fmt.Errorf("MCP-сервер с именем %q уже задан", srv.Name)
+		}
+		seen[strings.ToLower(srv.Name)] = true
+
+		command := srv.Command[:0:0]
+		for _, arg := range srv.Command {
+			if arg = strings.TrimSpace(arg); arg != "" {
+				command = append(command, arg)
+			}
+		}
+		if len(command) == 0 {
+			return nil, fmt.Errorf("для MCP-сервера %q не задана команда запуска", srv.Name)
+		}
+		srv.Command = command
+		out = append(out, srv)
+	}
+	return out, nil
+}
+
+// validMCPName mirrors what a tool name may carry: the server name becomes the
+// mcp__<name>__<tool> prefix the agent reports calls under.
+func validMCPName(name string) bool {
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // AddAgent registers a new agent and persists the config.

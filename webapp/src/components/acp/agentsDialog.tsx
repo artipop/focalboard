@@ -22,6 +22,12 @@ import './agentsDialog.scss'
 // to a registered agent. Synced by "Sync to board"; matched in resolveAgent.
 const AGENT_PROPERTY_NAME = 'Agent'
 
+type AgentMCPServer = {
+    name: string
+    command: string[]
+    env?: {[key: string]: string}
+}
+
 type AgentEntry = {
     name: string
     kind: string
@@ -31,6 +37,7 @@ type AgentEntry = {
     env?: {[key: string]: string}
     args?: string[]
     command?: string[]
+    mcpServers?: AgentMCPServer[]
     proxyName?: string
 }
 
@@ -56,6 +63,31 @@ export function envToText(env?: {[key: string]: string}): string {
         return ''
     }
     return Object.entries(env).map(([k, v]) => `${k}=${v}`).join('\n')
+}
+
+// serversToText / textToServers convert between the "name = argv" textarea and
+// the list. One server per line, because that is what an agent's MCP config
+// looks like anywhere else: a name and a command to run.
+export function serversToText(servers?: AgentMCPServer[]): string {
+    if (!servers) {
+        return ''
+    }
+    return servers.map((s) => `${s.name} = ${joinArgv(s.command)}`).join('\n')
+}
+
+export function textToServers(text: string): AgentMCPServer[] {
+    const servers: AgentMCPServer[] = []
+    for (const line of text.split('\n')) {
+        const trimmed = line.trim()
+        if (!trimmed) {
+            continue
+        }
+        const eq = trimmed.indexOf('=')
+        const name = eq > 0 ? trimmed.slice(0, eq).trim() : trimmed
+        const command = eq > 0 ? splitArgv(trimmed.slice(eq + 1)) : []
+        servers.push({name, command})
+    }
+    return servers
 }
 
 export function textToEnv(text: string): {[key: string]: string} {
@@ -112,6 +144,7 @@ const AgentsDialog = (props: Props) => {
     const [systemPrompt, setSystemPrompt] = useState('')
     const [form, setForm] = useState<AgentEntry | null>(null)
     const [envText, setEnvText] = useState('')
+    const [serversText, setServersText] = useState('')
     const [argsText, setArgsText] = useState('')
     const [commandText, setCommandText] = useState('')
     const [editingName, setEditingName] = useState<string | null>(null)
@@ -167,6 +200,7 @@ const AgentsDialog = (props: Props) => {
     const startAdd = useCallback(() => {
         setForm({...emptyForm})
         setEnvText('')
+        setServersText('')
         setArgsText('')
         setCommandText('')
         setEditingName(null)
@@ -176,6 +210,7 @@ const AgentsDialog = (props: Props) => {
     const startEdit = useCallback((agent: AgentEntry) => {
         setForm({...agent})
         setEnvText(envToText(agent.env))
+        setServersText(serversToText(agent.mcpServers))
         setArgsText(joinArgv(agent.args))
         setCommandText(joinArgv(agent.command))
         setEditingName(agent.name)
@@ -193,6 +228,7 @@ const AgentsDialog = (props: Props) => {
             env: textToEnv(envText),
             args: splitArgv(argsText),
             command: splitArgv(commandText),
+            mcpServers: textToServers(serversText),
         }
         try {
             if (editingName) {
@@ -205,7 +241,7 @@ const AgentsDialog = (props: Props) => {
         } catch (e) {
             setError(String(e))
         }
-    }, [bindings, form, envText, argsText, commandText, editingName, refresh])
+    }, [bindings, form, envText, serversText, argsText, commandText, editingName, refresh])
 
     const removeAgent = useCallback(async (name: string) => {
         if (!bindings?.RemoveAgent) {
@@ -397,6 +433,18 @@ const AgentsDialog = (props: Props) => {
                                 onChange={(e) => setEnvText(e.target.value)}
                             />
                         </label>
+                        <label>
+                            {intl.formatMessage({id: 'Agents.mcp-servers', defaultMessage: 'MCP servers, one per line as “name = command” — offered to this agent in every session'})}
+                            <textarea
+                                rows={2}
+                                value={serversText}
+                                placeholder={'playwright = npx -y @playwright/mcp@latest --headless --browser chrome'}
+                                onChange={(e) => setServersText(e.target.value)}
+                            />
+                        </label>
+                        <div className='AgentsDialog__hint'>
+                            {intl.formatMessage({id: 'Agents.mcp-servers-hint', defaultMessage: 'Their tools run without asking: wiring a server here is consent to use it. The built-in deploy and test servers are added by the card itself.'})}
+                        </div>
                         <label>
                             {intl.formatMessage({id: 'Agents.args', defaultMessage: 'Extra CLI args (space-separated)'})}
                             <input

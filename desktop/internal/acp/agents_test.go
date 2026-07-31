@@ -456,3 +456,76 @@ func TestLoadConfigMigratesLegacyTriggerColumn(t *testing.T) {
 		t.Errorf("custom column was rewritten to %q", got)
 	}
 }
+
+func TestAgentMCPServersValidation(t *testing.T) {
+	ok, err := validateAgent(AgentEntry{Name: "jojo", Kind: "junie", MCPServers: []AgentMCPServer{
+		{Name: "playwright", Command: []string{"npx", " -y ", "@playwright/mcp@latest", "  "}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Stray whitespace would become an empty argv element and a puzzling exec error.
+	if got := strings.Join(ok.MCPServers[0].Command, "|"); got != "npx|-y|@playwright/mcp@latest" {
+		t.Errorf("command not cleaned: %q", got)
+	}
+
+	bad := []struct {
+		why    string
+		server AgentMCPServer
+	}{
+		{"без имени", AgentMCPServer{Command: []string{"npx"}}},
+		{"без команды", AgentMCPServer{Name: "playwright"}},
+		{"имя не годится в префикс инструмента", AgentMCPServer{Name: "play wright", Command: []string{"npx"}}},
+		{"имя занято встроенным сервером", AgentMCPServer{Name: "dokku", Command: []string{"npx"}}},
+		{"имя занято встроенным сервером", AgentMCPServer{Name: "webtest", Command: []string{"npx"}}},
+	}
+	for _, c := range bad {
+		if _, err := validateAgent(AgentEntry{Name: "a", Kind: "claude", MCPServers: []AgentMCPServer{c.server}}); err == nil {
+			t.Errorf("принят сервер %s: %+v", c.why, c.server)
+		}
+	}
+	if _, err := validateAgent(AgentEntry{Name: "a", Kind: "claude", MCPServers: []AgentMCPServer{
+		{Name: "pw", Command: []string{"npx"}}, {Name: "PW", Command: []string{"npx"}},
+	}}); err == nil {
+		t.Error("принято два сервера с одним именем")
+	}
+}
+
+func TestAgentMCPServersTravelWithEverySession(t *testing.T) {
+	agent := AgentEntry{Name: "jojo", Kind: "junie", MCPServers: []AgentMCPServer{
+		{Name: "playwright", Command: []string{"npx", "-y", "@playwright/mcp@latest", "--headless"}, Env: map[string]string{"X": "1"}},
+	}}
+	cfg := DefaultConfig(t.TempDir())
+
+	// An ordinary card task gets the agent's own server even though the card
+	// itself configures none.
+	s := &Session{RepoPath: "/repo", Agent: agent}
+	specs, err := sessionMCPServers(s, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(specs) != 1 || specs[0].Name != "playwright" || specs[0].Command != "npx" {
+		t.Fatalf("specs: %+v", specs)
+	}
+	if strings.Join(specs[0].Args, " ") != "-y @playwright/mcp@latest --headless" || specs[0].Env["X"] != "1" {
+		t.Errorf("argv/env lost: %+v", specs[0])
+	}
+	// Wiring a server in is consent to use it: an unattended session has nobody
+	// to ask, and the tool names only exist at run time.
+	if !s.toolPrefixAllowed("mcp__playwright__browser_click") {
+		t.Error("tools of a configured server should run unasked")
+	}
+	if s.toolPrefixAllowed("mcp__other__thing") {
+		t.Error("only the configured server's tools may be allowed")
+	}
+
+	// A test session keeps ours first and appends the agent's.
+	testSession := &Session{RepoPath: "/repo", Agent: agent, Test: &TestRun{URL: "http://preview.example.com", Artifacts: t.TempDir()}}
+	specs, err = sessionMCPServers(testSession, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(specs) != 2 || specs[0].Name != "webtest" || specs[1].Name != "playwright" {
+		t.Fatalf("test session specs: %+v", specs)
+	}
+}

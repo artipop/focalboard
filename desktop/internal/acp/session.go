@@ -79,14 +79,15 @@ type Session struct {
 	// no repository, removed when the session ends.
 	scratchDir string
 
-	mu          sync.Mutex
-	status      SessionStatus
-	turnCancel  context.CancelFunc // cancels the in-flight turn
-	cancelSent  bool
-	allowTools  map[string]bool
-	interactive bool // opened as a console, or attached to while running
-	attached    int  // consoles currently watching
-	turnNo      int
+	mu            sync.Mutex
+	status        SessionStatus
+	turnCancel    context.CancelFunc // cancels the in-flight turn
+	cancelSent    bool
+	allowTools    map[string]bool
+	allowPrefixes []string // tool prefixes of MCP servers the user wired in
+	interactive   bool     // opened as a console, or attached to while running
+	attached      int      // consoles currently watching
+	turnNo        int
 
 	turns     chan turnRequest
 	closeCh   chan struct{}
@@ -179,6 +180,26 @@ func (s *Session) usesOurMCP() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.mcpConfigured
+}
+
+// allowToolPrefix allows every tool of a server the user wired to the agent.
+// The names are not known ahead of time — they come from the server at run time
+// — so the whole prefix is what can be consented to.
+func (s *Session) allowToolPrefix(prefix string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.allowPrefixes = append(s.allowPrefixes, prefix)
+}
+
+func (s *Session) toolPrefixAllowed(name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, p := range s.allowPrefixes {
+		if strings.HasPrefix(name, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // allowToolAlways remembers a tool the user approved for the rest of the session.

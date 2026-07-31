@@ -46,11 +46,30 @@ type AgentEntry struct {
 	// protocol flags. Takes precedence over BinPath.
 	Command []string `json:"command,omitempty"`
 
+	// MCPServers are the agent's own MCP servers, spawned alongside the ones a
+	// session configures itself (dokku for a deploy, webtest for a test). This
+	// is how a Node-based server such as @playwright/mcp plugs in without the
+	// app depending on Node: the user wires it per agent, we only pass it on.
+	MCPServers []AgentMCPServer `json:"mcpServers,omitempty"`
+
 	// ProxyName selects a named entry from the proxy registry (Config.Proxies).
 	// Network settings live there rather than on the agent, so several agents
 	// share one configuration and it is edited in a single place. Empty means
 	// the agent inherits the app's own environment.
 	ProxyName string `json:"proxyName,omitempty"`
+}
+
+// AgentMCPServer is one MCP server an agent carries of its own. Command is the
+// launch argv ("npx", "-y", "@playwright/mcp@latest", "--headless"); Env is
+// added to what the agent process already passes down.
+//
+// Configuring one is consent to use it: its tools (mcp__<name>__…) run without
+// asking, for the same reason our own servers' do — a card-triggered session
+// has no console, and asking nobody means rejecting.
+type AgentMCPServer struct {
+	Name    string            `json:"name"`
+	Command []string          `json:"command"`
+	Env     map[string]string `json:"env,omitempty"`
 }
 
 // NetworkSettings is one network path: the proxy an agent's traffic takes and
