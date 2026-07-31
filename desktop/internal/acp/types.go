@@ -43,10 +43,16 @@ type BoardEvents interface {
 	Subscribe(ctx context.Context) (<-chan CardMoved, error)
 }
 
-// BoardWriter performs the only two mutations the integration needs.
+// BoardWriter performs the mutations the integration needs.
 type BoardWriter interface {
 	AddComment(ctx context.Context, cardID, text string) error
 	MoveCard(ctx context.Context, cardID, optionID string) error
+	// MoveCardByOptionName moves a card to a column the config names rather than
+	// identifies: "Tested", not an option id.
+	MoveCardByOptionName(ctx context.Context, cardID, propertyName, optionName string) error
+	// AttachFile adds a file to the card's content — how a test run's
+	// screenshots reach the person reading the result.
+	AttachFile(ctx context.Context, cardID, filename, mime string, data []byte) error
 }
 
 // BoardReader reads a card on demand, so a session can be opened from the UI

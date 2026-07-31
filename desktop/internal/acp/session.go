@@ -59,6 +59,11 @@ type Session struct {
 	// answer rather than the user's.
 	mcpConfigured bool
 
+	// Test is set only for a session started by the test column: the preview it
+	// checks and where its evidence goes. Its presence turns the browser tools
+	// on, the same way Deploy turns the dokku tools on.
+	Test *TestRun
+
 	Worktree     WorktreeInfo
 	usedWorktree bool // a dedicated worktree was actually created
 
@@ -74,14 +79,15 @@ type Session struct {
 	// no repository, removed when the session ends.
 	scratchDir string
 
-	mu          sync.Mutex
-	status      SessionStatus
-	turnCancel  context.CancelFunc // cancels the in-flight turn
-	cancelSent  bool
-	allowTools  map[string]bool
-	interactive bool // opened as a console, or attached to while running
-	attached    int  // consoles currently watching
-	turnNo      int
+	mu            sync.Mutex
+	status        SessionStatus
+	turnCancel    context.CancelFunc // cancels the in-flight turn
+	cancelSent    bool
+	allowTools    map[string]bool
+	allowPrefixes []string // tool prefixes of MCP servers the user wired in
+	interactive   bool     // opened as a console, or attached to while running
+	attached      int      // consoles currently watching
+	turnNo        int
 
 	turns     chan turnRequest
 	closeCh   chan struct{}
@@ -144,10 +150,14 @@ func (s *Session) requestClose() {
 // created, or — for a deploy session, which works in the repo itself — the
 // branch it publishes.
 func (s *Session) recordedBranch() string {
-	if s.Worktree.Branch != "" {
+	switch {
+	case s.Worktree.Branch != "":
 		return s.Worktree.Branch
+	case s.Test != nil:
+		return s.Test.Branch
+	default:
+		return s.DeployBranch
 	}
-	return s.DeployBranch
 }
 
 // hasConsole reports whether a human is watching and could answer a prompt.
@@ -170,6 +180,26 @@ func (s *Session) usesOurMCP() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.mcpConfigured
+}
+
+// allowToolPrefix allows every tool of a server the user wired to the agent.
+// The names are not known ahead of time — they come from the server at run time
+// — so the whole prefix is what can be consented to.
+func (s *Session) allowToolPrefix(prefix string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.allowPrefixes = append(s.allowPrefixes, prefix)
+}
+
+func (s *Session) toolPrefixAllowed(name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, p := range s.allowPrefixes {
+		if strings.HasPrefix(name, p) {
+			return true
+		}
+	}
+	return false
 }
 
 // allowToolAlways remembers a tool the user approved for the rest of the session.
@@ -241,12 +271,13 @@ func (m *Manager) runSession(s *Session) {
 
 // prepareWorkdir sets up the session's working directory and announces it.
 func (m *Manager) prepareWorkdir(s *Session) error {
-	// Two kinds of session run in the repository itself even under worktreeMode
-	// "always": a planning session only reads, so a worktree would cost a
-	// checkout and leave a branch behind for a conversation that changes
-	// nothing, and a deploy session publishes an existing branch rather than
-	// writing code, so a throwaway branch is not the one anybody deploys.
-	if m.cfg.UseWorktrees() && !s.Planning && s.Deploy == nil {
+	// Three kinds of session run in the repository itself even under
+	// worktreeMode "always": a planning session only reads, so a worktree would
+	// cost a checkout and leave a branch behind for a conversation that changes
+	// nothing; a deploy session publishes an existing branch rather than writing
+	// code, so a throwaway branch is not the one anybody deploys; and a test
+	// session only reads the code it is checking.
+	if m.cfg.UseWorktrees() && !s.Planning && s.Deploy == nil && s.Test == nil {
 		wt, err := CreateWorktree(m.rootCtx, s.RepoPath, s.BaseBranch, s.Title, s.CardID, s.ID, m.cfg.WorktreeDir)
 		if err != nil {
 			return fmt.Errorf("не удалось создать git worktree: %w", err)
@@ -269,6 +300,10 @@ func (m *Manager) prepareWorkdir(s *Session) error {
 	if s.Deploy != nil {
 		m.comment(s, fmt.Sprintf("Деплой ветки `%s` → `%s`\nОжидаемый адрес: %s",
 			s.DeployBranch, s.Deploy.Name, s.Deploy.URL(dokku.AppSlug(s.DeployBranch))))
+		return nil
+	}
+	if s.Test != nil {
+		m.comment(s, fmt.Sprintf("Тестирую превью: %s", s.Test.URL))
 		return nil
 	}
 	m.comment(s, fmt.Sprintf("Агент запущен прямо в репозитории `%s`.", s.RepoPath))
@@ -357,10 +392,20 @@ func (m *Manager) commentFirstTurn(s *Session, finalText string, err error) {
 		if !interactive {
 			m.finishSession(s, StatusFailed, err.Error())
 		}
+		// A test session reports even when its turn broke off: the screenshots
+		// and the verdict it managed to write are the point of the run.
+		if s.Test != nil {
+			m.reportTestRun(s, finalText, err)
+			return
+		}
 		m.comment(s, failComment(s, err.Error()))
 	default:
 		if !interactive {
 			m.finishSession(s, StatusDone, "")
+		}
+		if s.Test != nil {
+			m.reportTestRun(s, finalText, nil)
+			return
 		}
 		m.comment(s, doneComment(s, finalText))
 	}
@@ -418,7 +463,7 @@ func connectionLost(conn *acpsdk.ClientSideConnection) bool {
 // session. The connection is held for the session's whole life, so every turn
 // runs against the same agent process and keeps the conversation.
 func (m *Manager) openConnection(ctx context.Context, s *Session) (*acpsdk.ClientSideConnection, acpsdk.SessionId, func(), error) {
-	specs, err := sessionMCPServers(s)
+	specs, err := sessionMCPServers(s, m.cfg)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -487,7 +532,13 @@ func (m *Manager) runTurn(s *Session, conn *acpsdk.ClientSideConnection, acpSess
 		return "", m.rootCtx.Err()
 	}
 
-	ctx, cancel := context.WithTimeout(m.rootCtx, m.cfg.SessionTimeout())
+	// A browser scenario is much slower than a code edit, so a test turn gets
+	// its own budget.
+	timeout := m.cfg.SessionTimeout()
+	if s.Test != nil {
+		timeout = m.cfg.TestTimeout()
+	}
+	ctx, cancel := context.WithTimeout(m.rootCtx, timeout)
 	defer cancel()
 
 	s.mu.Lock()

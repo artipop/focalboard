@@ -20,8 +20,26 @@ func testLogger() *slog.Logger {
 
 // fakeWriter records board writes.
 type fakeWriter struct {
-	mu       sync.Mutex
-	comments map[string][]string // cardID → comments
+	mu          sync.Mutex
+	comments    map[string][]string // cardID → comments
+	moves       []cardMove          // moves by column name, in order
+	attachments []attachment
+}
+
+// cardMove is one MoveCardByOptionName call.
+type cardMove struct {
+	cardID   string
+	property string
+	option   string
+}
+
+// attachment is one AttachFile call; the bytes are kept so tests can tell the
+// files apart.
+type attachment struct {
+	cardID string
+	name   string
+	mime   string
+	data   []byte
 }
 
 func newFakeWriter() *fakeWriter { return &fakeWriter{comments: map[string][]string{}} }
@@ -35,10 +53,36 @@ func (w *fakeWriter) AddComment(ctx context.Context, cardID, text string) error 
 
 func (w *fakeWriter) MoveCard(ctx context.Context, cardID, optionID string) error { return nil }
 
+func (w *fakeWriter) MoveCardByOptionName(ctx context.Context, cardID, property, option string) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.moves = append(w.moves, cardMove{cardID: cardID, property: property, option: option})
+	return nil
+}
+
+func (w *fakeWriter) AttachFile(ctx context.Context, cardID, filename, mimeType string, data []byte) error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.attachments = append(w.attachments, attachment{cardID: cardID, name: filename, mime: mimeType, data: data})
+	return nil
+}
+
 func (w *fakeWriter) cardComments(cardID string) []string {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return append([]string(nil), w.comments[cardID]...)
+}
+
+func (w *fakeWriter) cardMoves() []cardMove {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return append([]cardMove(nil), w.moves...)
+}
+
+func (w *fakeWriter) cardAttachments() []attachment {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return append([]attachment(nil), w.attachments...)
 }
 
 // fakeEmitter records UI events with their payloads.

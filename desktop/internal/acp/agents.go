@@ -44,8 +44,74 @@ func validateAgent(a AgentEntry) (AgentEntry, error) {
 	default:
 		return AgentEntry{}, fmt.Errorf("неизвестный тип агента %q (допустимо: %s)", a.Kind, strings.Join(AgentKinds, ", "))
 	}
+	servers, err := validateMCPServers(a.MCPServers)
+	if err != nil {
+		return AgentEntry{}, fmt.Errorf("агент %q: %w", a.Name, err)
+	}
+	a.MCPServers = servers
 	a.ProxyName = strings.TrimSpace(a.ProxyName)
 	return a, nil
+}
+
+// validateMCPServers normalizes the agent's own MCP servers. A name has to be
+// usable as a tool prefix and must not shadow one we spawn ourselves.
+func validateMCPServers(servers map[string]AgentMCPServer) (map[string]AgentMCPServer, error) {
+	if len(servers) == 0 {
+		return nil, nil
+	}
+	out := make(map[string]AgentMCPServer, len(servers))
+	for name, srv := range servers {
+		name = strings.TrimSpace(name)
+		if name == "" {
+			return nil, fmt.Errorf("у MCP-сервера не задано имя")
+		}
+		if !validMCPName(name) {
+			return nil, fmt.Errorf("имя MCP-сервера %q может состоять только из латиницы, цифр, дефиса и подчёркивания", name)
+		}
+		for _, builtin := range builtinMCPNames {
+			if strings.EqualFold(name, builtin) {
+				return nil, fmt.Errorf("имя %q занято встроенным сервером", name)
+			}
+		}
+		for existing := range out {
+			if strings.EqualFold(existing, name) {
+				return nil, fmt.Errorf("MCP-сервер с именем %q уже задан", name)
+			}
+		}
+
+		// A remote server is a normal thing to paste from a README, and it
+		// would otherwise fail as "no command" — which explains nothing.
+		if strings.TrimSpace(srv.URL) != "" || strings.EqualFold(strings.TrimSpace(srv.Type), "http") || strings.EqualFold(strings.TrimSpace(srv.Type), "sse") {
+			return nil, fmt.Errorf("сервер %q удалённый (url/type), а поддерживаются пока только локальные: command + args", name)
+		}
+		srv.Command = strings.TrimSpace(srv.Command)
+		if srv.Command == "" {
+			return nil, fmt.Errorf("для MCP-сервера %q не задана команда запуска (command)", name)
+		}
+		args := srv.Args[:0:0]
+		for _, arg := range srv.Args {
+			if arg = strings.TrimSpace(arg); arg != "" {
+				args = append(args, arg)
+			}
+		}
+		srv.Args = args
+		srv.Type = ""
+		out[name] = srv
+	}
+	return out, nil
+}
+
+// validMCPName mirrors what a tool name may carry: the server name becomes the
+// mcp__<name>__<tool> prefix the agent reports calls under.
+func validMCPName(name string) bool {
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_':
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // AddAgent registers a new agent and persists the config.

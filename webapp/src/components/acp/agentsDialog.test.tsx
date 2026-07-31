@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 import React from 'react'
-import {render, screen, waitFor} from '@testing-library/react'
+import {fireEvent, render, screen, waitFor} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 
@@ -268,5 +268,107 @@ describe('components/acp/agentsDialog', () => {
         expect(agentProp).toBeDefined()
         expect(agentProp.type).toBe('select')
         expect(agentProp.options.map((o) => o.value)).toEqual(['claude', 'codex-a'])
+    })
+
+    test('wires an MCP server of the agent\'s own and reloads it for editing', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([])),
+            ListProxies: jest.fn().mockResolvedValue('[]'),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AddAgent: jest.fn().mockResolvedValue(JSON.stringify({name: 'jojo', kind: 'junie'})),
+            UpdateAgent: jest.fn(),
+            RemoveAgent: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByRole('button', {name: 'Add agent…'})).toBeInTheDocument())
+        userEvent.click(screen.getByRole('button', {name: 'Add agent…'}))
+        await waitFor(() => expect(screen.getByPlaceholderText('Name (matches the "Agent" option)')).toBeInTheDocument())
+
+        userEvent.type(screen.getByPlaceholderText('Name (matches the "Agent" option)'), 'jojo')
+
+        // Pasted the way a server's own README gives it, wrapper and all.
+        const field = screen.getByRole('textbox', {name: /MCP servers/})
+        fireEvent.change(field, {target: {value: '{"mcpServers": {"playwright": {"command": "npx", "args": ["-y", "@playwright/mcp@latest"]}}}'}})
+
+        userEvent.click(screen.getByRole('button', {name: 'Save'}))
+        await waitFor(() => expect(bindings.AddAgent).toBeCalled())
+        expect(JSON.parse(bindings.AddAgent.mock.calls[0][0])).toMatchObject({
+            name: 'jojo',
+            mcpServers: {playwright: {command: 'npx', args: ['-y', '@playwright/mcp@latest']}},
+        })
+    })
+
+    test('refuses to save MCP servers that are not JSON', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([])),
+            ListProxies: jest.fn().mockResolvedValue('[]'),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AddAgent: jest.fn(),
+            UpdateAgent: jest.fn(),
+            RemoveAgent: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByRole('button', {name: 'Add agent…'})).toBeInTheDocument())
+        userEvent.click(screen.getByRole('button', {name: 'Add agent…'}))
+        await waitFor(() => expect(screen.getByPlaceholderText('Name (matches the "Agent" option)')).toBeInTheDocument())
+
+        userEvent.type(screen.getByPlaceholderText('Name (matches the "Agent" option)'), 'jojo')
+        fireEvent.change(screen.getByRole('textbox', {name: /MCP servers/}), {target: {value: 'playwright = npx'}})
+        userEvent.click(screen.getByRole('button', {name: 'Save'}))
+
+        // Saving half a configuration is worse than not saving it.
+        await waitFor(() => expect(screen.getByText(/must be valid JSON/)).toBeInTheDocument())
+        expect(bindings.AddAgent).not.toBeCalled()
+    })
+
+    test('round-trips the MCP server list through the form', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([
+                {name: 'jojo', kind: 'junie', mcpServers: {playwright: {command: 'npx', args: ['-y', '@playwright/mcp@latest']}}},
+            ])),
+            ListProxies: jest.fn().mockResolvedValue('[]'),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AddAgent: jest.fn(),
+            UpdateAgent: jest.fn().mockResolvedValue('{}'),
+            RemoveAgent: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByText('jojo')).toBeInTheDocument())
+        userEvent.click(screen.getAllByRole('button', {name: 'Edit'})[0])
+
+        // Reloaded as the same JSON, wrapper included, so it can be edited and
+        // pasted onwards.
+        await waitFor(() => expect(screen.getByRole('textbox', {name: /MCP servers/})).toHaveValue(
+            JSON.stringify({mcpServers: {playwright: {command: 'npx', args: ['-y', '@playwright/mcp@latest']}}}, null, 2),
+        ))
+        userEvent.click(screen.getByRole('button', {name: 'Save'}))
+        await waitFor(() => expect(bindings.UpdateAgent).toBeCalled())
+        expect(JSON.parse(bindings.UpdateAgent.mock.calls[0][0])).toMatchObject({
+            mcpServers: {playwright: {command: 'npx', args: ['-y', '@playwright/mcp@latest']}},
+        })
     })
 })

@@ -13,23 +13,21 @@ import (
 	"github.com/mattermost/focalboard/desktop/internal/dokku"
 )
 
-// A session can offer its agent extra tools through MCP servers. Today there is
-// exactly one — the dokku deploy server — and it is our own binary re-invoked as
-// `<self> mcp dokku`, configured entirely through its environment.
+// A session can offer its agent extra tools through MCP servers. There are two
+// — the dokku deploy server and the webtest browser server — and both are our
+// own binary re-invoked as `<self> mcp <name>`, configured entirely through
+// their environment, so the model picks steps but never targets.
 //
 // Every agent kind takes the same description by a different road: claude gets
 // --mcp-config, codex gets -c overrides, and an ACP-native agent gets the
 // servers in session/new, where the protocol has a field for them.
 
-// dokkuAutoAllowTools are the deploy tools a session may call unasked. Reading
-// the state of a deployment is safe and is most of what the agent does between
-// pushes; tearing one down is not, so destroy_deployment still asks.
-var dokkuAutoAllowTools = []string{
-	"mcp__dokku__deploy_branch",
-	"mcp__dokku__deployment_status",
-	"mcp__dokku__app_logs",
-	"mcp__dokku__list_deployments",
-}
+// builtinMCPNames are the servers a session spawns itself, with per-session
+// configuration the agent must not be able to supply: the deploy target, the
+// repository and the branch arrive in the dokku server's environment, which is
+// what leaves the model choosing the branch and nothing else. An agent's own
+// entry may not take one of these names.
+var builtinMCPNames = []string{dokku.ServerName}
 
 // mcpServerSpec is one stdio MCP server offered to an agent.
 type mcpServerSpec struct {
@@ -39,44 +37,71 @@ type mcpServerSpec struct {
 	Env     map[string]string
 }
 
-// sessionMCPServers returns the MCP servers a session runs with. Only a deploy
-// session has any: an ordinary card task gets the agent's own configuration
-// untouched.
-func sessionMCPServers(s *Session) ([]mcpServerSpec, error) {
-	if s.Deploy == nil {
-		return nil, nil
+// sessionMCPServers returns the MCP servers a session runs with: the deploy
+// server we spawn ourselves for a deploy column, plus whatever the agent
+// carries of its own — which is what a test session drives the browser with.
+func sessionMCPServers(s *Session, _ Config) ([]mcpServerSpec, error) {
+	// The agent's own servers travel with every session it runs, whatever the
+	// column started it: they are part of how that agent works, not of what
+	// this particular card is for.
+	specs := agentMCPServers(s)
+	if s.Deploy != nil {
+		self, err := os.Executable()
+		if err != nil {
+			return nil, fmt.Errorf("не удалось определить путь к приложению для MCP-сервера: %w", err)
+		}
+		target, err := json.Marshal(s.Deploy.Target)
+		if err != nil {
+			return nil, fmt.Errorf("не удалось сериализовать цель деплоя: %w", err)
+		}
+		specs = append([]mcpServerSpec{{
+			Name:    dokku.ServerName,
+			Command: self,
+			Args:    []string{"mcp", dokku.ServerName},
+			Env: map[string]string{
+				dokku.EnvTarget: string(target),
+				dokku.EnvRepo:   s.RepoPath,
+				dokku.EnvBranch: s.DeployBranch,
+			},
+		}}, specs...)
 	}
-	self, err := os.Executable()
-	if err != nil {
-		return nil, fmt.Errorf("не удалось определить путь к приложению для MCP-сервера: %w", err)
+	if len(specs) > 0 {
+		// Whoever configured a server — us or the user — consented to it being
+		// launched, so the agent's "may I start MCP?" prompt is ours to answer.
+		s.markMCPConfigured()
 	}
-	target, err := json.Marshal(s.Deploy.Target)
-	if err != nil {
-		return nil, fmt.Errorf("не удалось сериализовать цель деплоя: %w", err)
-	}
-	// The tools of the server we are configuring: an unattended deploy has
-	// nobody to ask, and seeding the session (rather than the config's
-	// autoAllowTools) also reaches installs whose config.json predates the
-	// deploy feature. destroy_deployment is deliberately not here.
-	for _, tool := range dokkuAutoAllowTools {
-		s.allowToolAlways(tool)
-	}
-	s.markMCPConfigured()
-	return []mcpServerSpec{{
-		Name:    dokku.ServerName,
-		Command: self,
-		Args:    []string{"mcp", dokku.ServerName},
-		Env: map[string]string{
-			dokku.EnvTarget: string(target),
-			dokku.EnvRepo:   s.RepoPath,
-			dokku.EnvBranch: s.DeployBranch,
-		},
-	}}, nil
+	return specs, nil
 }
 
-// claudeMCPArgs renders the servers as claude's --mcp-config payload, which
-// accepts inline JSON as well as a file. --strict-mcp-config is deliberately
-// not passed: the user's own MCP servers should keep working.
+// agentMCPServers turns the agent's registry entries into specs and records
+// their tool prefixes on the session: wiring a server to an agent is consent to
+// use it, and a card-triggered session has no console to ask.
+func agentMCPServers(s *Session) []mcpServerSpec {
+	if len(s.Agent.MCPServers) == 0 {
+		return nil
+	}
+	// Sorted, because a map has no order and the agent's command line should
+	// not change between two runs of the same configuration.
+	names := make([]string, 0, len(s.Agent.MCPServers))
+	for name := range s.Agent.MCPServers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	specs := make([]mcpServerSpec, 0, len(names))
+	for _, name := range names {
+		srv := s.Agent.MCPServers[name]
+		specs = append(specs, mcpServerSpec{
+			Name:    name,
+			Command: srv.Command,
+			Args:    append([]string(nil), srv.Args...),
+			Env:     srv.Env,
+		})
+		s.allowToolPrefix("mcp__" + name + "__")
+	}
+	return specs
+}
+
 func claudeMCPArgs(specs []mcpServerSpec) ([]string, error) {
 	if len(specs) == 0 {
 		return nil, nil

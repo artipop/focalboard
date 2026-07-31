@@ -46,11 +46,39 @@ type AgentEntry struct {
 	// protocol flags. Takes precedence over BinPath.
 	Command []string `json:"command,omitempty"`
 
+	// MCPServers are the agent's own MCP servers, spawned alongside the one a
+	// deploy session configures itself. This is how a Node-based server such as
+	// @playwright/mcp plugs in without the app depending on Node: the user wires
+	// it per agent, we only pass it on.
+	//
+	// The shape is the one every MCP client uses — name → {command, args, env} —
+	// so an entry can be pasted straight from a server's README, and so the
+	// config file reads the same as the agent's own.
+	MCPServers map[string]AgentMCPServer `json:"mcpServers,omitempty"`
+
 	// ProxyName selects a named entry from the proxy registry (Config.Proxies).
 	// Network settings live there rather than on the agent, so several agents
 	// share one configuration and it is edited in a single place. Empty means
 	// the agent inherits the app's own environment.
 	ProxyName string `json:"proxyName,omitempty"`
+}
+
+// AgentMCPServer is one MCP server an agent carries of its own, in the standard
+// client shape: a command with its arguments and environment.
+//
+// Configuring one is consent to use it: its tools (mcp__<name>__…) run without
+// asking, for the same reason our own server's do — a card-triggered session
+// has no console, and asking nobody means rejecting.
+//
+// Type and URL exist only to recognise a remote server pasted from a README and
+// say what is wrong: everything here is spawned over stdio.
+type AgentMCPServer struct {
+	Command string            `json:"command,omitempty"`
+	Args    []string          `json:"args,omitempty"`
+	Env     map[string]string `json:"env,omitempty"`
+
+	Type string `json:"type,omitempty"`
+	URL  string `json:"url,omitempty"`
 }
 
 // NetworkSettings is one network path: the proxy an agent's traffic takes and
@@ -285,6 +313,16 @@ type Config struct {
 	// Dokku target it resolves to. Empty disables the deploy trigger.
 	DeployColumn string `json:"deployColumn"`
 
+	// TestColumn is the third trigger on the same property: a card dragged into
+	// it starts a session that opens the card's preview in a real browser and
+	// checks it against the card's description. Empty disables the test trigger.
+	TestColumn string `json:"testColumn"`
+
+	// TestPassColumn and TestFailColumn are where the card goes once the verdict
+	// is in. Empty means the card stays put and a human decides.
+	TestPassColumn string `json:"testPassColumn"`
+	TestFailColumn string `json:"testFailColumn"`
+
 	// RepoWhitelist lists directory roots a card's repo_path must be under.
 	// Empty means every repo_path is rejected (explicit opt-in).
 	RepoWhitelist []string `json:"repoWhitelist"`
@@ -316,6 +354,19 @@ type Config struct {
 	// DeployPrompt is what a deploy session is told to do; the concrete facts
 	// (repository, branch, target, expected URL) are appended to it.
 	DeployPrompt string `json:"deployPrompt"`
+
+	// TestPrompt is what a test session is told to do; the preview URL and the
+	// card's own description (which is the scenario) are appended to it.
+	TestPrompt string `json:"testPrompt"`
+
+	// TestTimeoutMinutes replaces SessionTimeoutMinutes for a test turn, which
+	// clicks through a whole scenario and needs longer than a code edit. How the
+	// browser itself is launched — headless, which binary, what viewport — is
+	// the business of the MCP server the agent carries, not of this config.
+	TestTimeoutMinutes int `json:"testTimeoutMinutes"`
+
+	// ArtifactsDir is where screenshots and result.json of test runs are kept.
+	ArtifactsDir string `json:"artifactsDir"`
 
 	// WorktreeMode controls where sessions run: "always" (default) — a
 	// dedicated git worktree per session, which is what gives a card its own
@@ -362,15 +413,20 @@ func DefaultConfig(dataDir string) Config {
 		TriggerProperty:          "Status",
 		TriggerColumn:            DefaultTriggerColumn,
 		DeployColumn:             "Deploy",
+		TestColumn:               "To Test",
+		TestPassColumn:           "Tested",
+		TestFailColumn:           "Failed",
 		RepoWhitelist:            []string{},
 		Repos:                    []RepoEntry{},
 		Agents:                   []AgentEntry{},
 		Proxies:                  []ProxyEntry{},
 		Deploys:                  []DeployEntry{},
 		DeployPrompt:             DefaultDeployPrompt,
+		TestPrompt:               DefaultTestPrompt,
 		WorktreeMode:             "always",
 		MaxConcurrent:            3,
 		SessionTimeoutMinutes:    15,
+		TestTimeoutMinutes:       30,
 		SessionIdleMinutes:       30,
 		ShowThoughts:             true,
 		PermissionTimeoutMinutes: 5,
@@ -388,7 +444,8 @@ func DefaultConfig(dataDir string) Config {
 			"mcp__dokku__deploy_branch", "mcp__dokku__app_logs",
 			"mcp__dokku__deployment_status", "mcp__dokku__list_deployments",
 		},
-		WorktreeDir: filepath.Join(dataDir, "worktrees"),
+		WorktreeDir:  filepath.Join(dataDir, "worktrees"),
+		ArtifactsDir: filepath.Join(dataDir, "artifacts"),
 	}
 }
 
@@ -404,6 +461,43 @@ app_logs показывает логи сборки и приложения, dep
 конфиг сборки). Не переписывай логику приложения — вместо этого опиши проблему.
 
 В конце ответа дай URL превью.`
+
+// DefaultTestPrompt is the task text a test session starts with. It is written
+// for a tester, not a developer: the job is to find what is broken on the
+// preview, not to fix it.
+const DefaultTestPrompt = `Задача: проверить в браузере превью этой карточки — вместо ручного тестировщика.
+
+Сценарий бери из описания карточки: что должно было измениться, то и проверяй,
+плюс убедись, что рядом ничего не развалилось. Браузер води инструментами
+браузерного MCP-сервера, который у тебя есть (mcp__…__browser_navigate,
+browser_snapshot, browser_click, browser_type и прочие): snapshot показывает
+страницу текстом со ссылками на элементы, действия делаются по этим ссылкам.
+После действия, меняющего страницу, бери новый snapshot — ссылки протухают.
+
+Открывай только адрес превью, указанный ниже, и страницы под ним — на другие
+хосты не ходи. Посмотри консоль и сетевые запросы: ошибки JS и упавшие запросы
+— это дефекты, даже если внешне всё нарисовалось. Делай скриншоты на ключевых
+шагах и на каждом найденном дефекте, сохраняя их в каталог screenshots рядом
+с отчётом: они попадут в карточку.
+
+Ничего не чини и не меняй код — ты тестируешь. В самом конце запиши отчёт
+в файл result.json (путь указан ниже) — без него результат прогона не
+засчитывается:
+
+{"verdict": "pass|fail|blocked", "summary": "итог в одну-две фразы",
+ "steps": ["что проделал, по шагам"], "bugs": ["что ожидалось и что произошло"]}
+
+pass — сценарий прошёл, fail — есть дефекты (перечисли их в bugs),
+blocked — проверить не удалось (превью не открывается, нет доступа).`
+
+// TestTimeout bounds one test turn. A browser scenario takes much longer than a
+// code edit, so it has its own budget instead of SessionTimeoutMinutes.
+func (c Config) TestTimeout() time.Duration {
+	if c.TestTimeoutMinutes <= 0 {
+		return c.SessionTimeout()
+	}
+	return time.Duration(c.TestTimeoutMinutes) * time.Minute
+}
 
 // LoadConfig reads path, creating it with defaults when absent.
 func LoadConfig(path, dataDir string) (Config, error) {

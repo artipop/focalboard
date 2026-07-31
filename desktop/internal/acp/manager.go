@@ -134,6 +134,9 @@ type startOptions struct {
 	// deploy makes this a deploy session: it resolves a Dokku target, is given
 	// the dokku MCP tools and gets the deploy prompt instead of the card task.
 	deploy bool
+	// test makes this a test session: it resolves the card's preview address, is
+	// given the browser MCP tools and gets the tester prompt.
+	test bool
 	// repoName picks a repository explicitly, for a console opened on a card
 	// that does not say which one it is about.
 	repoName string
@@ -149,6 +152,12 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 // same machinery as a card task, pointed at publishing the card's branch.
 func (m *Manager) StartDeploySessionForEvent(ev CardMoved) (*Session, error) {
 	return m.startSession(ev, startOptions{deploy: true})
+}
+
+// StartTestSessionForEvent launches the session behind the test column: the
+// same machinery again, pointed at the card's deployed preview.
+func (m *Manager) StartTestSessionForEvent(ev CardMoved) (*Session, error) {
+	return m.startSession(ev, startOptions{test: true})
 }
 
 // startSession is the shared launch path. An interactive session survives its
@@ -167,6 +176,13 @@ func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error
 	if err != nil {
 		return nil, err
 	}
+	sessionID := uuid.NewString()
+	test, err := m.resolveTestRun(ev, repoPath, sessionID, opts.test)
+	if err != nil {
+		return nil, err
+	}
+	// A deploy no longer pins its own agent: the card decides, as it does for
+	// every other kind of session.
 	agent, err := m.resolveAgent(ev)
 	if err != nil {
 		return nil, err
@@ -174,6 +190,12 @@ func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error
 	net, err := m.resolveNetwork(agent)
 	if err != nil {
 		return nil, err
+	}
+	// A test session is an agent clicking through a browser it brings itself:
+	// without a browser MCP server on the agent there is nothing to test with,
+	// and finding that out mid-turn costs a whole session.
+	if test != nil && len(agent.MCPServers) == 0 {
+		return nil, fmt.Errorf("агенту %q не задан MCP-сервер браузера — тестировать нечем (меню доски → Агенты → «MCP-серверы»)", agent.Name)
 	}
 	// Without worktrees, two agents must never share one working tree
 	// (spec §7): reject while another live session uses the same repo. A deploy
@@ -197,17 +219,27 @@ func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error
 	}
 
 	m.cfgMu.RLock()
-	systemPrompt := m.cfg.SystemPrompt
+	systemPrompt, deployPrompt, testPrompt := m.cfg.SystemPrompt, m.cfg.DeployPrompt, m.cfg.TestPrompt
 	m.cfgMu.RUnlock()
 	prompt := composePrompt(ev, agent, systemPrompt, m.cfg.UseWorktrees())
-	if deploy != nil {
-		m.cfgMu.RLock()
-		deployPrompt := m.cfg.DeployPrompt
-		m.cfgMu.RUnlock()
+	switch {
+	case deploy != nil:
 		prompt = composeDeployPrompt(ev, agent, systemPrompt, deployPrompt, *deploy, deployBranch)
+	case test != nil:
+		prompt = composeTestPrompt(ev, agent, systemPrompt, testPrompt, *test)
+	}
+	// The tools of the deploy server are allowed up front: nobody is watching a
+	// card-triggered run, and an unanswered prompt is a rejected one. Seeding
+	// the session rather than DefaultConfig.AutoAllowTools also reaches installs
+	// whose config.json predates the feature. A test session drives a browser
+	// through a server the agent carries, whose tools are allowed by prefix
+	// (agentMCPServers) since their names only exist at run time.
+	allowTools := make(map[string]bool)
+	if deploy != nil {
+		allowTools = deployTools()
 	}
 	s := &Session{
-		ID:           uuid.NewString(),
+		ID:           sessionID,
 		CardID:       ev.CardID,
 		Title:        ev.Title,
 		BoardID:      ev.BoardID,
@@ -217,10 +249,11 @@ func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error
 		Net:          net,
 		Deploy:       deploy,
 		DeployBranch: deployBranch,
+		Test:         test,
 		PromptText:   prompt,
 		Policy:       agentPolicy(agent),
 		status:       StatusQueued,
-		allowTools:   make(map[string]bool),
+		allowTools:   allowTools,
 		interactive:  opts.interactive,
 		turns:        make(chan turnRequest, 1),
 		closeCh:      make(chan struct{}),

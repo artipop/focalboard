@@ -86,7 +86,8 @@ func (c *sessionClient) RequestPermission(ctx context.Context, params acpsdk.Req
 		title = *params.ToolCall.Title
 	}
 
-	if c.s.autoAllowed(toolName, params.ToolCall.RawInput, c.m.cfg) || c.s.toolAllowed(toolName) {
+	if c.s.autoAllowed(toolName, params.ToolCall.RawInput, c.m.cfg) || c.s.toolAllowed(toolName) ||
+		c.s.toolPrefixAllowed(toolName) {
 		c.recordDecision(toolName, title, "allow", true)
 		return selectOption(params, acpsdk.PermissionOptionKindAllowOnce)
 	}

@@ -456,3 +456,81 @@ func TestLoadConfigMigratesLegacyTriggerColumn(t *testing.T) {
 		t.Errorf("custom column was rewritten to %q", got)
 	}
 }
+
+func TestAgentMCPServersValidation(t *testing.T) {
+	ok, err := validateAgent(AgentEntry{Name: "jojo", Kind: "junie", MCPServers: map[string]AgentMCPServer{
+		"playwright": {Command: " npx ", Args: []string{" -y ", "@playwright/mcp@latest", "  "}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Stray whitespace would become an empty argv element and a puzzling exec error.
+	srv := ok.MCPServers["playwright"]
+	if srv.Command != "npx" || strings.Join(srv.Args, "|") != "-y|@playwright/mcp@latest" {
+		t.Errorf("command not cleaned: %+v", srv)
+	}
+
+	bad := map[string]struct {
+		why    string
+		server AgentMCPServer
+	}{
+		"":            {"без имени", AgentMCPServer{Command: "npx"}},
+		"playwright":  {"без команды", AgentMCPServer{}},
+		"play wright": {"имя не годится в префикс инструмента", AgentMCPServer{Command: "npx"}},
+		"dokku":       {"имя занято встроенным сервером", AgentMCPServer{Command: "npx"}},
+		"remote":      {"удалённый сервер", AgentMCPServer{Type: "http", URL: "https://mcp.example.com"}},
+	}
+	for name, c := range bad {
+		if _, err := validateAgent(AgentEntry{Name: "a", Kind: "claude", MCPServers: map[string]AgentMCPServer{name: c.server}}); err == nil {
+			t.Errorf("принят сервер %s: %q %+v", c.why, name, c.server)
+		}
+	}
+	// A remote server is a normal thing to paste, so the error has to name the
+	// reason rather than complain about a missing command.
+	_, err = validateAgent(AgentEntry{Name: "a", Kind: "claude", MCPServers: map[string]AgentMCPServer{
+		"remote": {Type: "http", URL: "https://mcp.example.com"},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "удалённый") {
+		t.Errorf("unhelpful error for a remote server: %v", err)
+	}
+}
+
+func TestAgentMCPServersTravelWithEverySession(t *testing.T) {
+	agent := AgentEntry{Name: "jojo", Kind: "junie", MCPServers: map[string]AgentMCPServer{
+		"playwright": {Command: "npx", Args: []string{"-y", "@playwright/mcp@latest", "--headless"}, Env: map[string]string{"X": "1"}},
+	}}
+	cfg := DefaultConfig(t.TempDir())
+
+	// An ordinary card task gets the agent's own server even though the card
+	// itself configures none.
+	s := &Session{RepoPath: "/repo", Agent: agent}
+	specs, err := sessionMCPServers(s, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(specs) != 1 || specs[0].Name != "playwright" || specs[0].Command != "npx" {
+		t.Fatalf("specs: %+v", specs)
+	}
+	if strings.Join(specs[0].Args, " ") != "-y @playwright/mcp@latest --headless" || specs[0].Env["X"] != "1" {
+		t.Errorf("argv/env lost: %+v", specs[0])
+	}
+	// Wiring a server in is consent to use it: an unattended session has nobody
+	// to ask, and the tool names only exist at run time.
+	if !s.toolPrefixAllowed("mcp__playwright__browser_click") {
+		t.Error("tools of a configured server should run unasked")
+	}
+	if s.toolPrefixAllowed("mcp__other__thing") {
+		t.Error("only the configured server's tools may be allowed")
+	}
+
+	// A deploy session keeps ours first and appends the agent's.
+	target := deployEntry("prod")
+	deploySession := &Session{RepoPath: "/repo", Agent: agent, Deploy: &target, DeployBranch: "feat/x"}
+	specs, err = sessionMCPServers(deploySession, cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(specs) != 2 || specs[0].Name != "dokku" || specs[1].Name != "playwright" {
+		t.Fatalf("deploy session specs: %+v", specs)
+	}
+}

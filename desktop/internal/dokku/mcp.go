@@ -68,15 +68,15 @@ func NewServer(cl *Client) *mcp.Server {
 		if err != nil {
 			// The build log is the whole point of the failure report, so it goes
 			// back to the model instead of a bare error string.
-			return errorResult("❌ Деплой не удался: %v\n\n%s", err, logBlock(res.PushLog)), nil, nil
+			return errorResult("Деплой не удался: %v\n\n%s", err, logBlock(res.PushLog)), nil, nil
 		}
 		var b strings.Builder
-		fmt.Fprintf(&b, "✅ Ветка `%s` задеплоена.\nURL: %s\nПриложение Dokku: %s", res.Branch, res.URL, res.App)
+		fmt.Fprintf(&b, "Ветка `%s` задеплоена.\nURL: %s\nПриложение Dokku: %s", res.Branch, res.URL, res.App)
 		if res.Created {
 			b.WriteString("\n(приложение создано этим деплоем)")
 		}
 		for _, w := range res.Warnings {
-			fmt.Fprintf(&b, "\n⚠️ %s", w)
+			fmt.Fprintf(&b, "\n%s", w)
 		}
 		fmt.Fprintf(&b, "\n\n%s", logBlock(res.PushLog))
 		return textResult(b.String()), nil, nil

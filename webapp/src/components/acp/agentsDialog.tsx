@@ -22,6 +22,26 @@ import './agentsDialog.scss'
 // to a registered agent. Synced by "Sync to board"; matched in resolveAgent.
 const AGENT_PROPERTY_NAME = 'Agent'
 
+// The standard MCP client shape, so a server can be pasted straight from its
+// README: a name mapped to the command that starts it.
+type AgentMCPServer = {
+    command?: string
+    args?: string[]
+    env?: {[key: string]: string}
+    type?: string
+    url?: string
+}
+
+type AgentMCPServers = {[name: string]: AgentMCPServer}
+
+// What the field expects, shown when it is empty: the browser server a test
+// session needs, in the form its own README gives it.
+const mcpServersPlaceholder = JSON.stringify({
+    mcpServers: {
+        playwright: {command: 'npx', args: ['-y', '@playwright/mcp@latest', '--headless', '--browser', 'chrome']},
+    },
+}, null, 2)
+
 type AgentEntry = {
     name: string
     kind: string
@@ -31,6 +51,7 @@ type AgentEntry = {
     env?: {[key: string]: string}
     args?: string[]
     command?: string[]
+    mcpServers?: AgentMCPServers
     proxyName?: string
 }
 
@@ -56,6 +77,33 @@ export function envToText(env?: {[key: string]: string}): string {
         return ''
     }
     return Object.entries(env).map(([k, v]) => `${k}=${v}`).join('\n')
+}
+
+// serversToText / textToServers convert between the textarea and the map, in
+// the JSON every MCP client uses. The mcpServers wrapper is written on the way
+// out and accepted but not required on the way in, which is what lets a block
+// be pasted from a server's README as it is. Invalid JSON throws: the caller
+// says so instead of silently saving an empty list.
+export function serversToText(servers?: AgentMCPServers): string {
+    if (!servers || Object.keys(servers).length === 0) {
+        return ''
+    }
+    return JSON.stringify({mcpServers: servers}, null, 2)
+}
+
+export function textToServers(text: string): AgentMCPServers {
+    if (!text.trim()) {
+        return {}
+    }
+    const parsed = JSON.parse(text)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('mcpServers must be an object')
+    }
+    const servers = parsed.mcpServers === undefined ? parsed : parsed.mcpServers
+    if (!servers || typeof servers !== 'object' || Array.isArray(servers)) {
+        throw new Error('mcpServers must be an object')
+    }
+    return servers
 }
 
 export function textToEnv(text: string): {[key: string]: string} {
@@ -112,6 +160,7 @@ const AgentsDialog = (props: Props) => {
     const [systemPrompt, setSystemPrompt] = useState('')
     const [form, setForm] = useState<AgentEntry | null>(null)
     const [envText, setEnvText] = useState('')
+    const [serversText, setServersText] = useState('')
     const [argsText, setArgsText] = useState('')
     const [commandText, setCommandText] = useState('')
     const [editingName, setEditingName] = useState<string | null>(null)
@@ -167,6 +216,7 @@ const AgentsDialog = (props: Props) => {
     const startAdd = useCallback(() => {
         setForm({...emptyForm})
         setEnvText('')
+        setServersText('')
         setArgsText('')
         setCommandText('')
         setEditingName(null)
@@ -176,6 +226,7 @@ const AgentsDialog = (props: Props) => {
     const startEdit = useCallback((agent: AgentEntry) => {
         setForm({...agent})
         setEnvText(envToText(agent.env))
+        setServersText(serversToText(agent.mcpServers))
         setArgsText(joinArgv(agent.args))
         setCommandText(joinArgv(agent.command))
         setEditingName(agent.name)
@@ -187,12 +238,20 @@ const AgentsDialog = (props: Props) => {
             return
         }
         setError('')
+        let mcpServers: AgentMCPServers
+        try {
+            mcpServers = textToServers(serversText)
+        } catch (e) {
+            setError(intl.formatMessage({id: 'Agents.mcp-servers-invalid', defaultMessage: 'MCP servers must be valid JSON: a server name mapped to its command and args, the same block any MCP client takes.'}))
+            return
+        }
         const entry: AgentEntry = {
             ...form,
             name: form.name.trim(),
             env: textToEnv(envText),
             args: splitArgv(argsText),
             command: splitArgv(commandText),
+            mcpServers,
         }
         try {
             if (editingName) {
@@ -205,7 +264,7 @@ const AgentsDialog = (props: Props) => {
         } catch (e) {
             setError(String(e))
         }
-    }, [bindings, form, envText, argsText, commandText, editingName, refresh])
+    }, [bindings, form, intl, envText, serversText, argsText, commandText, editingName, refresh])
 
     const removeAgent = useCallback(async (name: string) => {
         if (!bindings?.RemoveAgent) {
@@ -397,6 +456,18 @@ const AgentsDialog = (props: Props) => {
                                 onChange={(e) => setEnvText(e.target.value)}
                             />
                         </label>
+                        <label>
+                            {intl.formatMessage({id: 'Agents.mcp-servers', defaultMessage: 'MCP servers (the JSON any MCP client takes) — offered to this agent in every session'})}
+                            <textarea
+                                rows={7}
+                                value={serversText}
+                                placeholder={mcpServersPlaceholder}
+                                onChange={(e) => setServersText(e.target.value)}
+                            />
+                        </label>
+                        <div className='AgentsDialog__hint'>
+                            {intl.formatMessage({id: 'Agents.mcp-servers-hint', defaultMessage: 'Their tools run without asking: wiring a server here is consent to use it. A browser server (Playwright, say) is what the "To Test" column runs on.'})}
+                        </div>
                         <label>
                             {intl.formatMessage({id: 'Agents.args', defaultMessage: 'Extra CLI args (space-separated)'})}
                             <input

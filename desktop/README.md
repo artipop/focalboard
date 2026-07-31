@@ -27,7 +27,12 @@ The Go code is platform-agnostic — the same files build for every OS:
   bootstrap `<script>` into the served HTML that: seeds the single-user session
   token into `localStorage`; sets `window.webSocketBaseURL` to the real server;
   and wires `window.openInNewBrowser` to open external links in the system
-  browser.
+  browser. A capture-phase click handler sends **every** absolute http(s) anchor
+  there, same-origin ones excepted. It deliberately does not defer to the inline
+  `onclick` that `Utils.htmlFromMarkdown` puts on markdown links: when that
+  handler does not run, the click is simply lost — the webview cannot navigate
+  to an outside origin either — which is what made preview links in card
+  comments dead.
 
   **WebSockets do not go through this proxy.** On macOS (and Linux) Wails serves
   the page from a WebKit custom-scheme origin, and that scheme handler cannot
@@ -61,6 +66,15 @@ runtime).
 - **Linux installers**: `nfpm` for `.deb` (`go install
   github.com/goreleaser/nfpm/v2/cmd/nfpm@latest`); the AppImage script downloads
   `appimagetool` if it isn't already on `PATH`.
+- **Browser-testing sessions** (the "To Test" column) need a browser MCP server
+  on the agent — under *Agents → MCP servers*, paste the same JSON any MCP
+  client takes, e.g. `{"mcpServers": {"playwright": {"command": "npx", "args":
+  ["-y", "@playwright/mcp@latest", "--headless"]}}}`. The app ships no
+  browser driver of its own and stays Node-free; the server is the user's
+  choice, and a test session refuses to start for an agent without one. Each run
+  gets a directory under `artifactsDir` (default
+  `<dataDir>/artifacts/<session-id>`) where the agent is asked to save its
+  screenshots and write `result.json` — that verdict is what moves the card.
 
 ## Develop
 
