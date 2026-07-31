@@ -458,41 +458,46 @@ func TestLoadConfigMigratesLegacyTriggerColumn(t *testing.T) {
 }
 
 func TestAgentMCPServersValidation(t *testing.T) {
-	ok, err := validateAgent(AgentEntry{Name: "jojo", Kind: "junie", MCPServers: []AgentMCPServer{
-		{Name: "playwright", Command: []string{"npx", " -y ", "@playwright/mcp@latest", "  "}},
+	ok, err := validateAgent(AgentEntry{Name: "jojo", Kind: "junie", MCPServers: map[string]AgentMCPServer{
+		"playwright": {Command: " npx ", Args: []string{" -y ", "@playwright/mcp@latest", "  "}},
 	}})
 	if err != nil {
 		t.Fatal(err)
 	}
 	// Stray whitespace would become an empty argv element and a puzzling exec error.
-	if got := strings.Join(ok.MCPServers[0].Command, "|"); got != "npx|-y|@playwright/mcp@latest" {
-		t.Errorf("command not cleaned: %q", got)
+	srv := ok.MCPServers["playwright"]
+	if srv.Command != "npx" || strings.Join(srv.Args, "|") != "-y|@playwright/mcp@latest" {
+		t.Errorf("command not cleaned: %+v", srv)
 	}
 
-	bad := []struct {
+	bad := map[string]struct {
 		why    string
 		server AgentMCPServer
 	}{
-		{"без имени", AgentMCPServer{Command: []string{"npx"}}},
-		{"без команды", AgentMCPServer{Name: "playwright"}},
-		{"имя не годится в префикс инструмента", AgentMCPServer{Name: "play wright", Command: []string{"npx"}}},
-		{"имя занято встроенным сервером", AgentMCPServer{Name: "dokku", Command: []string{"npx"}}},
+		"":            {"без имени", AgentMCPServer{Command: "npx"}},
+		"playwright":  {"без команды", AgentMCPServer{}},
+		"play wright": {"имя не годится в префикс инструмента", AgentMCPServer{Command: "npx"}},
+		"dokku":       {"имя занято встроенным сервером", AgentMCPServer{Command: "npx"}},
+		"remote":      {"удалённый сервер", AgentMCPServer{Type: "http", URL: "https://mcp.example.com"}},
 	}
-	for _, c := range bad {
-		if _, err := validateAgent(AgentEntry{Name: "a", Kind: "claude", MCPServers: []AgentMCPServer{c.server}}); err == nil {
-			t.Errorf("принят сервер %s: %+v", c.why, c.server)
+	for name, c := range bad {
+		if _, err := validateAgent(AgentEntry{Name: "a", Kind: "claude", MCPServers: map[string]AgentMCPServer{name: c.server}}); err == nil {
+			t.Errorf("принят сервер %s: %q %+v", c.why, name, c.server)
 		}
 	}
-	if _, err := validateAgent(AgentEntry{Name: "a", Kind: "claude", MCPServers: []AgentMCPServer{
-		{Name: "pw", Command: []string{"npx"}}, {Name: "PW", Command: []string{"npx"}},
-	}}); err == nil {
-		t.Error("принято два сервера с одним именем")
+	// A remote server is a normal thing to paste, so the error has to name the
+	// reason rather than complain about a missing command.
+	_, err = validateAgent(AgentEntry{Name: "a", Kind: "claude", MCPServers: map[string]AgentMCPServer{
+		"remote": {Type: "http", URL: "https://mcp.example.com"},
+	}})
+	if err == nil || !strings.Contains(err.Error(), "удалённый") {
+		t.Errorf("unhelpful error for a remote server: %v", err)
 	}
 }
 
 func TestAgentMCPServersTravelWithEverySession(t *testing.T) {
-	agent := AgentEntry{Name: "jojo", Kind: "junie", MCPServers: []AgentMCPServer{
-		{Name: "playwright", Command: []string{"npx", "-y", "@playwright/mcp@latest", "--headless"}, Env: map[string]string{"X": "1"}},
+	agent := AgentEntry{Name: "jojo", Kind: "junie", MCPServers: map[string]AgentMCPServer{
+		"playwright": {Command: "npx", Args: []string{"-y", "@playwright/mcp@latest", "--headless"}, Env: map[string]string{"X": "1"}},
 	}}
 	cfg := DefaultConfig(t.TempDir())
 

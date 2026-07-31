@@ -122,8 +122,8 @@ func TestComposeTestPromptCarriesTheScenario(t *testing.T) {
 
 func TestSessionMCPServersForATestSession(t *testing.T) {
 	cfg := DefaultConfig(t.TempDir())
-	agent := AgentEntry{Name: "jojo", Kind: "junie", MCPServers: []AgentMCPServer{
-		{Name: "playwright", Command: []string{"npx", "-y", "@playwright/mcp@latest", "--headless"}},
+	agent := AgentEntry{Name: "jojo", Kind: "junie", MCPServers: map[string]AgentMCPServer{
+		"playwright": {Command: "npx", Args: []string{"-y", "@playwright/mcp@latest", "--headless"}},
 	}}
 	s := &Session{RepoPath: "/repo", Agent: agent, Test: &TestRun{URL: "https://feat-x.example.com", Artifacts: "/data/run"}}
 

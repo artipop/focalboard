@@ -80,15 +80,24 @@ func agentMCPServers(s *Session) []mcpServerSpec {
 	if len(s.Agent.MCPServers) == 0 {
 		return nil
 	}
-	specs := make([]mcpServerSpec, 0, len(s.Agent.MCPServers))
-	for _, srv := range s.Agent.MCPServers {
+	// Sorted, because a map has no order and the agent's command line should
+	// not change between two runs of the same configuration.
+	names := make([]string, 0, len(s.Agent.MCPServers))
+	for name := range s.Agent.MCPServers {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	specs := make([]mcpServerSpec, 0, len(names))
+	for _, name := range names {
+		srv := s.Agent.MCPServers[name]
 		specs = append(specs, mcpServerSpec{
-			Name:    srv.Name,
-			Command: srv.Command[0],
-			Args:    append([]string(nil), srv.Command[1:]...),
+			Name:    name,
+			Command: srv.Command,
+			Args:    append([]string(nil), srv.Args...),
 			Env:     srv.Env,
 		})
-		s.allowToolPrefix("mcp__" + srv.Name + "__")
+		s.allowToolPrefix("mcp__" + name + "__")
 	}
 	return specs
 }

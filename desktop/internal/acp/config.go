@@ -46,11 +46,15 @@ type AgentEntry struct {
 	// protocol flags. Takes precedence over BinPath.
 	Command []string `json:"command,omitempty"`
 
-	// MCPServers are the agent's own MCP servers, spawned alongside the ones a
-	// session configures itself (dokku for a deploy, webtest for a test). This
-	// is how a Node-based server such as @playwright/mcp plugs in without the
-	// app depending on Node: the user wires it per agent, we only pass it on.
-	MCPServers []AgentMCPServer `json:"mcpServers,omitempty"`
+	// MCPServers are the agent's own MCP servers, spawned alongside the one a
+	// deploy session configures itself. This is how a Node-based server such as
+	// @playwright/mcp plugs in without the app depending on Node: the user wires
+	// it per agent, we only pass it on.
+	//
+	// The shape is the one every MCP client uses — name → {command, args, env} —
+	// so an entry can be pasted straight from a server's README, and so the
+	// config file reads the same as the agent's own.
+	MCPServers map[string]AgentMCPServer `json:"mcpServers,omitempty"`
 
 	// ProxyName selects a named entry from the proxy registry (Config.Proxies).
 	// Network settings live there rather than on the agent, so several agents
@@ -59,17 +63,22 @@ type AgentEntry struct {
 	ProxyName string `json:"proxyName,omitempty"`
 }
 
-// AgentMCPServer is one MCP server an agent carries of its own. Command is the
-// launch argv ("npx", "-y", "@playwright/mcp@latest", "--headless"); Env is
-// added to what the agent process already passes down.
+// AgentMCPServer is one MCP server an agent carries of its own, in the standard
+// client shape: a command with its arguments and environment.
 //
 // Configuring one is consent to use it: its tools (mcp__<name>__…) run without
-// asking, for the same reason our own servers' do — a card-triggered session
+// asking, for the same reason our own server's do — a card-triggered session
 // has no console, and asking nobody means rejecting.
+//
+// Type and URL exist only to recognise a remote server pasted from a README and
+// say what is wrong: everything here is spawned over stdio.
 type AgentMCPServer struct {
-	Name    string            `json:"name"`
-	Command []string          `json:"command"`
+	Command string            `json:"command,omitempty"`
+	Args    []string          `json:"args,omitempty"`
 	Env     map[string]string `json:"env,omitempty"`
+
+	Type string `json:"type,omitempty"`
+	URL  string `json:"url,omitempty"`
 }
 
 // NetworkSettings is one network path: the proxy an agent's traffic takes and

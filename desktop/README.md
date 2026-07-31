@@ -67,8 +67,9 @@ runtime).
   github.com/goreleaser/nfpm/v2/cmd/nfpm@latest`); the AppImage script downloads
   `appimagetool` if it isn't already on `PATH`.
 - **Browser-testing sessions** (the "To Test" column) need a browser MCP server
-  on the agent — `playwright = npx -y @playwright/mcp@latest --headless
-  --browser chrome` under *Agents → MCP servers*, for instance. The app ships no
+  on the agent — under *Agents → MCP servers*, paste the same JSON any MCP
+  client takes, e.g. `{"mcpServers": {"playwright": {"command": "npx", "args":
+  ["-y", "@playwright/mcp@latest", "--headless"]}}}`. The app ships no
   browser driver of its own and stays Node-free; the server is the user's
   choice, and a test session refuses to start for an agent without one. Each run
   gets a directory under `artifactsDir` (default

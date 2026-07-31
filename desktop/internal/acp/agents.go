@@ -54,43 +54,49 @@ func validateAgent(a AgentEntry) (AgentEntry, error) {
 }
 
 // validateMCPServers normalizes the agent's own MCP servers. A name has to be
-// usable as a tool prefix and must not shadow one of ours, which the session
-// adds for a deploy or a test run.
-func validateMCPServers(servers []AgentMCPServer) ([]AgentMCPServer, error) {
+// usable as a tool prefix and must not shadow one we spawn ourselves.
+func validateMCPServers(servers map[string]AgentMCPServer) (map[string]AgentMCPServer, error) {
 	if len(servers) == 0 {
 		return nil, nil
 	}
-	out := make([]AgentMCPServer, 0, len(servers))
-	seen := make(map[string]bool, len(servers))
-	for _, srv := range servers {
-		srv.Name = strings.TrimSpace(srv.Name)
-		if srv.Name == "" {
+	out := make(map[string]AgentMCPServer, len(servers))
+	for name, srv := range servers {
+		name = strings.TrimSpace(name)
+		if name == "" {
 			return nil, fmt.Errorf("у MCP-сервера не задано имя")
 		}
-		if !validMCPName(srv.Name) {
-			return nil, fmt.Errorf("имя MCP-сервера %q может состоять только из латиницы, цифр, дефиса и подчёркивания", srv.Name)
+		if !validMCPName(name) {
+			return nil, fmt.Errorf("имя MCP-сервера %q может состоять только из латиницы, цифр, дефиса и подчёркивания", name)
 		}
 		for _, builtin := range builtinMCPNames {
-			if strings.EqualFold(srv.Name, builtin) {
-				return nil, fmt.Errorf("имя %q занято встроенным сервером", srv.Name)
+			if strings.EqualFold(name, builtin) {
+				return nil, fmt.Errorf("имя %q занято встроенным сервером", name)
 			}
 		}
-		if seen[strings.ToLower(srv.Name)] {
-			return nil, fmt.Errorf("MCP-сервер с именем %q уже задан", srv.Name)
+		for existing := range out {
+			if strings.EqualFold(existing, name) {
+				return nil, fmt.Errorf("MCP-сервер с именем %q уже задан", name)
+			}
 		}
-		seen[strings.ToLower(srv.Name)] = true
 
-		command := srv.Command[:0:0]
-		for _, arg := range srv.Command {
+		// A remote server is a normal thing to paste from a README, and it
+		// would otherwise fail as "no command" — which explains nothing.
+		if strings.TrimSpace(srv.URL) != "" || strings.EqualFold(strings.TrimSpace(srv.Type), "http") || strings.EqualFold(strings.TrimSpace(srv.Type), "sse") {
+			return nil, fmt.Errorf("сервер %q удалённый (url/type), а поддерживаются пока только локальные: command + args", name)
+		}
+		srv.Command = strings.TrimSpace(srv.Command)
+		if srv.Command == "" {
+			return nil, fmt.Errorf("для MCP-сервера %q не задана команда запуска (command)", name)
+		}
+		args := srv.Args[:0:0]
+		for _, arg := range srv.Args {
 			if arg = strings.TrimSpace(arg); arg != "" {
-				command = append(command, arg)
+				args = append(args, arg)
 			}
 		}
-		if len(command) == 0 {
-			return nil, fmt.Errorf("для MCP-сервера %q не задана команда запуска", srv.Name)
-		}
-		srv.Command = command
-		out = append(out, srv)
+		srv.Args = args
+		srv.Type = ""
+		out[name] = srv
 	}
 	return out, nil
 }
