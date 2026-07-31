@@ -151,6 +151,13 @@ func (m *Manager) runNodeAction(ev CardMoved, flow FlowEntry, node FlowNode) {
 		m.enqueueStage(ev, spec, flow.Name, node.ID)
 		return
 	}
+	// The card is somebody's: the route keeps its place and waits for them to
+	// move it on. Not a failed stage — the work is being done, just not by us.
+	var mine AssignedToHumanError
+	if errors.As(err, &mine) {
+		m.sayCardIsTaken(ev.CardID, mine)
+		return
+	}
 	if err != nil {
 		m.log.Warn("acp: flow action not started", "card", ev.CardID, "node", node.ID, "err", err)
 		m.commentCard(ev.CardID, fmt.Sprintf("Флоу «%s», стадия «%s»: шаг не запущен: %v", flow.Name, node.Column, err))

@@ -89,6 +89,10 @@ runtime).
   registry on first load, so nothing changes until you edit it. A crew of several
   agents needs `worktreeMode: "always"` (the default) — without worktrees two
   agents cannot share one repository, and the crew works one card at a time.
+- **Taking a card yourself**: assign it to yourself and no agent starts on it —
+  the card keeps its place on the route and waits for you to move it on. Deploy
+  and test still run, since that is machine work; assigning a registered agent,
+  or nobody, hands the card back to automation.
 - **Flows** (board "…" menu → *Workflows*) join those columns into a route and
   move cards along it. Repository events are polled from the branches parked
   cards wait on: plain git needs nothing, while `pr.*`, `review.approved` and

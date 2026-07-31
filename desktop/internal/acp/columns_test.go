@@ -3,6 +3,7 @@ package acp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -375,5 +376,77 @@ func TestBoardFlowOverviewCountsWhereTheCardsAre(t *testing.T) {
 	// A board that has no such route is told nothing rather than everything.
 	if got, err := m.BoardFlowOverview("другая-доска"); err != nil || len(got) != 1 || got[0].Cards != 0 {
 		t.Fatalf("another board sees this one's cards: %+v, %v", got, err)
+	}
+}
+
+// Assigning yourself is how you say "this one is mine". An agent picking the
+// same card up would do the work twice and — on a route — move the card on the
+// moment it decided it was done.
+func TestCardAssignedToAPersonIsLeftAlone(t *testing.T) {
+	m, writer, events, repo := testManager(t, fakeClaudeHappy, func(c *Config) {
+		c.Agents = []AgentEntry{{Name: "claude-1", Kind: "claude"}}
+	})
+
+	ev := moveEvent("cardMine", repo, "opt-backlog", "opt-agent")
+	ev.PersonNames = []string{"artem"}
+	events.ch <- ev
+
+	waitFor(t, 10*time.Second, "the card says why nothing started", func() bool {
+		return len(writer.cardComments("cardMine")) > 0
+	})
+	comment := writer.cardComments("cardMine")[0]
+	if !strings.Contains(comment, "artem") || !strings.Contains(comment, "агент не запускается") {
+		t.Fatalf("the card should say who took it: %q", comment)
+	}
+	if sessions, _, _ := m.store.SessionsForCard("cardMine"); len(sessions) != 0 {
+		t.Fatalf("an agent started on somebody's card: %d sessions", len(sessions))
+	}
+
+	// An assignee that is an agent means the opposite: that agent works.
+	agentEv := moveEvent("cardTheirs", repo, "opt-backlog", "opt-agent")
+	agentEv.PersonNames = []string{"claude-1"}
+	events.ch <- agentEv
+	waitFor(t, 10*time.Second, "the assigned agent takes its card", func() bool {
+		sessions, _, err := m.store.SessionsForCard("cardTheirs")
+		return err == nil && len(sessions) == 1
+	})
+}
+
+// The veto is about the stage where a person and an agent would be doing the
+// same job. Deploying and testing are machine work, and a card assigned to
+// somebody is still deployed.
+func TestAssignedCardIsStillDeployed(t *testing.T) {
+	m := agentManager(t, "", AgentEntry{Name: "claude-1", Kind: "claude"})
+	m.cfg.Deploys = []DeployEntry{deployEntry("prod")}
+	m.rootCtx = context.Background()
+
+	ev := CardMoved{CardID: "cardDeploy", BoardID: "board1", PersonNames: []string{"artem"},
+		Props: map[string]string{"branch": "feat/x"}}
+
+	// The launch path gets past the veto for a deploy session; it stops later,
+	// for want of a repository, which is a different complaint.
+	_, err := m.startSession(ev, startOptions{deploy: true})
+	var mine AssignedToHumanError
+	if errors.As(err, &mine) {
+		t.Fatalf("a deploy must not be vetoed by an assignee: %v", err)
+	}
+
+	// An ordinary stage on the same card is.
+	_, err = m.startSession(ev, startOptions{})
+	if !errors.As(err, &mine) || mine.Who != "artem" {
+		t.Fatalf("an agent stage should be vetoed: %v", err)
+	}
+
+	// And a console the user opens is asking for an agent outright.
+	_, err = m.startSession(ev, startOptions{interactive: true})
+	if errors.As(err, &mine) {
+		t.Fatalf("an interactive session must not be vetoed: %v", err)
+	}
+
+	// An explicit agent property is a direct instruction and wins over it.
+	ev.Props["agent"] = "claude-1"
+	_, err = m.startSession(ev, startOptions{})
+	if errors.As(err, &mine) {
+		t.Fatalf("an explicit agent property should win: %v", err)
 	}
 }

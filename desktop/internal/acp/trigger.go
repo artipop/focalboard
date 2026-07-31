@@ -67,6 +67,11 @@ func (m *Manager) handleEnter(ev CardMoved, spec ColumnSpec) {
 		m.enqueueStage(ev, spec, "", "")
 		return
 	}
+	var mine AssignedToHumanError
+	if errors.As(err, &mine) {
+		m.sayCardIsTaken(ev.CardID, mine)
+		return
+	}
 	if err != nil {
 		m.log.Warn("acp: session not started", "card", ev.CardID, "kind", kind, "err", err)
 		m.commentCard(ev.CardID, fmt.Sprintf("%s: %v", failed, err))
@@ -107,4 +112,14 @@ func (m *Manager) claimMove(ev CardMoved, kind string) bool {
 		return false
 	}
 	return true
+}
+
+// sayCardIsTaken explains, once per move, why nothing started: somebody has the
+// card. It also says how to hand it back, since "nothing happened" is otherwise
+// indistinguishable from a broken setup.
+func (m *Manager) sayCardIsTaken(cardID string, err AssignedToHumanError) {
+	m.log.Info("acp: card is assigned to a person, no agent started", "card", cardID, "assignee", err.Who)
+	m.commentCard(cardID, fmt.Sprintf(
+		"%s — агент не запускается. Снимите исполнителя или назначьте агента, если работу должен взять он.",
+		err.Error()))
 }

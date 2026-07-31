@@ -193,6 +193,20 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 // startSession is the shared launch path. An interactive session survives its
 // turns and waits for the user; a triggered one runs the card task and ends.
 func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error) {
+	// Asked before anything is resolved: a card somebody took for themselves is
+	// theirs, and there is no point working out which repository an agent would
+	// not be using. Deploy and test are unaffected — that is machine work, not
+	// the assignee's — and neither is a console the user opened, which is asking
+	// for an agent outright.
+	if !opts.interactive && !opts.deploy && !opts.test && strings.TrimSpace(ev.Props["agent"]) == "" {
+		m.cfgMu.RLock()
+		known := append([]AgentEntry(nil), m.cfg.Agents...)
+		m.cfgMu.RUnlock()
+		if who := humanAssignee(ev, known); who != "" {
+			return nil, AssignedToHumanError{Who: who}
+		}
+	}
+
 	repoPath, err := m.resolveRepo(ev)
 	if opts.repoName != "" {
 		// An explicit choice wins: the console offers one exactly when the card

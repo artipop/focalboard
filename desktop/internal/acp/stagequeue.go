@@ -131,6 +131,13 @@ func (m *Manager) drainColumn(key string) {
 		return // somebody else took the place; the card keeps its turn
 	}
 	m.dequeueStage(q.CardID)
+	// Somebody took the card while it waited: it leaves the queue and stays
+	// where it is, rather than failing its stage.
+	var mine AssignedToHumanError
+	if errors.As(err, &mine) {
+		m.sayCardIsTaken(q.CardID, mine)
+		return
+	}
 	if err != nil {
 		m.log.Warn("acp: queued stage not started", "card", q.CardID, "column", spec.Column, "err", err)
 		m.commentCard(q.CardID, fmt.Sprintf("Стадия «%s» не запустилась: %v", spec.Column, err))

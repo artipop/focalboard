@@ -424,3 +424,40 @@ func agentNames(agents []AgentEntry) string {
 	}
 	return strings.Join(names, ", ")
 }
+
+// AssignedToHumanError is why a stage did not start: the card is somebody's.
+// It is not a failure — the work is being done, only not by us — so the card
+// waits where it stands rather than taking a failure branch.
+type AssignedToHumanError struct {
+	Who string
+}
+
+func (e AssignedToHumanError) Error() string {
+	return fmt.Sprintf("карточка назначена на %s", e.Who)
+}
+
+// humanAssignee is who took the card, when that is a person rather than an
+// agent. Assigning yourself is how you say "this one is mine": an agent picking
+// the same card up would do the same work twice, and — on a route — would move
+// the card on the moment it decided it was finished.
+//
+// An assignee that *is* a registered agent means the opposite (that agent runs
+// it), so a card with one is not somebody's in this sense.
+func humanAssignee(ev CardMoved, agents []AgentEntry) string {
+	human := ""
+	for _, person := range ev.PersonNames {
+		person = strings.TrimSpace(person)
+		if person == "" {
+			continue
+		}
+		for _, a := range agents {
+			if sameAgentName(person, a.Name) {
+				return "" // an agent was assigned; it works
+			}
+		}
+		if human == "" {
+			human = person
+		}
+	}
+	return human
+}
