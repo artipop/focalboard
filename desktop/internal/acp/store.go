@@ -469,3 +469,20 @@ func (s *Store) DequeueStage(cardID string) error {
 	_, err := s.db.Exec(`DELETE FROM stage_queue WHERE card_id=?`, cardID)
 	return err
 }
+
+// LatestBranchForCard is the branch the card was last worked on: the worktree
+// branch of its most recent session. With worktrees on — the default — that is
+// the branch the agent commits to, and the card itself never learns its name,
+// so this is where anything watching the repository has to ask.
+func (s *Store) LatestBranchForCard(cardID string) (string, error) {
+	var branch string
+	err := s.db.QueryRow(`SELECT branch FROM agent_session
+		WHERE card_id=? AND branch<>'' ORDER BY started_at DESC LIMIT 1`, cardID).Scan(&branch)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return branch, nil
+}

@@ -33,6 +33,13 @@ func flowEvent(cardID, repo, from, to string) CardMoved {
 func flowManager(t *testing.T, claudeScript string, flow FlowEntry) (*Manager, *fakeWriter, *fakeEvents, string) {
 	t.Helper()
 	m, w, ev, repo := testManager(t, claudeScript, func(c *Config) { c.Flows = []FlowEntry{flow} })
+	// Re-reading a card gives back what it says, branch included — the real
+	// reader does, and the route asks it again on every transition.
+	m.SetBoardReader(&fakeReader{ev: CardMoved{
+		BoardID: "board1",
+		Title:   "Test task",
+		Props:   map[string]string{"repo_path": repo, "branch": flowTestBranch},
+	}})
 	// The cards below name the branch their work lives on, and a session bases
 	// its worktree on it — so it has to exist, as it would on a real board.
 	if _, err := gitCmd(context.Background(), repo, "branch", flowTestBranch); err != nil {
@@ -197,5 +204,52 @@ func TestLegacyColumnsStillWorkWithoutAFlow(t *testing.T) {
 	})
 	if _, ok, _ := m.store.FlowStateForCard("card7"); ok {
 		t.Fatal("a card without a route must not get flow state")
+	}
+}
+
+// The card that never names a branch is the usual case: with worktrees on, the
+// agent commits to a branch of its own and the card never learns its name. The
+// route has to follow that branch anyway — otherwise it waits for a merge of
+// whatever the repository happened to have checked out, which never comes.
+func TestRouteFollowsTheBranchTheAgentWorkedOn(t *testing.T) {
+	m, _, events, repo := flowManager(t, fakeClaudeHappy, sampleFlow())
+
+	// This card says nothing about branches, and neither does re-reading it.
+	m.SetBoardReader(&fakeReader{ev: CardMoved{
+		BoardID: "board1",
+		Title:   "Test task",
+		Props:   map[string]string{"repo_path": repo},
+	}})
+	ev := flowEvent("cardNoBranch", repo, "Backlog", "To Agent")
+	delete(ev.Props, "branch")
+	events.ch <- ev
+
+	waitFor(t, 20*time.Second, "the card advances to Review", func() bool {
+		st, ok, _ := m.store.FlowStateForCard("cardNoBranch")
+		return ok && st.NodeID == "review"
+	})
+
+	st, _, err := m.store.FlowStateForCard("cardNoBranch")
+	if err != nil {
+		t.Fatal(err)
+	}
+	worked, err := m.store.LatestBranchForCard("cardNoBranch")
+	if err != nil || worked == "" {
+		t.Fatalf("the session recorded no branch: %q, %v", worked, err)
+	}
+	if st.Branch != worked {
+		t.Fatalf("the route follows %q while the agent worked on %q", st.Branch, worked)
+	}
+
+	// And that is the branch a deploy stage would publish.
+	m.cfgMu.Lock()
+	m.cfg.Deploys = []DeployEntry{deployEntry("prod")}
+	m.cfgMu.Unlock()
+	_, branch, err := m.resolveDeploy(CardMoved{CardID: "cardNoBranch"}, repo, true, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if branch != worked {
+		t.Fatalf("a deploy would publish %q instead of %q", branch, worked)
 	}
 }

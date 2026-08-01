@@ -129,9 +129,21 @@ func (m *Manager) resolveDeploy(ev CardMoved, repoPath string, deploy bool, over
 		return nil, "", err
 	}
 	target.Target = target.Target.WithBaseApp(m.deployAppName(repoPath))
-	branch, err := resolveDeployBranch(ev, repoPath)
-	if err != nil {
-		return nil, "", err
+
+	// What to publish: what the card says, else the branch its own sessions
+	// have been committing to — with worktrees the agent works on a branch the
+	// card never learns about, and deploying the repository's checked-out one
+	// would publish somebody else's work. That is also what the Deploy button
+	// next to the branch does, so the column and the button agree.
+	branch := strings.TrimSpace(ev.Props["branch"])
+	if branch == "" {
+		branch = m.cardBranch(ev.CardID)
+	}
+	if branch == "" {
+		var err error
+		if branch, err = resolveDeployBranch(ev, repoPath); err != nil {
+			return nil, "", err
+		}
 	}
 	return &target, branch, nil
 }

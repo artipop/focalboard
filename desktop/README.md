@@ -99,7 +99,9 @@ runtime).
   `checks.*` call the GitHub API and want a token in `githubToken` (or
   `GITHUB_TOKEN`) — public repositories work without one, more slowly. The
   interval is `vcsPollSeconds` (default 60) and the remote is `gitRemote`
-  (default `origin`). A fresh config is seeded with three routes — `Feature`,
+  (default `origin`). Which branch is watched: the card's `branch` property if
+  it has one, otherwise the branch the card's own sessions worked on — with
+  worktrees that is the agent's branch, which the card never names itself. A fresh config is seeded with three routes — `Feature`,
   `Hotfix` and `Review only` — and the "My Project Tasks" board template ships
   the columns they name plus a `Workflow` property to pick one with, so a new
   board runs them without any setup. Picking a route stays optional: a card with

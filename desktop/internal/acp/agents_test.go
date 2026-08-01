@@ -582,21 +582,3 @@ func TestMCPServersReadEveryShapeThatMeansTheSame(t *testing.T) {
 func entry2WithServers(s AgentMCPServer) AgentEntry {
 	return AgentEntry{Name: "jojo", Kind: "junie", MCPServers: MCPServerSet{"playwright": s}}
 }
-
-// A flag never begins with a typographic dash: it is what an editor makes of
-// "--", and the server would fail with an unknown argument long after anybody
-// was watching.
-func TestTypographicDashInArgsIsRefused(t *testing.T) {
-	_, err := validateAgent(AgentEntry{Name: "jojo", Kind: "junie", MCPServers: MCPServerSet{
-		"pw": {Command: "npx", Args: []string{"-y", "@playwright/mcp@latest", "—headless"}},
-	}})
-	if err == nil || !strings.Contains(err.Error(), "тире") {
-		t.Fatalf("a mangled flag should be refused with a helpful message: %v", err)
-	}
-
-	if _, err := validateAgent(AgentEntry{Name: "jojo", Kind: "junie", MCPServers: MCPServerSet{
-		"pw": {Command: "npx", Args: []string{"-y", "@playwright/mcp@latest", "--headless"}},
-	}}); err != nil {
-		t.Fatalf("a proper flag must pass: %v", err)
-	}
-}

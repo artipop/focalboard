@@ -84,7 +84,7 @@ func (m *Manager) enterNode(ev CardMoved, flow FlowEntry, node FlowNode, move bo
 		BoardID:  ev.BoardID,
 		Flow:     flow.Name,
 		NodeID:   node.ID,
-		Branch:   flowBranch(ev, repoPath, previousBranch),
+		Branch:   m.flowBranch(ev, repoPath, previousBranch),
 		RepoPath: repoPath,
 	})
 	m.appendFlowEvent(FlowEventRecord{
@@ -96,11 +96,21 @@ func (m *Manager) enterNode(ev CardMoved, flow FlowEntry, node FlowNode, move bo
 }
 
 // flowBranch is the branch a card's route follows — what the VCS watcher polls
-// for. A card names it explicitly or it is whatever the repository had checked
-// out when the route started; either way it is carried from stage to stage, so
-// a card that stops mentioning its branch does not silently stop being watched.
-func flowBranch(ev CardMoved, repoPath, previous string) string {
+// for, and what a later stage deploys. In order:
+//
+//  1. what the card says, since that is somebody's decision;
+//  2. the branch its last session worked on — with worktrees (the default) the
+//     agent commits to a branch of its own that the card never learns about, so
+//     without this the route would watch whatever the repository had checked
+//     out and wait for a merge that never comes;
+//  3. what the route already carried, so a card that stops mentioning its
+//     branch does not silently stop being watched;
+//  4. the repository's checked-out branch, for a card nobody has worked yet.
+func (m *Manager) flowBranch(ev CardMoved, repoPath, previous string) string {
 	if b := strings.TrimSpace(ev.Props["branch"]); b != "" {
+		return b
+	}
+	if b := m.cardBranch(ev.CardID); b != "" {
 		return b
 	}
 	if previous != "" {
@@ -111,6 +121,21 @@ func flowBranch(ev CardMoved, repoPath, previous string) string {
 	}
 	branch, err := resolveDeployBranch(ev, repoPath)
 	if err != nil {
+		return ""
+	}
+	return branch
+}
+
+// cardBranch is the branch the card was last worked on, as recorded by its own
+// sessions. Empty when it has never been worked on, or when the store is not
+// there (tests).
+func (m *Manager) cardBranch(cardID string) string {
+	if m.store == nil || cardID == "" {
+		return ""
+	}
+	branch, err := m.store.LatestBranchForCard(cardID)
+	if err != nil {
+		m.log.Warn("acp: cannot read the card's branch", "card", cardID, "err", err)
 		return ""
 	}
 	return branch

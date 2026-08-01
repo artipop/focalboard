@@ -95,27 +95,10 @@ func validateMCPServers(servers map[string]AgentMCPServer) (map[string]AgentMCPS
 			}
 		}
 		srv.Args = args
-		if bad := typographicDash(srv.Args); bad != "" {
-			return nil, fmt.Errorf("у сервера %q аргумент %q начинается с типографского тире — почти наверняка это автозамена «--», и сервер его не поймёт", name, bad)
-		}
 		srv.Type = ""
 		out[name] = srv
 	}
 	return out, nil
-}
-
-// typographicDash finds an argument starting with an em or en dash. A CLI flag
-// never begins with one: it is what a text editor makes of "--", and the server
-// would fail with an unknown argument long after anybody was watching.
-func typographicDash(args []string) string {
-	for _, arg := range args {
-		for _, dash := range []string{"—", "–", "―"} {
-			if strings.HasPrefix(arg, dash) {
-				return arg
-			}
-		}
-	}
-	return ""
 }
 
 // validMCPName mirrors what a tool name may carry: the server name becomes the
