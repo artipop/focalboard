@@ -1,6 +1,7 @@
 package acp
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -54,7 +55,7 @@ type AgentEntry struct {
 	// The shape is the one every MCP client uses — name → {command, args, env} —
 	// so an entry can be pasted straight from a server's README, and so the
 	// config file reads the same as the agent's own.
-	MCPServers map[string]AgentMCPServer `json:"mcpServers,omitempty"`
+	MCPServers MCPServerSet `json:"mcpServers,omitempty"`
 
 	// ProxyName selects a named entry from the proxy registry (Config.Proxies).
 	// Network settings live there rather than on the agent, so several agents
@@ -79,6 +80,113 @@ type AgentMCPServer struct {
 
 	Type string `json:"type,omitempty"`
 	URL  string `json:"url,omitempty"`
+}
+
+// UnmarshalJSON reads "command" as either the binary alone, with the rest in
+// "args", or as the whole argv — which is how a good few clients write it, and
+// what a person copying from one of them will produce. An argv is split into
+// the two fields, since that is what the bridges pass on.
+func (s *AgentMCPServer) UnmarshalJSON(data []byte) error {
+	var raw struct {
+		Command json.RawMessage   `json:"command,omitempty"`
+		Args    []string          `json:"args,omitempty"`
+		Env     map[string]string `json:"env,omitempty"`
+		Type    string            `json:"type,omitempty"`
+		URL     string            `json:"url,omitempty"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	*s = AgentMCPServer{Args: raw.Args, Env: raw.Env, Type: raw.Type, URL: raw.URL}
+	if len(bytes.TrimSpace(raw.Command)) == 0 {
+		return nil
+	}
+
+	var command string
+	if err := json.Unmarshal(raw.Command, &command); err == nil {
+		s.Command = command
+		return nil
+	}
+	var argv []string
+	if err := json.Unmarshal(raw.Command, &argv); err != nil {
+		return fmt.Errorf("\"command\" должен быть строкой или списком аргументов, а не %s", raw.Command)
+	}
+	if len(argv) == 0 {
+		return nil
+	}
+	s.Command = argv[0]
+	s.Args = append(append([]string(nil), argv[1:]...), s.Args...)
+	return nil
+}
+
+// MCPServerSet is how an agent's servers are stored: name → server, the shape
+// every MCP client uses. It reads more than it writes, because the file is
+// edited by hand as often as by us and the same servers are written differently
+// in the wild:
+//
+//	{"playwright": {"command": "npx", …}}                  the canonical shape
+//	[{"name": "playwright", "command": "npx", …}]          a list of named ones
+//	{"mcpServers": {"playwright": {…}}}                    the whole client file
+//
+// All three mean the same thing, so all three are accepted rather than
+// disabling the integration over the punctuation. Anything else is reported
+// with the name of the field, since a config that cannot be read stops
+// everything.
+type MCPServerSet map[string]AgentMCPServer
+
+func (s *MCPServerSet) UnmarshalJSON(data []byte) error {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 || string(trimmed) == "null" {
+		*s = nil
+		return nil
+	}
+
+	if trimmed[0] == '[' {
+		var list []json.RawMessage
+		if err := json.Unmarshal(trimmed, &list); err != nil {
+			return fmt.Errorf("mcpServers: %w", err)
+		}
+		out := make(MCPServerSet, len(list))
+		for i, item := range list {
+			var named struct {
+				Name string `json:"name"`
+			}
+			if err := json.Unmarshal(item, &named); err != nil {
+				return fmt.Errorf("mcpServers[%d]: %w", i+1, err)
+			}
+			name := strings.TrimSpace(named.Name)
+			if name == "" {
+				return fmt.Errorf("mcpServers: у сервера №%d нет имени — добавьте \"name\" или запишите их объектом {\"имя\": {…}}", i+1)
+			}
+			var server AgentMCPServer
+			if err := json.Unmarshal(item, &server); err != nil {
+				return fmt.Errorf("mcpServers[%q]: %w", name, err)
+			}
+			out[name] = server
+		}
+		*s = out
+		return nil
+	}
+
+	// Plain object — either the servers themselves, or a whole client config
+	// with them nested under "mcpServers".
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(trimmed, &raw); err != nil {
+		return fmt.Errorf("mcpServers: %w", err)
+	}
+	if nested, ok := raw["mcpServers"]; ok && len(raw) == 1 {
+		return s.UnmarshalJSON(nested)
+	}
+	out := make(MCPServerSet, len(raw))
+	for name, value := range raw {
+		var server AgentMCPServer
+		if err := json.Unmarshal(value, &server); err != nil {
+			return fmt.Errorf("mcpServers[%q]: %w", name, err)
+		}
+		out[name] = server
+	}
+	*s = out
+	return nil
 }
 
 // NetworkSettings is one network path: the proxy an agent's traffic takes and
@@ -346,6 +454,18 @@ type Config struct {
 	// column. The matching target is handed to the session's dokku MCP server.
 	Deploys []DeployEntry `json:"deploys"`
 
+	// Columns is what happens in each column of a board: the action a card
+	// entering it starts, who works it, how many at once. It is the single
+	// answer to "what does this column do" — the TriggerColumn/DeployColumn/
+	// TestColumn keys above are only the seed it is migrated from. See columns.go.
+	Columns []ColumnSpec `json:"columns"`
+
+	// Flows is the registry of named routes across the board: which column
+	// follows which, and on what event. A card without a matching flow still
+	// gets whatever its column does — a flow adds the transitions, not the
+	// behaviour. See flows.go.
+	Flows []FlowEntry `json:"flows"`
+
 	// SystemPrompt is the board/column-level instruction prepended to every
 	// triggered session's prompt (before the agent's own system prompt and the
 	// card task). One trigger column today; may become a per-column map later.
@@ -367,6 +487,16 @@ type Config struct {
 
 	// ArtifactsDir is where screenshots and result.json of test runs are kept.
 	ArtifactsDir string `json:"artifactsDir"`
+
+	// VCSPollSeconds is how often the repositories cards wait on are polled for
+	// branch and pull-request events. Zero disables repository watching.
+	VCSPollSeconds int `json:"vcsPollSeconds"`
+	// GitRemote is the remote consulted for those events.
+	GitRemote string `json:"gitRemote"`
+	// GithubToken authorizes the pull-request triggers. Empty falls back to
+	// GITHUB_TOKEN in the environment; without either, only public repositories
+	// answer, and slowly (60 requests an hour).
+	GithubToken string `json:"githubToken,omitempty"`
 
 	// WorktreeMode controls where sessions run: "always" (default) — a
 	// dedicated git worktree per session, which is what gives a card its own
@@ -421,6 +551,8 @@ func DefaultConfig(dataDir string) Config {
 		Agents:                   []AgentEntry{},
 		Proxies:                  []ProxyEntry{},
 		Deploys:                  []DeployEntry{},
+		Columns:                  []ColumnSpec{},
+		Flows:                    []FlowEntry{},
 		DeployPrompt:             DefaultDeployPrompt,
 		TestPrompt:               DefaultTestPrompt,
 		WorktreeMode:             "always",
@@ -444,8 +576,10 @@ func DefaultConfig(dataDir string) Config {
 			"mcp__dokku__deploy_branch", "mcp__dokku__app_logs",
 			"mcp__dokku__deployment_status", "mcp__dokku__list_deployments",
 		},
-		WorktreeDir:  filepath.Join(dataDir, "worktrees"),
-		ArtifactsDir: filepath.Join(dataDir, "artifacts"),
+		VCSPollSeconds: 60,
+		GitRemote:      "origin",
+		WorktreeDir:    filepath.Join(dataDir, "worktrees"),
+		ArtifactsDir:   filepath.Join(dataDir, "artifacts"),
 	}
 }
 
@@ -503,7 +637,11 @@ func (c Config) TestTimeout() time.Duration {
 func LoadConfig(path, dataDir string) (Config, error) {
 	b, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		cfg := DefaultConfig(dataDir)
+		// A new install seeds no routes: the board brings its own (the "My
+		// Project Tasks" template ships them), and the editor offers the same
+		// ones to a board that does not. Columns are still derived from the
+		// trigger-column keys, so a hand-made board behaves as it always did.
+		cfg := withColumns(DefaultConfig(dataDir))
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			return cfg, err
 		}
@@ -522,11 +660,70 @@ func LoadConfig(path, dataDir string) (Config, error) {
 	}
 	// An existing config keeps whatever it says, so the old default would live
 	// on forever in installs that never touched it. Only the abandoned default
-	// is rewritten; a column the user chose is left alone.
+	// is rewritten; a column the user chose is left alone. It happens before the
+	// routes are seeded, so their stages name the column cards land in now.
 	if strings.EqualFold(strings.TrimSpace(cfg.TriggerColumn), legacyTriggerColumn) {
 		cfg.TriggerColumn = DefaultTriggerColumn
 	}
+	// Seed the routes and the columns only when the file has no such key at
+	// all. An empty list is a decision — the user deleted every route, or
+	// cleared every column — and must survive restarts, which an emptiness
+	// check could not tell from a config written before either existed.
+	var probe struct {
+		Flows   *[]FlowEntry  `json:"flows"`
+		Columns *[]ColumnSpec `json:"columns"`
+	}
+	if err := json.Unmarshal(b, &probe); err != nil {
+		probe.Flows, probe.Columns = nil, nil
+	}
+	if probe.Columns == nil {
+		cfg = withColumns(cfg)
+	}
+	if probe.Flows == nil && len(cfg.Columns) > 0 {
+		// An install that predates flows keeps the routes it would have been
+		// given then; a fresh one gets them from its board instead.
+		cfg = withTemplateFlows(cfg)
+	}
 	return cfg, nil
+}
+
+// withColumns fills the column registry from the trigger-column keys the config
+// already carries, so an install that predates it keeps behaving exactly as it
+// did: the trigger column runs an agent, the deploy column deploys, the test
+// column tests. The keys stay in the file as the seed; from here on the
+// registry is what the trigger loop reads.
+func withColumns(cfg Config) Config {
+	if len(cfg.Columns) == 0 {
+		cfg.Columns = migratedColumns(cfg)
+	}
+	return cfg
+}
+
+// withTemplateFlows seeds the registry with the template routes, built from the
+// trigger columns the config already names. It runs after unmarshalling so the
+// routes reflect the user's own column names rather than the defaults.
+func withTemplateFlows(cfg Config) Config {
+	if flows := TemplateFlows(cfg); len(flows) > 0 {
+		cfg.Flows = flows
+	}
+	return cfg
+}
+
+// GithubTokenValue is the token to authorize pull-request polling with: the
+// configured one, else whatever the environment already holds.
+func (c Config) GithubTokenValue() string {
+	if t := strings.TrimSpace(c.GithubToken); t != "" {
+		return t
+	}
+	return strings.TrimSpace(os.Getenv("GITHUB_TOKEN"))
+}
+
+// VCSPoll is how often repositories are polled; zero turns watching off.
+func (c Config) VCSPoll() time.Duration {
+	if c.VCSPollSeconds <= 0 {
+		return 0
+	}
+	return time.Duration(c.VCSPollSeconds) * time.Second
 }
 
 // SessionTimeout bounds a single agent turn.

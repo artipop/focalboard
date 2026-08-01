@@ -40,6 +40,19 @@ export interface IAppWindow extends Window {
                 AddDeployTarget(entryJSON: string): Promise<string>
                 UpdateDeployTarget(entryJSON: string): Promise<string>
                 RemoveDeployTarget(name: string): Promise<void>
+                ListFlows(boardId: string): Promise<string>
+                ListFlowTriggers(): Promise<string>
+                ListFlowTemplates(): Promise<string>
+                ListBoardColumns(boardId: string): Promise<string>
+                SaveBoardColumn(specJSON: string): Promise<string>
+                RemoveBoardColumn(boardId: string, optionId: string, column: string): Promise<void>
+                GetWorktreeMode(): Promise<string>
+                GetCardFlow(cardId: string): Promise<string>
+                GetBoardFlowOverview(boardId: string): Promise<string>
+                SeedBoardAutomation(boardId: string): Promise<void>
+                AddFlow(entryJSON: string): Promise<string>
+                UpdateFlow(entryJSON: string): Promise<string>
+                RemoveFlow(name: string): Promise<void>
                 GetAgentSystemPrompt(): Promise<string>
                 SetAgentSystemPrompt(text: string): Promise<void>
                 GetCardSessions(cardId: string): Promise<string>

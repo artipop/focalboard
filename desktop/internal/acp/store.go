@@ -90,8 +90,186 @@ CREATE TABLE IF NOT EXISTS idempotency (
 	key TEXT PRIMARY KEY,
 	session_id TEXT NOT NULL,
 	created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS flow_state (
+	card_id TEXT PRIMARY KEY,
+	board_id TEXT NOT NULL DEFAULT '',
+	flow TEXT NOT NULL,
+	node_id TEXT NOT NULL,
+	branch TEXT NOT NULL DEFAULT '',
+	repo_path TEXT NOT NULL DEFAULT '',
+	entered_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS flow_event (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	card_id TEXT NOT NULL,
+	flow TEXT NOT NULL,
+	from_node TEXT NOT NULL DEFAULT '',
+	to_node TEXT NOT NULL,
+	on_kind TEXT NOT NULL,
+	detail TEXT NOT NULL DEFAULT '',
+	created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_flow_event_card ON flow_event(card_id, id);
+CREATE TABLE IF NOT EXISTS stage_queue (
+	card_id TEXT PRIMARY KEY,
+	board_id TEXT NOT NULL DEFAULT '',
+	column_key TEXT NOT NULL,
+	flow TEXT NOT NULL DEFAULT '',
+	node_id TEXT NOT NULL DEFAULT '',
+	queued_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_stage_queue_column ON stage_queue(column_key, queued_at);
+CREATE TABLE IF NOT EXISTS vcs_seen (
+	repo TEXT NOT NULL,
+	branch TEXT NOT NULL,
+	kind TEXT NOT NULL,
+	marker TEXT NOT NULL DEFAULT '',
+	created_at INTEGER NOT NULL,
+	PRIMARY KEY (repo, branch, kind)
 );`)
 	return err
+}
+
+// ClaimVCSEvent reports whether a repository event is new, and remembers it. A
+// watcher sees the same state on every poll — the branch stays merged — so the
+// event fires once per marker (the commit it refers to) instead of once a minute.
+func (s *Store) ClaimVCSEvent(repo, branch, kind, marker string) (bool, error) {
+	var seen string
+	err := s.db.QueryRow(`SELECT marker FROM vcs_seen WHERE repo=? AND branch=? AND kind=?`,
+		repo, branch, kind).Scan(&seen)
+	switch {
+	case err == sql.ErrNoRows:
+	case err != nil:
+		return false, err
+	case seen == marker:
+		return false, nil
+	}
+	_, err = s.db.Exec(`INSERT INTO vcs_seen (repo, branch, kind, marker, created_at) VALUES (?,?,?,?,?)
+		ON CONFLICT(repo, branch, kind) DO UPDATE SET marker=excluded.marker, created_at=excluded.created_at`,
+		repo, branch, kind, marker, time.Now().UnixMilli())
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// FlowState is where a card currently stands on its route.
+type FlowState struct {
+	CardID    string    `json:"cardId"`
+	BoardID   string    `json:"boardId"`
+	Flow      string    `json:"flow"`
+	NodeID    string    `json:"nodeId"`
+	Branch    string    `json:"branch"`
+	RepoPath  string    `json:"repoPath"`
+	EnteredAt time.Time `json:"enteredAt"`
+}
+
+// FlowEventRecord is one transition, kept as the card's route history.
+type FlowEventRecord struct {
+	ID        int64     `json:"id"`
+	CardID    string    `json:"cardId"`
+	Flow      string    `json:"flow"`
+	FromNode  string    `json:"fromNode"`
+	ToNode    string    `json:"toNode"`
+	On        string    `json:"on"`
+	Detail    string    `json:"detail"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// SaveFlowState records where the card is now, replacing any previous position.
+func (s *Store) SaveFlowState(st FlowState) error {
+	if st.EnteredAt.IsZero() {
+		st.EnteredAt = time.Now()
+	}
+	_, err := s.db.Exec(`INSERT INTO flow_state (card_id, board_id, flow, node_id, branch, repo_path, entered_at)
+		VALUES (?,?,?,?,?,?,?)
+		ON CONFLICT(card_id) DO UPDATE SET
+			board_id=excluded.board_id, flow=excluded.flow, node_id=excluded.node_id,
+			branch=excluded.branch, repo_path=excluded.repo_path, entered_at=excluded.entered_at`,
+		st.CardID, st.BoardID, st.Flow, st.NodeID, st.Branch, st.RepoPath, st.EnteredAt.UnixMilli())
+	return err
+}
+
+// FlowStateForCard returns the card's position, if it is on a route at all.
+func (s *Store) FlowStateForCard(cardID string) (FlowState, bool, error) {
+	row := s.db.QueryRow(`SELECT card_id, board_id, flow, node_id, branch, repo_path, entered_at
+		FROM flow_state WHERE card_id=?`, cardID)
+	st, err := scanFlowState(row)
+	if err == sql.ErrNoRows {
+		return FlowState{}, false, nil
+	}
+	if err != nil {
+		return FlowState{}, false, err
+	}
+	return st, true, nil
+}
+
+// FlowStates returns every card currently on a route — the input the VCS
+// watcher builds its poll targets from.
+func (s *Store) FlowStates() ([]FlowState, error) {
+	rows, err := s.db.Query(`SELECT card_id, board_id, flow, node_id, branch, repo_path, entered_at FROM flow_state`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []FlowState
+	for rows.Next() {
+		st, err := scanFlowState(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, st)
+	}
+	return out, rows.Err()
+}
+
+// ClearFlowState forgets a card's position (it left its route).
+func (s *Store) ClearFlowState(cardID string) error {
+	_, err := s.db.Exec(`DELETE FROM flow_state WHERE card_id=?`, cardID)
+	return err
+}
+
+// AppendFlowEvent records one transition.
+func (s *Store) AppendFlowEvent(r FlowEventRecord) error {
+	_, err := s.db.Exec(`INSERT INTO flow_event (card_id, flow, from_node, to_node, on_kind, detail, created_at)
+		VALUES (?,?,?,?,?,?,?)`,
+		r.CardID, r.Flow, r.FromNode, r.ToNode, r.On, r.Detail, time.Now().UnixMilli())
+	return err
+}
+
+// FlowEvents returns a card's route history, oldest first.
+func (s *Store) FlowEvents(cardID string) ([]FlowEventRecord, error) {
+	rows, err := s.db.Query(`SELECT id, card_id, flow, from_node, to_node, on_kind, detail, created_at
+		FROM flow_event WHERE card_id=? ORDER BY id`, cardID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []FlowEventRecord
+	for rows.Next() {
+		var r FlowEventRecord
+		var created int64
+		if err := rows.Scan(&r.ID, &r.CardID, &r.Flow, &r.FromNode, &r.ToNode, &r.On, &r.Detail, &created); err != nil {
+			return nil, err
+		}
+		r.CreatedAt = time.UnixMilli(created)
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+// scanner is satisfied by both *sql.Row and *sql.Rows.
+type scanner interface{ Scan(dest ...any) error }
+
+func scanFlowState(row scanner) (FlowState, error) {
+	var st FlowState
+	var entered int64
+	if err := row.Scan(&st.CardID, &st.BoardID, &st.Flow, &st.NodeID, &st.Branch, &st.RepoPath, &entered); err != nil {
+		return FlowState{}, err
+	}
+	st.EnteredAt = time.UnixMilli(entered)
+	return st, nil
 }
 
 func (s *Store) Close() error { return s.db.Close() }
@@ -243,4 +421,68 @@ func scanSession(rows *sql.Rows) (SessionRecord, error) {
 		r.FinishedAt = &t
 	}
 	return r, nil
+}
+
+// QueuedStage is a card waiting for its column to free up a place.
+type QueuedStage struct {
+	CardID    string    `json:"cardId"`
+	BoardID   string    `json:"boardId"`
+	ColumnKey string    `json:"columnKey"`
+	Flow      string    `json:"flow,omitempty"`
+	NodeID    string    `json:"nodeId,omitempty"`
+	QueuedAt  time.Time `json:"queuedAt"`
+}
+
+// EnqueueStage remembers that a card is waiting for a place in its column.
+// Queueing the same card again keeps its original position: waiting longer must
+// not cost it its turn.
+func (s *Store) EnqueueStage(q QueuedStage) (bool, error) {
+	res, err := s.db.Exec(`INSERT INTO stage_queue (card_id, board_id, column_key, flow, node_id, queued_at)
+		VALUES (?,?,?,?,?,?) ON CONFLICT(card_id) DO NOTHING`,
+		q.CardID, q.BoardID, q.ColumnKey, q.Flow, q.NodeID, time.Now().UnixMilli())
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
+// NextQueuedStage is the card that has waited longest for this column.
+func (s *Store) NextQueuedStage(columnKey string) (QueuedStage, bool, error) {
+	row := s.db.QueryRow(`SELECT card_id, board_id, column_key, flow, node_id, queued_at
+		FROM stage_queue WHERE column_key=? ORDER BY queued_at LIMIT 1`, columnKey)
+	var q QueuedStage
+	var at int64
+	err := row.Scan(&q.CardID, &q.BoardID, &q.ColumnKey, &q.Flow, &q.NodeID, &at)
+	if err == sql.ErrNoRows {
+		return QueuedStage{}, false, nil
+	}
+	if err != nil {
+		return QueuedStage{}, false, err
+	}
+	q.QueuedAt = time.UnixMilli(at)
+	return q, true, nil
+}
+
+// DequeueStage forgets a waiting card — it started, or it left the column.
+func (s *Store) DequeueStage(cardID string) error {
+	_, err := s.db.Exec(`DELETE FROM stage_queue WHERE card_id=?`, cardID)
+	return err
+}
+
+// LatestBranchForCard is the branch the card was last worked on: the worktree
+// branch of its most recent session. With worktrees on — the default — that is
+// the branch the agent commits to, and the card itself never learns its name,
+// so this is where anything watching the repository has to ask.
+func (s *Store) LatestBranchForCard(cardID string) (string, error) {
+	var branch string
+	err := s.db.QueryRow(`SELECT branch FROM agent_session
+		WHERE card_id=? AND branch<>'' ORDER BY started_at DESC LIMIT 1`, cardID).Scan(&branch)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return branch, nil
 }

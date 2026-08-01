@@ -23,6 +23,9 @@ import {useHasCurrentBoardPermissions} from '../../hooks/permissions'
 
 import BoardPermissionGate from '../permissions/boardPermissionGate'
 
+import ColumnBadge, {invalidateBoardColumns} from '../acp/columnBadge'
+import ColumnSettingsDialog, {isColumnSettingsAvailable} from '../acp/columnSettingsDialog'
+
 import {KanbanCalculation} from './calculation/calculation'
 
 type Props = {
@@ -52,6 +55,7 @@ export default function KanbanColumnHeader(props: Props): JSX.Element {
     const canEditOption = groupByProperty?.type !== 'person' && group.option.id
 
     const headerRef = useRef<HTMLDivElement>(null)
+    const [showColumnSettings, setShowColumnSettings] = useState(false)
 
     const [{isDragging}, drag] = useDrag(() => ({
         type: 'column',
@@ -157,6 +161,12 @@ export default function KanbanColumnHeader(props: Props): JSX.Element {
                     mutator.changeViewKanbanCalculations(board.id, props.activeView.id, props.activeView.fields.kanbanCalculations, newCalculations)
                 }}
             />
+            {Boolean(group.option.id) && groupByProperty &&
+                <ColumnBadge
+                    boardId={board.id}
+                    optionId={group.option.id}
+                    columnName={group.option.value}
+                />}
             <div className='octo-spacer'/>
             {!props.readonly &&
                 <>
@@ -170,6 +180,16 @@ export default function KanbanColumnHeader(props: Props): JSX.Element {
                                     name={intl.formatMessage({id: 'BoardComponent.hide', defaultMessage: 'Hide'})}
                                     onClick={() => mutator.hideViewColumn(board.id, activeView, group.option.id || '')}
                                 />
+                                {/* An empty array (unlike false/null) leaves no wrapper
+                                    div behind: Menu wraps every child slot in a div. */}
+                                {canEditOption && isColumnSettingsAvailable() ? [
+                                    <Menu.Text
+                                        key='columnAgents'
+                                        id='columnAgents'
+                                        name={intl.formatMessage({id: 'BoardComponent.column-agents', defaultMessage: 'Agents in this column…'})}
+                                        onClick={() => setShowColumnSettings(true)}
+                                    />,
+                                ] : []}
                                 {canEditOption &&
                                     <>
                                         <Menu.Text
@@ -201,6 +221,14 @@ export default function KanbanColumnHeader(props: Props): JSX.Element {
                     </BoardPermissionGate>
                 </>
             }
+            {showColumnSettings && groupByProperty &&
+                <ColumnSettingsDialog
+                    boardId={board.id}
+                    property={groupByProperty}
+                    option={group.option}
+                    onClose={() => setShowColumnSettings(false)}
+                    onSaved={invalidateBoardColumns}
+                />}
         </div>
     )
 }

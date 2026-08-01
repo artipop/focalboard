@@ -283,6 +283,183 @@ func (a *App) RemoveDeployTarget(name string) error {
 	return a.mgr.RemoveDeploy(name)
 }
 
+// ListFlows returns the routes a board may use as JSON — its own, plus any tied
+// to no board in particular — each a graph of nodes (a column) and edges (an
+// event and where it leads).
+func (a *App) ListFlows(boardID string) (string, error) {
+	if a.mgr == nil {
+		return "[]", nil
+	}
+	out, err := json.Marshal(a.mgr.BoardFlows(boardID))
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// ListFlowTriggers returns the closed set of edge triggers the engine
+// implements, so the editor can only offer transitions that actually work.
+func (a *App) ListFlowTriggers() (string, error) {
+	out, err := json.Marshal(acp.FlowTriggers)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// ListFlowTemplates returns the routes a fresh install is seeded with, rebuilt
+// from the current column names. An install whose registry predates them (or
+// whose routes were deleted) can add the ones it is missing from the editor
+// instead of retyping a graph.
+func (a *App) ListFlowTemplates() (string, error) {
+	if a.mgr == nil {
+		return "[]", nil
+	}
+	out, err := json.Marshal(a.mgr.FlowTemplates())
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// AddFlow registers a route from a JSON-encoded FlowEntry and returns it.
+func (a *App) AddFlow(entryJSON string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	var entry acp.FlowEntry
+	if err := json.Unmarshal([]byte(entryJSON), &entry); err != nil {
+		return "", err
+	}
+	saved, err := a.mgr.AddFlow(entry)
+	if err != nil {
+		return "", err
+	}
+	out, _ := json.Marshal(saved)
+	return string(out), nil
+}
+
+// UpdateFlow replaces an existing route (matched by name) and returns it.
+func (a *App) UpdateFlow(entryJSON string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	var entry acp.FlowEntry
+	if err := json.Unmarshal([]byte(entryJSON), &entry); err != nil {
+		return "", err
+	}
+	saved, err := a.mgr.UpdateFlow(entry)
+	if err != nil {
+		return "", err
+	}
+	out, _ := json.Marshal(saved)
+	return string(out), nil
+}
+
+// RemoveFlow deletes a route by name. Cards standing on it simply stop moving
+// by themselves.
+func (a *App) RemoveFlow(name string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	return a.mgr.RemoveFlow(name)
+}
+
+// ListBoardColumns returns what each configured column of a board does: the
+// action, the crew that works it and how many of them at once.
+func (a *App) ListBoardColumns(boardID string) (string, error) {
+	if a.mgr == nil {
+		return "[]", nil
+	}
+	out, err := json.Marshal(a.mgr.BoardColumns(boardID))
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// SaveBoardColumn stores the settings of one column from a JSON-encoded
+// ColumnSpec and returns what was saved.
+func (a *App) SaveBoardColumn(specJSON string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	var spec acp.ColumnSpec
+	if err := json.Unmarshal([]byte(specJSON), &spec); err != nil {
+		return "", err
+	}
+	saved, err := a.mgr.SaveColumn(spec)
+	if err != nil {
+		return "", err
+	}
+	out, _ := json.Marshal(saved)
+	return string(out), nil
+}
+
+// RemoveBoardColumn forgets a column's settings. The column stays on the board.
+func (a *App) RemoveBoardColumn(boardID, optionID, column string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	return a.mgr.RemoveColumn(boardID, optionID, column)
+}
+
+// GetCardFlow describes where a card stands on its route: the stages, the one
+// it is on, what that stage waits for. Returns "null" for a card with no route.
+func (a *App) GetCardFlow(cardID string) (string, error) {
+	if a.mgr == nil {
+		return "null", nil
+	}
+	flow, err := a.mgr.CardFlowFor(cardID)
+	if err != nil {
+		return "", err
+	}
+	out, err := json.Marshal(flow)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// SeedBoardAutomation takes the columns and routes a board carries of its own
+// into the registry now, rather than waiting for the first card to be moved.
+// The setup wizard calls it, so what the board can do is visible as soon as it
+// is configured. Idempotent: anything already registered is left alone.
+func (a *App) SeedBoardAutomation(boardID string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	a.mgr.SeedBoard(boardID)
+	return nil
+}
+
+// GetBoardFlowOverview returns where the board's cards stand on each route:
+// per stage, how many are there, how many are working and how many wait.
+func (a *App) GetBoardFlowOverview(boardID string) (string, error) {
+	if a.mgr == nil {
+		return "[]", nil
+	}
+	overview, err := a.mgr.BoardFlowOverview(boardID)
+	if err != nil {
+		return "", err
+	}
+	out, err := json.Marshal(overview)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// GetWorktreeMode reports where sessions run ("always" or "never"). The column
+// editor asks, because a crew of several agents in one repository only works
+// when each session gets its own worktree.
+func (a *App) GetWorktreeMode() (string, error) {
+	if a.mgr == nil {
+		return "", nil
+	}
+	return a.mgr.WorktreeMode(), nil
+}
+
 // GetAgentSystemPrompt returns the board/column-level system prompt.
 func (a *App) GetAgentSystemPrompt() (string, error) {
 	if a.mgr == nil {

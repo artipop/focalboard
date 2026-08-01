@@ -110,7 +110,7 @@ func TestResolveDeployNamesTheAppAfterTheRepository(t *testing.T) {
 	m.cfg.Deploys = []DeployEntry{entry}
 	m.cfg.Repos = []RepoEntry{{Name: "My Webapp", Path: repo}}
 
-	got, branch, err := m.resolveDeploy(CardMoved{}, repo, true)
+	got, branch, err := m.resolveDeploy(CardMoved{}, repo, true, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestResolveDeployNamesTheAppAfterTheRepository(t *testing.T) {
 
 	// An unregistered repository is named after its directory.
 	m.cfg.Repos = nil
-	got, _, err = m.resolveDeploy(CardMoved{}, repo, true)
+	got, _, err = m.resolveDeploy(CardMoved{}, repo, true, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -137,11 +137,11 @@ func TestResolveDeployNamesTheAppAfterTheRepository(t *testing.T) {
 	// An explicit name is left alone, and an ordinary session resolves nothing.
 	entry.Target.BaseApp = "api"
 	m.cfg.Deploys = []DeployEntry{entry}
-	got, _, err = m.resolveDeploy(CardMoved{}, repo, true)
+	got, _, err = m.resolveDeploy(CardMoved{}, repo, true, "")
 	if err != nil || got.Target.BaseApp != "api" {
 		t.Errorf("explicit base app: %+v, %v", got.Target, err)
 	}
-	if d, b, err := m.resolveDeploy(CardMoved{}, repo, false); d != nil || b != "" || err != nil {
+	if d, b, err := m.resolveDeploy(CardMoved{}, repo, false, ""); d != nil || b != "" || err != nil {
 		t.Errorf("a non-deploy session resolved a target: %+v, %q, %v", d, b, err)
 	}
 }
@@ -157,6 +157,33 @@ func TestResolveDeployBranch(t *testing.T) {
 	branch, err = resolveDeployBranch(CardMoved{}, repo)
 	if err != nil || branch != "main" {
 		t.Fatalf("checked-out branch: %q, %v", branch, err)
+	}
+}
+
+// A stage names the crew that may work it; the card chooses among them, and an
+// agent who is not on the crew does not get the card.
+func TestResolveSessionAgentPrefersTheStagesCrew(t *testing.T) {
+	m := agentManager(t, "", AgentEntry{Name: "claude-1", Kind: "claude"}, AgentEntry{Name: "deployer", Kind: "codex"})
+
+	agent, busy, err := m.resolveSessionAgent(CardMoved{OptionNames: []string{"claude-1"}}, []string{"deployer"})
+	if err != nil || busy || agent.Name != "deployer" {
+		t.Fatalf("the crew should decide: %+v, %v, %v", agent, busy, err)
+	}
+
+	// On the crew, the card's own choice stands.
+	agent, _, err = m.resolveSessionAgent(CardMoved{OptionNames: []string{"claude-1"}}, []string{"claude-1", "deployer"})
+	if err != nil || agent.Name != "claude-1" {
+		t.Fatalf("card agent ignored: %+v, %v", agent, err)
+	}
+
+	// Without a crew the card decides, exactly as before.
+	agent, _, err = m.resolveSessionAgent(CardMoved{OptionNames: []string{"claude-1"}}, nil)
+	if err != nil || agent.Name != "claude-1" {
+		t.Fatalf("card agent ignored without a crew: %+v, %v", agent, err)
+	}
+
+	if _, _, err := m.resolveSessionAgent(CardMoved{}, []string{"gone"}); err == nil {
+		t.Error("a crew of unregistered agents should fail")
 	}
 }
 
@@ -370,9 +397,15 @@ func TestDeployColumnStartsASessionWithTheDokkuTools(t *testing.T) {
 	if !strings.Contains(comments[0], "http://api-main.example.com") {
 		t.Errorf("start comment should announce the address: %q", comments[0])
 	}
-	last := comments[len(comments)-1]
-	if !strings.Contains(last, "Сессия деплоя завершена") || !strings.Contains(last, "api-main") {
-		t.Errorf("final comment should summarize the deployment: %q", last)
+	all := strings.Join(comments, "\n")
+	if !strings.Contains(all, "Сессия деплоя завершена") || !strings.Contains(all, "api-main") {
+		t.Errorf("comments should summarize the deployment: %q", all)
+	}
+	// The fake agent never calls deploy_branch, so nothing was published — and
+	// the card has to say so rather than let "the session finished" pass for
+	// "the branch is live".
+	if !strings.Contains(all, "Деплой не подтверждён") {
+		t.Errorf("an unconfirmed deploy must be called out: %q", all)
 	}
 
 	// The session must have been given the dokku MCP server on the CLI.

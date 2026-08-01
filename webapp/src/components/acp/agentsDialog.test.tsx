@@ -9,7 +9,7 @@ import {wrapIntl} from '../../testUtils'
 import {TestBlockFactory} from '../../test/testBlockFactory'
 import mutator from '../../mutator'
 
-import AgentsDialog, {isAgentsAvailable} from './agentsDialog'
+import AgentsDialog, {isAgentsAvailable, textToServers} from './agentsDialog'
 
 jest.mock('../../mutator')
 const mockedMutator = jest.mocked(mutator, true)
@@ -304,6 +304,15 @@ describe('components/acp/agentsDialog', () => {
             name: 'jojo',
             mcpServers: {playwright: {command: 'npx', args: ['-y', '@playwright/mcp@latest']}},
         })
+    })
+
+    test('takes MCP servers listed instead of keyed by name', () => {
+        // Some clients write them as a list; the config file reads both shapes,
+        // so pasting from one of them must not be refused here either.
+        expect(textToServers('[{"name": "pw", "command": "npx", "args": ["-y", "@playwright/mcp@latest"]}]')).toEqual({
+            pw: {command: 'npx', args: ['-y', '@playwright/mcp@latest']},
+        })
+        expect(() => textToServers('[{"command": "npx"}]')).toThrow(/name/)
     })
 
     test('refuses to save MCP servers that are not JSON', async () => {

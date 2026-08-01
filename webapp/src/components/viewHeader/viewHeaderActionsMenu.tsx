@@ -19,7 +19,9 @@ import {sendFlashMessage} from '../flashMessages'
 import AgentReposDialog, {isAgentReposAvailable} from '../acp/agentReposDialog'
 import AgentsDialog, {isAgentsAvailable} from '../acp/agentsDialog'
 import DeployTargetsDialog, {isDeployTargetsAvailable} from '../acp/deployTargetsDialog'
+import WorkflowsDialog, {isWorkflowsAvailable} from '../acp/workflowsDialog'
 import PlanningDialog, {isPlanningAvailable} from '../acp/planningDialog'
+import BoardSetupWizard, {isBoardSetupAvailable} from '../acp/boardSetupWizard'
 
 type Props = {
     board: Board
@@ -104,7 +106,9 @@ const ViewHeaderActionsMenu = (props: Props) => {
     const [showAgentRepos, setShowAgentRepos] = useState(false)
     const [showAgents, setShowAgents] = useState(false)
     const [showDeployTargets, setShowDeployTargets] = useState(false)
+    const [showWorkflows, setShowWorkflows] = useState(false)
     const [showPlanning, setShowPlanning] = useState(false)
+    const [showSetup, setShowSetup] = useState(false)
 
     return (
         <ModalWrapper>
@@ -131,6 +135,14 @@ const ViewHeaderActionsMenu = (props: Props) => {
                             onClick={() => setShowPlanning(true)}
                         />,
                     ] : []}
+                    {isBoardSetupAvailable() ? [
+                        <Menu.Text
+                            key='boardSetup'
+                            id='boardSetup'
+                            name={intl.formatMessage({id: 'ViewHeader.board-setup', defaultMessage: 'Set up this board…'})}
+                            onClick={() => setShowSetup(true)}
+                        />,
+                    ] : []}
                     {isAgentReposAvailable() ? [
                         <Menu.Text
                             key='agentRepos'
@@ -153,6 +165,14 @@ const ViewHeaderActionsMenu = (props: Props) => {
                             id='deployTargets'
                             name={intl.formatMessage({id: 'ViewHeader.deploy-targets', defaultMessage: 'Deploy targets…'})}
                             onClick={() => setShowDeployTargets(true)}
+                        />,
+                    ] : []}
+                    {isWorkflowsAvailable() ? [
+                        <Menu.Text
+                            key='workflows'
+                            id='workflows'
+                            name={intl.formatMessage({id: 'ViewHeader.workflows', defaultMessage: 'Workflows…'})}
+                            onClick={() => setShowWorkflows(true)}
                         />,
                     ] : []}
                     {/*
@@ -194,6 +214,16 @@ const ViewHeaderActionsMenu = (props: Props) => {
             {showDeployTargets &&
                 <DeployTargetsDialog
                     onClose={() => setShowDeployTargets(false)}
+                />}
+            {showWorkflows &&
+                <WorkflowsDialog
+                    board={board}
+                    onClose={() => setShowWorkflows(false)}
+                />}
+            {showSetup &&
+                <BoardSetupWizard
+                    board={board}
+                    onClose={() => setShowSetup(false)}
                 />}
             {showPlanning &&
                 <PlanningDialog

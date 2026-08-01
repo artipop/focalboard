@@ -34,6 +34,7 @@ import {getClientConfig} from '../../store/clientConfig'
 
 import CardSkeleton from '../../svg/card-skeleton'
 import SessionConsole, {isSessionConsoleAvailable} from '../acp/sessionConsole'
+import FlowStrip, {isFlowStripAvailable} from '../acp/flowStrip'
 
 import CommentsList from './commentsList'
 import {CardDetailProvider} from './cardDetailContext'
@@ -301,6 +302,11 @@ const CardDetail = (props: Props): JSX.Element|null => {
                 </Fragment>}
 
                 {/* Agent session console (desktop app only) */}
+
+                {!limited && !props.readonly && isFlowStripAvailable() && <Fragment>
+                    <hr/>
+                    <FlowStrip cardId={card.id}/>
+                </Fragment>}
 
                 {!limited && !props.readonly && isSessionConsoleAvailable() && <Fragment>
                     <hr/>

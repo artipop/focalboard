@@ -1,0 +1,127 @@
+.WorkflowsDialog {
+    .WorkflowsDialog__content {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 0 24px 24px;
+        min-width: 640px;
+    }
+
+    .WorkflowsDialog__empty {
+        color: rgba(var(--center-channel-color-rgb), 0.64);
+        padding: 8px 0;
+    }
+
+    .WorkflowsDialog__flow {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(var(--center-channel-color-rgb), 0.08);
+    }
+
+    .WorkflowsDialog__row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+
+        .WorkflowsDialog__name {
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .WorkflowsDialog__route {
+            flex: 1;
+            color: rgba(var(--center-channel-color-rgb), 0.64);
+            font-size: 12px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+    }
+
+    .WorkflowsDialog__form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin: 8px 0;
+        padding: 12px;
+        border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+        border-radius: 4px;
+
+        label {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            font-size: 12px;
+            color: rgba(var(--center-channel-color-rgb), 0.72);
+        }
+
+        input,
+        select {
+            padding: 6px 8px;
+            border: 1px solid rgba(var(--center-channel-color-rgb), 0.24);
+            border-radius: 4px;
+            background: rgba(var(--center-channel-bg-rgb), 1);
+            color: rgba(var(--center-channel-color-rgb), 1);
+        }
+    }
+
+    .WorkflowsDialog__formHeader {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 12px;
+    }
+
+    .WorkflowsDialog__node {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 10px;
+        border: 1px solid rgba(var(--center-channel-color-rgb), 0.12);
+        border-radius: 4px;
+        background: rgba(var(--center-channel-color-rgb), 0.04);
+    }
+
+    .WorkflowsDialog__nodeHead,
+    .WorkflowsDialog__wait {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .WorkflowsDialog__outcomes {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+    }
+
+    .WorkflowsDialog__arrow {
+        color: rgba(var(--center-channel-color-rgb), 0.56);
+    }
+
+    .WorkflowsDialog__templates {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 4px;
+    }
+
+    .WorkflowsDialog__formActions,
+    .WorkflowsDialog__actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 4px;
+    }
+
+    .WorkflowsDialog__hint {
+        font-size: 12px;
+        color: rgba(var(--center-channel-color-rgb), 0.56);
+    }
+
+    .WorkflowsDialog__error {
+        color: rgba(var(--error-text-color-rgb), 1);
+        font-size: 12px;
+    }
+}

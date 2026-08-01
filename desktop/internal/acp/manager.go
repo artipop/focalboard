@@ -15,6 +15,7 @@ import (
 
 	"github.com/mattermost/focalboard/desktop/internal/acp/claudebridge"
 	"github.com/mattermost/focalboard/desktop/internal/dokku"
+	"github.com/mattermost/focalboard/desktop/internal/vcs"
 )
 
 // Manager owns all agent sessions: it consumes board events, enforces limits
@@ -27,6 +28,7 @@ type Manager struct {
 	writer  BoardWriter
 	reader  BoardReader // optional; enables opening a console on a card
 	users   BoardUsers  // optional; enables assigning cards to an agent
+	meta    BoardMeta   // optional; lets a board bring its own columns and routes
 	ui      UIEmitter
 	log     *slog.Logger
 	tr      *Tracer
@@ -35,8 +37,13 @@ type Manager struct {
 	active map[string]*Session // session ID → session
 	byCard map[string]*Session // card ID → live (non-terminal) session
 
+	seededMu sync.Mutex
+	seeded   map[string]bool // boards whose own settings have been imported
+
 	permMu sync.Mutex
 	perms  map[string]pendingPermission // request ID → prompt awaiting a human
+
+	watchers []vcs.Watcher // repository watchers feeding the flow engine
 
 	sem     chan struct{}
 	rootCtx context.Context
@@ -73,17 +80,18 @@ func NewManager(cfg Config, cfgPath string, st *Store, w BoardWriter, ui UIEmitt
 		ui = &tracingEmitter{inner: ui, tr: tr}
 	}
 	return &Manager{
-		cfg:     cfg,
-		cfgPath: cfgPath,
-		store:   st,
-		writer:  w,
-		ui:      ui,
-		log:     log,
-		tr:      tr,
-		active:  make(map[string]*Session),
-		byCard:  make(map[string]*Session),
-		perms:   make(map[string]pendingPermission),
-		sem:     make(chan struct{}, maxConc),
+		cfg:      cfg,
+		cfgPath:  cfgPath,
+		store:    st,
+		writer:   w,
+		ui:       ui,
+		log:      log,
+		tr:       tr,
+		watchers: defaultWatchers(cfg),
+		active:   make(map[string]*Session),
+		byCard:   make(map[string]*Session),
+		perms:    make(map[string]pendingPermission),
+		sem:      make(chan struct{}, maxConc),
 	}
 }
 
@@ -99,6 +107,14 @@ func (m *Manager) Start(ctx context.Context, events BoardEvents) error {
 		}
 	}
 
+	// A hand-edited config is never validated, so what the editor would have
+	// refused only surfaces when a server fails to start. Say it now instead.
+	for _, a := range m.cfg.Agents {
+		if _, err := validateAgent(a); err != nil {
+			m.log.Warn("acp: agent is configured in a way that will not work", "agent", a.Name, "err", err)
+		}
+	}
+
 	m.recover()
 	PruneStale(m.rootCtx, m.cfg.RepoWhitelist)
 
@@ -108,6 +124,13 @@ func (m *Manager) Start(ctx context.Context, events BoardEvents) error {
 	}
 	m.wg.Add(1)
 	go m.triggerLoop(ch)
+
+	// Repository polling only matters once some card waits on a branch, but the
+	// loop itself is cheap: it does nothing at all until FlowTargets is non-empty.
+	if m.cfg.VCSPoll() > 0 && len(m.watchers) > 0 {
+		m.wg.Add(1)
+		go m.vcsLoop()
+	}
 	return nil
 }
 
@@ -140,6 +163,25 @@ type startOptions struct {
 	// repoName picks a repository explicitly, for a console opened on a card
 	// that does not say which one it is about.
 	repoName string
+	// flowName/flowNodeID tie the session to the stage of a route that started
+	// it, so its outcome can move the card on.
+	flowName, flowNodeID string
+	// agentCrew/deployOverride let a flow node name the agents or the deploy
+	// target for its stage only, overriding the column's own.
+	agentCrew      []string
+	deployOverride string
+	// column is the column the card landed in: who works it, how many at once,
+	// and where it deploys to. What a flow node names wins over it.
+	column ColumnSpec
+}
+
+// crew is who may work this session: the stage's own list if it has one, else
+// the column's.
+func (o startOptions) crew() []string {
+	if len(o.agentCrew) > 0 {
+		return o.agentCrew
+	}
+	return o.column.Agents
 }
 
 // StartSessionForEvent creates and launches a session for a validated trigger
@@ -148,21 +190,23 @@ func (m *Manager) StartSessionForEvent(ev CardMoved) (*Session, error) {
 	return m.startSession(ev, startOptions{})
 }
 
-// StartDeploySessionForEvent launches the session behind the deploy column: the
-// same machinery as a card task, pointed at publishing the card's branch.
-func (m *Manager) StartDeploySessionForEvent(ev CardMoved) (*Session, error) {
-	return m.startSession(ev, startOptions{deploy: true})
-}
-
-// StartTestSessionForEvent launches the session behind the test column: the
-// same machinery again, pointed at the card's deployed preview.
-func (m *Manager) StartTestSessionForEvent(ev CardMoved) (*Session, error) {
-	return m.startSession(ev, startOptions{test: true})
-}
-
 // startSession is the shared launch path. An interactive session survives its
 // turns and waits for the user; a triggered one runs the card task and ends.
 func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error) {
+	// Asked before anything is resolved: a card somebody took for themselves is
+	// theirs, and there is no point working out which repository an agent would
+	// not be using. Deploy and test are unaffected — that is machine work, not
+	// the assignee's — and neither is a console the user opened, which is asking
+	// for an agent outright.
+	if !opts.interactive && !opts.deploy && !opts.test && strings.TrimSpace(ev.Props["agent"]) == "" {
+		m.cfgMu.RLock()
+		known := append([]AgentEntry(nil), m.cfg.Agents...)
+		m.cfgMu.RUnlock()
+		if who := humanAssignee(ev, known); who != "" {
+			return nil, AssignedToHumanError{Who: who}
+		}
+	}
+
 	repoPath, err := m.resolveRepo(ev)
 	if opts.repoName != "" {
 		// An explicit choice wins: the console offers one exactly when the card
@@ -172,20 +216,37 @@ func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error
 	if err != nil {
 		return nil, err
 	}
-	deploy, deployBranch, err := m.resolveDeploy(ev, repoPath, opts.deploy)
+	deployName := opts.deployOverride
+	if deployName == "" {
+		deployName = opts.column.DeployName
+	}
+	deploy, deployBranch, err := m.resolveDeploy(ev, repoPath, opts.deploy, deployName)
 	if err != nil {
 		return nil, err
 	}
 	sessionID := uuid.NewString()
-	test, err := m.resolveTestRun(ev, repoPath, sessionID, opts.test)
+	artifacts, err := m.artifactsDir(sessionID)
 	if err != nil {
 		return nil, err
 	}
-	// A deploy no longer pins its own agent: the card decides, as it does for
-	// every other kind of session.
-	agent, err := m.resolveAgent(ev)
+	test, err := m.resolveTestRun(ev, repoPath, artifacts, opts.test)
 	if err != nil {
 		return nil, err
+	}
+	// A deploy no longer pins its own agent: the card decides among the crew of
+	// the column it landed in — the flow node's crew, if the stage names one.
+	agent, busy, err := m.resolveSessionAgent(ev, opts.crew())
+	if err != nil {
+		return nil, err
+	}
+	if busy {
+		return nil, errStageBusy
+	}
+	// The column's own limit: how many of its crew may work it at once. It is
+	// checked here rather than at the trigger, so every way into a stage — a
+	// drag, a flow transition, the queue itself — obeys the same number.
+	if opts.column.MaxRunning > 0 && m.runningInColumn(opts.column.Key()) >= opts.column.MaxRunning {
+		return nil, errStageBusy
 	}
 	net, err := m.resolveNetwork(agent)
 	if err != nil {
@@ -249,7 +310,12 @@ func (m *Manager) startSession(ev CardMoved, opts startOptions) (*Session, error
 		Net:          net,
 		Deploy:       deploy,
 		DeployBranch: deployBranch,
+		ColumnKey:    opts.column.Key(),
+		ColumnName:   opts.column.Column,
 		Test:         test,
+		Artifacts:    artifacts,
+		FlowName:     opts.flowName,
+		FlowNodeID:   opts.flowNodeID,
 		PromptText:   prompt,
 		Policy:       agentPolicy(agent),
 		status:       StatusQueued,

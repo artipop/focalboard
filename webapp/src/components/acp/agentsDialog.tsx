@@ -66,6 +66,17 @@ const commandPlaceholders: {[kind: string]: string} = {
     acp: 'gemini --acp',
 }
 
+// The agent kinds the manager knows, in the order they are offered. Exported
+// because the setup wizard asks the same question.
+export const AGENT_KINDS = [
+    {value: 'claude', label: 'Claude'},
+    {value: 'codex', label: 'Codex'},
+    {value: 'antigravity', label: 'Antigravity'},
+    {value: 'copilot', label: 'GitHub Copilot'},
+    {value: 'junie', label: 'JetBrains Junie'},
+    {value: 'acp', label: 'ACP (other)'},
+]
+
 export function isAgentsAvailable(): boolean {
     return Boolean(agentBindings()?.ListAgents)
 }
@@ -96,12 +107,27 @@ export function textToServers(text: string): AgentMCPServers {
         return {}
     }
     const parsed = JSON.parse(text)
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    if (!parsed || typeof parsed !== 'object') {
         throw new Error('mcpServers must be an object')
     }
-    const servers = parsed.mcpServers === undefined ? parsed : parsed.mcpServers
-    if (!servers || typeof servers !== 'object' || Array.isArray(servers)) {
+    const servers = (!Array.isArray(parsed) && parsed.mcpServers !== undefined) ? parsed.mcpServers : parsed
+    if (!servers || typeof servers !== 'object') {
         throw new Error('mcpServers must be an object')
+    }
+
+    // Some clients list the servers instead of keying them by name, and that is
+    // what somebody copying from one of them will paste. The config file reads
+    // both shapes, so the dialog does too.
+    if (Array.isArray(servers)) {
+        const named: AgentMCPServers = {}
+        for (const entry of servers) {
+            const {name, ...server} = entry || {}
+            if (!name) {
+                throw new Error('every server in the list needs a "name"')
+            }
+            named[name] = server
+        }
+        return named
     }
     return servers
 }
@@ -386,12 +412,12 @@ const AgentsDialog = (props: Props) => {
                                 value={form.kind}
                                 onChange={(e) => updateForm({kind: e.target.value})}
                             >
-                                <option value='claude'>{'Claude'}</option>
-                                <option value='codex'>{'Codex'}</option>
-                                <option value='antigravity'>{'Antigravity'}</option>
-                                <option value='copilot'>{'GitHub Copilot'}</option>
-                                <option value='junie'>{'JetBrains Junie'}</option>
-                                <option value='acp'>{'ACP (other)'}</option>
+                                {AGENT_KINDS.map((kind) => (
+                                    <option
+                                        key={kind.value}
+                                        value={kind.value}
+                                    >{kind.label}</option>
+                                ))}
                             </select>
                         </label>
                         <label>

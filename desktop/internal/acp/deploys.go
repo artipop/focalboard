@@ -118,21 +118,52 @@ func (m *Manager) resolveDeployTarget(ev CardMoved) (DeployEntry, error) {
 
 // resolveDeploy gathers what a deploy session needs: the target and the branch
 // to publish. For an ordinary session it returns nothing and no error, so the
-// launch path can call it unconditionally.
-func (m *Manager) resolveDeploy(ev CardMoved, repoPath string, deploy bool) (*DeployEntry, string, error) {
+// launch path can call it unconditionally. override names the target a flow
+// node pinned, which wins over the card's own resolution.
+func (m *Manager) resolveDeploy(ev CardMoved, repoPath string, deploy bool, override string) (*DeployEntry, string, error) {
 	if !deploy {
 		return nil, "", nil
 	}
-	target, err := m.resolveDeployTarget(ev)
+	target, err := m.resolveDeployTargetNamed(ev, override)
 	if err != nil {
 		return nil, "", err
 	}
 	target.Target = target.Target.WithBaseApp(m.deployAppName(repoPath))
-	branch, err := resolveDeployBranch(ev, repoPath)
-	if err != nil {
-		return nil, "", err
+
+	// What to publish: what the card says, else the branch its own sessions
+	// have been committing to — with worktrees the agent works on a branch the
+	// card never learns about, and deploying the repository's checked-out one
+	// would publish somebody else's work. That is also what the Deploy button
+	// next to the branch does, so the column and the button agree.
+	branch := strings.TrimSpace(ev.Props["branch"])
+	if branch == "" {
+		branch = m.cardBranch(ev.CardID)
+	}
+	if branch == "" {
+		var err error
+		if branch, err = resolveDeployBranch(ev, repoPath); err != nil {
+			return nil, "", err
+		}
 	}
 	return &target, branch, nil
+}
+
+// resolveDeployTargetNamed is resolveDeployTarget with an explicit name taking
+// precedence — how a flow node pins the destination for its stage alone.
+func (m *Manager) resolveDeployTargetNamed(ev CardMoved, name string) (DeployEntry, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return m.resolveDeployTarget(ev)
+	}
+	m.cfgMu.RLock()
+	deploys := append([]DeployEntry(nil), m.cfg.Deploys...)
+	m.cfgMu.RUnlock()
+	for _, d := range deploys {
+		if strings.EqualFold(d.Name, name) {
+			return d, nil
+		}
+	}
+	return DeployEntry{}, fmt.Errorf("цель деплоя %q не найдена в реестре (%s)", name, deployNames(deploys))
 }
 
 // deployAppName is what a target without an explicit base app names its apps

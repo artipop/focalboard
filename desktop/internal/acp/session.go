@@ -64,6 +64,21 @@ type Session struct {
 	// on, the same way Deploy turns the dokku tools on.
 	Test *TestRun
 
+	// Artifacts is the session's own directory for evidence: screenshots and
+	// the test verdict, the deploy outcome. Empty disables recording.
+	Artifacts string
+
+	// ColumnKey/ColumnName are the column the card was in when the session
+	// started: what the column's limit is counted against, and what the queue
+	// of waiting cards is keyed by.
+	ColumnKey  string
+	ColumnName string
+
+	// FlowName/FlowNodeID are set when a flow stage started this session. Its
+	// outcome is then the event that moves the card on.
+	FlowName   string
+	FlowNodeID string
+
 	Worktree     WorktreeInfo
 	usedWorktree bool // a dedicated worktree was actually created
 
@@ -81,6 +96,8 @@ type Session struct {
 
 	mu            sync.Mutex
 	status        SessionStatus
+	outcome       string             // flow trigger the session ended with, when it is known
+	outcomeText   string             // what to write on the card when the flow moves on
 	turnCancel    context.CancelFunc // cancels the in-flight turn
 	cancelSent    bool
 	allowTools    map[string]bool
@@ -157,6 +174,33 @@ func (s *Session) recordedBranch() string {
 		return s.Test.Branch
 	default:
 		return s.DeployBranch
+	}
+}
+
+// setOutcome records the flow trigger the session's own work produced — a test
+// verdict, say — instead of the status the session ends in.
+func (s *Session) setOutcome(trigger, detail string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.outcome, s.outcomeText = trigger, detail
+}
+
+// flowOutcome is the event the session hands to its stage. A recorded outcome
+// wins; otherwise it follows from the final status, and a cancelled session
+// yields nothing at all — a human stepped in, so the route waits for them.
+func (s *Session) flowOutcome() (trigger, detail string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.outcome != "" {
+		return s.outcome, s.outcomeText
+	}
+	switch s.status {
+	case StatusDone:
+		return TriggerSuccess, "агент завершил работу"
+	case StatusFailed:
+		return TriggerFailure, "сессия агента упала"
+	default:
+		return "", ""
 	}
 }
 
@@ -238,6 +282,11 @@ func (s *Session) appendEvent(m *Manager, kind string, payload any) {
 // runSession is the whole session lifecycle; it runs on its own goroutine.
 func (m *Manager) runSession(s *Session) {
 	defer m.wg.Done()
+	// Deferred before releaseSession, so they run after it: the next stage of a
+	// flow, and the next card waiting for this column, must not race the
+	// finished session for the repository or for its own place.
+	defer m.drainColumn(s.ColumnKey)
+	defer m.flowAfterSession(s)
 	defer m.releaseSession(s)
 
 	if m.rootCtx.Err() != nil {
@@ -399,6 +448,7 @@ func (m *Manager) commentFirstTurn(s *Session, finalText string, err error) {
 			return
 		}
 		m.comment(s, failComment(s, err.Error()))
+		m.applyDeployOutcome(s)
 	default:
 		if !interactive {
 			m.finishSession(s, StatusDone, "")
@@ -408,6 +458,7 @@ func (m *Manager) commentFirstTurn(s *Session, finalText string, err error) {
 			return
 		}
 		m.comment(s, doneComment(s, finalText))
+		m.applyDeployOutcome(s)
 	}
 }
 

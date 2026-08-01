@@ -56,36 +56,43 @@ func TestResolvePreviewURL(t *testing.T) {
 	}
 }
 
-func TestResolveTestRunUsesAPerSessionArtifactsDir(t *testing.T) {
+func TestSessionArtifactsDir(t *testing.T) {
 	m := agentManager(t, "")
 	root := t.TempDir()
 	m.cfg.ArtifactsDir = root
+
+	dir, err := m.artifactsDir("sess-1")
+	if err != nil || dir != filepath.Join(root, "sess-1") {
+		t.Fatalf("artifacts dir: %q, %v", dir, err)
+	}
+	// The agent is told to write its report there, so the directory has to
+	// exist before it tries.
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		t.Fatalf("artifacts dir not created: %v", err)
+	}
+	// No configured root means no artifacts, not a broken path.
+	m.cfg.ArtifactsDir = ""
+	if dir, err := m.artifactsDir("sess-1"); err != nil || dir != "" {
+		t.Fatalf("without a root: %q, %v", dir, err)
+	}
+}
+
+func TestResolveTestRun(t *testing.T) {
+	m := agentManager(t, "")
 	ev := CardMoved{Props: map[string]string{"preview_url": "https://feat-x.example.com"}}
 
 	// An ordinary session resolves nothing, so the launch path can call this
 	// unconditionally.
-	if run, err := m.resolveTestRun(ev, "/repo", "sess-1", false); run != nil || err != nil {
+	if run, err := m.resolveTestRun(ev, "/repo", "/data/run", false); run != nil || err != nil {
 		t.Fatalf("non-test session: %+v, %v", run, err)
 	}
 
-	run, err := m.resolveTestRun(ev, "/repo", "sess-1", true)
+	run, err := m.resolveTestRun(ev, "/repo", "/data/run", true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if run.Artifacts != filepath.Join(root, "sess-1") {
-		t.Fatalf("artifacts dir: %q", run.Artifacts)
-	}
-	// The agent is told to write its report there, so the directory has to
-	// exist before it tries.
-	if info, err := os.Stat(run.Artifacts); err != nil || !info.IsDir() {
-		t.Fatalf("artifacts dir not created: %v", err)
-	}
-
-	// No configured root means no artifacts, not a broken path.
-	m.cfg.ArtifactsDir = ""
-	run, err = m.resolveTestRun(ev, "/repo", "sess-1", true)
-	if err != nil || run.Artifacts != "" {
-		t.Fatalf("without a root: %+v, %v", run, err)
+	if run.URL != "https://feat-x.example.com" || run.Artifacts != "/data/run" {
+		t.Fatalf("test run: %+v", run)
 	}
 }
 
@@ -166,20 +173,25 @@ func TestTestSessionNeedsABrowserServer(t *testing.T) {
 func TestTestColumnRouting(t *testing.T) {
 	m := agentManager(t, "")
 	m.cfg.TriggerProperty = "Status"
-	m.cfg.TestColumn = "To Test"
+	m.cfg.Columns = migratedColumns(m.cfg)
 
 	col := func(name string) Column { return Column{PropertyName: "status", Name: name} }
-	if !m.isTestColumn(col("to test")) {
-		t.Fatal("the test column should match case-insensitively")
+	spec, ok := m.columnFor("board1", col("to test"))
+	if !ok || spec.Action != FlowActionTest {
+		t.Fatalf("the test column should match case-insensitively: %+v, %v", spec, ok)
 	}
-	if m.isTestColumn(col("To Agent")) || m.isTestColumn(Column{PropertyName: "Other", Name: "To Test"}) {
-		t.Fatal("only the configured property/column may match")
+	if spec, _ := m.columnFor("board1", col(m.cfg.TriggerColumn)); spec.Action != FlowActionAgent {
+		t.Fatalf("the trigger column should run an agent: %+v", spec)
+	}
+	if _, ok := m.columnFor("board1", Column{PropertyName: "Other", Name: "To Test"}); ok {
+		t.Fatal("only the configured property may match")
 	}
 
-	// An empty name disables the trigger instead of matching every unnamed column.
+	// An empty name is not a column: it must not match every unnamed one.
 	m.cfg.TestColumn = ""
-	if m.isTestColumn(Column{PropertyName: "Status"}) {
-		t.Fatal("an empty testColumn must disable the trigger")
+	m.cfg.Columns = migratedColumns(m.cfg)
+	if _, ok := m.columnFor("board1", Column{PropertyName: "Status"}); ok {
+		t.Fatal("an empty column name must not become a trigger")
 	}
 }
 

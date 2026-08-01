@@ -75,6 +75,47 @@ runtime).
   gets a directory under `artifactsDir` (default
   `<dataDir>/artifacts/<session-id>`) where the agent is asked to save its
   screenshots and write `result.json` — that verdict is what moves the card.
+- **First run**: a board made from the template opens a setup wizard by itself
+  when the registries are still empty — a repository and an agent are asked for
+  (nothing runs without them), Dokku and a browser MCP server are offered and
+  skippable. It can be reopened from the board menu (*Set up this board…*), and
+  closing it is remembered for that board.
+- **Columns** (column menu → *Agents in this column…*) say what happens when a
+  card lands in one: the action, the crew of agents who work it, and how many of
+  them at once. A card without an agent of its own goes to whoever of the crew is
+  free; when they are all busy, or the limit is reached, the card waits in place
+  and starts by itself as soon as a place frees up. The old
+  `triggerColumn`/`deployColumn`/`testColumn` keys are migrated into this
+  registry on first load, so nothing changes until you edit it. A crew of several
+  agents needs `worktreeMode: "always"` (the default) — without worktrees two
+  agents cannot share one repository, and the crew works one card at a time.
+- **Taking a card yourself**: assign it to yourself and no agent starts on it —
+  the card keeps its place on the route and waits for you to move it on. Deploy
+  and test still run, since that is machine work; assigning a registered agent,
+  or nobody, hands the card back to automation.
+- **Flows** (board "…" menu → *Workflows*) join those columns into a route and
+  move cards along it. Repository events are polled from the branches parked
+  cards wait on: plain git needs nothing, while `pr.*`, `review.approved` and
+  `checks.*` call the GitHub API and want a token in `githubToken` (or
+  `GITHUB_TOKEN`) — public repositories work without one, more slowly. The
+  interval is `vcsPollSeconds` (default 60) and the remote is `gitRemote`
+  (default `origin`). Which branch is watched: the card's `branch` property if
+  it has one, otherwise the branch the card's own sessions worked on — with
+  worktrees that is the agent's branch, which the card never names itself. A fresh config is seeded with three routes — `Feature`,
+  `Hotfix` and `Review only` — and the "My Project Tasks" board template ships
+  the columns they name plus a `Workflow` property to pick one with, so a new
+  board runs them without any setup. Picking a route stays optional: a card with
+  no `Workflow` option takes none, and the trigger columns work as they always
+  did. The editor draws the route as a graph and offers whichever shipped route
+  the registry is missing. A card shows its own route: which stage it stands on
+  and what that stage is waiting for. Routes belong to the board they were made
+  on, and a board made from the "My Project Tasks" template arrives with them:
+  the template carries its columns and routes in the board's own properties, and
+  the first card moved on it takes them into the registry. The Workflows dialog
+  is both the map and the builder: it draws each route with the number of cards
+  standing on every stage, and editing one turns the same canvas into the place
+  the graph is drawn — stages are dragged, and pulling from a stage's right edge
+  joins it to another.
 
 ## Develop
 

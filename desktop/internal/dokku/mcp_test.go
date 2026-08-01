@@ -12,10 +12,15 @@ import (
 // connect wires the server to an in-memory client, so the tools are exercised
 // through the real protocol without spawning anything.
 func connect(t *testing.T, cl *Client) *mcp.ClientSession {
+	return connectWithArtifacts(t, cl, "")
+}
+
+// connectWithArtifacts is connect for a server that records its deploy outcome.
+func connectWithArtifacts(t *testing.T, cl *Client, artifacts string) *mcp.ClientSession {
 	t.Helper()
 	ctx := context.Background()
 	serverTransport, clientTransport := mcp.NewInMemoryTransports()
-	ss, err := NewServer(cl).Connect(ctx, serverTransport, nil)
+	ss, err := NewServer(cl, artifacts).Connect(ctx, serverTransport, nil)
 	if err != nil {
 		t.Fatalf("server connect: %v", err)
 	}

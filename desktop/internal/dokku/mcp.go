@@ -3,6 +3,7 @@ package dokku
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -46,8 +47,10 @@ type destroyInput struct {
 	Confirm bool   `json:"confirm" jsonschema:"подтверждение удаления; без него ничего не произойдёт"`
 }
 
-// NewServer builds the MCP server exposing cl's operations as tools.
-func NewServer(cl *Client) *mcp.Server {
+// NewServer builds the MCP server exposing cl's operations as tools. artifacts
+// is where the deploy outcome is recorded for the session that spawned us; an
+// empty path records nothing.
+func NewServer(cl *Client, artifacts string) *mcp.Server {
 	srv := mcp.NewServer(
 		&mcp.Implementation{Name: ServerName, Title: "Dokku deploy", Version: version},
 		&mcp.ServerOptions{Instructions: instructions},
@@ -65,6 +68,7 @@ func NewServer(cl *Client) *mcp.Server {
 		defer cancel()
 
 		res, err := cl.Deploy(ctx, branch)
+		recordOutcome(artifacts, res, branch, err)
 		if err != nil {
 			// The build log is the whole point of the failure report, so it goes
 			// back to the model instead of a bare error string.
@@ -148,8 +152,27 @@ func NewServer(cl *Client) *mcp.Server {
 }
 
 // ServeStdio runs the MCP server on stdin/stdout until the client disconnects.
-func ServeStdio(ctx context.Context, cl *Client) error {
-	return NewServer(cl).Run(ctx, &mcp.StdioTransport{})
+func ServeStdio(ctx context.Context, cl *Client, artifacts string) error {
+	return NewServer(cl, artifacts).Run(ctx, &mcp.StdioTransport{})
+}
+
+// recordOutcome files what the attempt did. A failure to record is not worth
+// failing the tool call over — the model already has the real answer — but it
+// must not pass silently either, so it goes to stderr, which is the server's log.
+func recordOutcome(dir string, res Result, branch string, deployErr error) {
+	if dir == "" {
+		return
+	}
+	o := Outcome{OK: deployErr == nil, App: res.App, Branch: res.Branch, URL: res.URL}
+	if o.Branch == "" {
+		o.Branch = branch
+	}
+	if deployErr != nil {
+		o.Error = deployErr.Error()
+	}
+	if err := WriteOutcome(dir, o); err != nil {
+		fmt.Fprintf(os.Stderr, "mcp dokku: не удалось записать %s: %v\n", OutcomeFile, err)
+	}
 }
 
 // branch resolves the branch a tool call works on: the explicit argument, the

@@ -191,6 +191,9 @@ func testManagerWithEmitter(t *testing.T, claudeScript string, mutate func(*Conf
 	if mutate != nil {
 		mutate(&cfg)
 	}
+	// LoadConfig is what fills the column registry from the trigger-column keys
+	// on a real install; a config built in code needs the same step.
+	cfg = withColumns(cfg)
 
 	st, err := OpenStore(filepath.Join(dir, "acp.db"))
 	if err != nil {

@@ -60,6 +60,7 @@ import CardLimitNotification from './cardLimitNotification'
 import Gallery from './gallery/gallery'
 import {BoardTourSteps, FINISHED, TOUR_BOARD, TOUR_CARD} from './onboardingTour'
 import ShareBoardTourStep from './onboardingTour/shareBoard/shareBoard'
+import BoardSetupWizard, {readRegistry, rememberDismissed, setupNeeded} from './acp/boardSetupWizard'
 
 type Props = {
     clientConfig?: ClientConfig
@@ -78,6 +79,21 @@ type Props = {
 const CenterPanel = (props: Props) => {
     const intl = useIntl()
     const [selectedCardIds, setSelectedCardIds] = useState<string[]>([])
+
+    // A board that runs something on a machine that cannot run it yet: ask for
+    // the missing half once, rather than let a dragged card explain it later.
+    const [showSetup, setShowSetup] = useState(false)
+    useEffect(() => {
+        let cancelled = false
+        readRegistry().then((registry) => {
+            if (!cancelled) {
+                setShowSetup(setupNeeded(props.board, registry))
+            }
+        }).catch(() => setShowSetup(false))
+        return () => {
+            cancelled = true
+        }
+    }, [props.board])
     const [cardIdToFocusOnRender, setCardIdToFocusOnRender] = useState('')
     const [showHiddenCardCountNotification, setShowHiddenCardCountNotification] = useState(false)
 
@@ -401,6 +417,16 @@ const CenterPanel = (props: Props) => {
             className='BoardComponent'
             onClick={backgroundClicked}
         >
+            {showSetup &&
+                <RootPortal>
+                    <BoardSetupWizard
+                        board={props.board}
+                        onClose={() => {
+                            rememberDismissed(props.board.id)
+                            setShowSetup(false)
+                        }}
+                    />
+                </RootPortal>}
             {props.shownCardId &&
                 <RootPortal>
                     <CardDialog
