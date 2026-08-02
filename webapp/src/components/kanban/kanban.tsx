@@ -277,9 +277,11 @@ const Kanban = (props: Props) => {
                         key={group.option.id || 'empty'}
                         onDrop={(card: Card) => onDropToColumn(group.option, card)}
                     >
-                        {group.cards.map((card) => (
+                        {group.cards.map((card, cardIndex) => (
                             <KanbanCard
                                 card={card}
+                                index={cardIndex}
+                                groupId={group.option.id || 'empty'}
                                 board={board}
                                 visiblePropertyTemplates={visiblePropertyTemplates}
                                 visibleBadges={visibleBadges}

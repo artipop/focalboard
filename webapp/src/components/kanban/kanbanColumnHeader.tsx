@@ -81,7 +81,6 @@ export default function KanbanColumnHeader(props: Props): JSX.Element {
             ref={headerRef}
             style={{opacity: isDragging ? 0.5 : 1}}
             className={className}
-            draggable={!props.readonly && canEditBoardProperties}
         >
             {!group.option.id &&
                 <Label

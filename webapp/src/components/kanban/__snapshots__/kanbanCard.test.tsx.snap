@@ -4,7 +4,6 @@ exports[`src/components/kanban/kanbanCard return kanbanCard and click on copy li
 <div>
   <div
     class="KanbanCard"
-    draggable="true"
     style="opacity: 1;"
   >
     <div
@@ -186,7 +185,6 @@ exports[`src/components/kanban/kanbanCard return kanbanCard and click on delete 
 <div>
   <div
     class="KanbanCard"
-    draggable="true"
     style="opacity: 1;"
   >
     <div
@@ -368,7 +366,6 @@ exports[`src/components/kanban/kanbanCard return kanbanCard and click on duplica
 <div>
   <div
     class="KanbanCard"
-    draggable="true"
     style="opacity: 1;"
   >
     <div
@@ -550,7 +547,6 @@ exports[`src/components/kanban/kanbanCard should match snapshot 1`] = `
 <div>
   <div
     class="KanbanCard"
-    draggable="true"
     style="opacity: 1;"
   >
     <div
@@ -596,7 +592,6 @@ exports[`src/components/kanban/kanbanCard should match snapshot with readonly 1`
 <div>
   <div
     class="KanbanCard"
-    draggable="false"
     style="opacity: 1;"
   >
     <div

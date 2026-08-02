@@ -191,7 +191,6 @@ exports[`components/boardTemplateSelector/boardTemplateSelectorPreview should ma
       >
         <div
           class="octo-board-header-cell KanbanColumnHeader"
-          draggable="true"
           style="opacity: 1;"
         >
           <span
@@ -238,7 +237,6 @@ exports[`components/boardTemplateSelector/boardTemplateSelectorPreview should ma
         </div>
         <div
           class="octo-board-header-cell KanbanColumnHeader"
-          draggable="true"
           style="opacity: 1;"
         >
           <span
@@ -290,7 +288,6 @@ exports[`components/boardTemplateSelector/boardTemplateSelectorPreview should ma
         </div>
         <div
           class="octo-board-header-cell KanbanColumnHeader"
-          draggable="true"
           style="opacity: 1;"
         >
           <span
@@ -361,7 +358,6 @@ exports[`components/boardTemplateSelector/boardTemplateSelectorPreview should ma
         >
           <div
             class="KanbanCard"
-            draggable="true"
             style="opacity: 1;"
           >
             <div

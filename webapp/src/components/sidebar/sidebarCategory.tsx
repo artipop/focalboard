@@ -7,6 +7,7 @@ import {generatePath, useHistory, useRouteMatch} from 'react-router-dom'
 import debounce from 'lodash/debounce'
 
 import {useSortable} from '@dnd-kit/react/sortable'
+import {SortableKeyboardPlugin} from '@dnd-kit/dom/sortable'
 import {useDroppable} from '@dnd-kit/react'
 
 import HandRightIcon from '@mattermost/compass-icons/components/hand-right'
@@ -89,11 +90,14 @@ const SidebarCategory = (props: Props) => {
     // A category is sortable among categories and, at the same time, the place
     // boards get dropped into -- including an empty one, which is why the boards
     // area is its own droppable keyed by the category id.
-    const {ref, handleRef, isDragging} = useSortable({
+    const {ref, isDragging} = useSortable({
         id: props.categoryBoards.id,
         index: props.index,
         type: 'category',
         accept: 'category',
+
+        // Left out everywhere, not only here: see hooks/sortable.tsx.
+        plugins: [SortableKeyboardPlugin],
     })
 
     const {ref: boardsRef, isDropTarget: isBoardOver} = useDroppable({
@@ -290,7 +294,6 @@ const SidebarCategory = (props: Props) => {
                     >
                         <div
                             className='octo-sidebar-title category-title'
-                            ref={handleRef}
                             title={props.categoryBoards.name}
                             onClick={toggleCollapse}
                         >

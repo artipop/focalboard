@@ -17,7 +17,6 @@ exports[`src/component/kanban/kanban return kanban and change title on KanbanCol
     >
       <div
         class="octo-board-header-cell KanbanColumnHeader"
-        draggable="true"
         style="opacity: 1;"
       >
         <span
@@ -69,7 +68,6 @@ exports[`src/component/kanban/kanban return kanban and change title on KanbanCol
       </div>
       <div
         class="octo-board-header-cell KanbanColumnHeader"
-        draggable="true"
         style="opacity: 1;"
       >
         <span
@@ -145,7 +143,6 @@ exports[`src/component/kanban/kanban return kanban and change title on KanbanCol
       >
         <div
           class="KanbanCard"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -178,7 +175,6 @@ exports[`src/component/kanban/kanban return kanban and change title on KanbanCol
         </div>
         <div
           class="KanbanCard"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -222,7 +218,6 @@ exports[`src/component/kanban/kanban return kanban and change title on KanbanCol
       >
         <div
           class="KanbanCard"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -303,7 +298,6 @@ exports[`src/component/kanban/kanban return kanban and click on KanbanCalculatio
     >
       <div
         class="octo-board-header-cell KanbanColumnHeader"
-        draggable="true"
         style="opacity: 1;"
       >
         <span
@@ -519,7 +513,6 @@ exports[`src/component/kanban/kanban return kanban and click on KanbanCalculatio
       </div>
       <div
         class="octo-board-header-cell KanbanColumnHeader"
-        draggable="true"
         style="opacity: 1;"
       >
         <span
@@ -595,7 +588,6 @@ exports[`src/component/kanban/kanban return kanban and click on KanbanCalculatio
       >
         <div
           class="KanbanCard"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -628,7 +620,6 @@ exports[`src/component/kanban/kanban return kanban and click on KanbanCalculatio
         </div>
         <div
           class="KanbanCard"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -672,7 +663,6 @@ exports[`src/component/kanban/kanban return kanban and click on KanbanCalculatio
       >
         <div
           class="KanbanCard"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -753,7 +743,6 @@ exports[`src/component/kanban/kanban should match snapshot 1`] = `
     >
       <div
         class="octo-board-header-cell KanbanColumnHeader"
-        draggable="true"
         style="opacity: 1;"
       >
         <span
@@ -805,7 +794,6 @@ exports[`src/component/kanban/kanban should match snapshot 1`] = `
       </div>
       <div
         class="octo-board-header-cell KanbanColumnHeader"
-        draggable="true"
         style="opacity: 1;"
       >
         <span
@@ -881,7 +869,6 @@ exports[`src/component/kanban/kanban should match snapshot 1`] = `
       >
         <div
           class="KanbanCard"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -914,7 +901,6 @@ exports[`src/component/kanban/kanban should match snapshot 1`] = `
         </div>
         <div
           class="KanbanCard"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -958,7 +944,6 @@ exports[`src/component/kanban/kanban should match snapshot 1`] = `
       >
         <div
           class="KanbanCard"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -1039,7 +1024,6 @@ exports[`src/component/kanban/kanban should match snapshot without permissions 1
     >
       <div
         class="octo-board-header-cell KanbanColumnHeader"
-        draggable="false"
         style="opacity: 1;"
       >
         <span
@@ -1072,7 +1056,6 @@ exports[`src/component/kanban/kanban should match snapshot without permissions 1
       </div>
       <div
         class="octo-board-header-cell KanbanColumnHeader"
-        draggable="false"
         style="opacity: 1;"
       >
         <span
@@ -1118,7 +1101,6 @@ exports[`src/component/kanban/kanban should match snapshot without permissions 1
       >
         <div
           class="KanbanCard"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -1151,7 +1133,6 @@ exports[`src/component/kanban/kanban should match snapshot without permissions 1
         </div>
         <div
           class="KanbanCard"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -1188,7 +1169,6 @@ exports[`src/component/kanban/kanban should match snapshot without permissions 1
       >
         <div
           class="KanbanCard"
-          draggable="true"
           style="opacity: 1;"
         >
           <div

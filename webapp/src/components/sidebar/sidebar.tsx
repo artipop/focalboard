@@ -301,13 +301,24 @@ const Sidebar = (props: Props) => {
                 return
             }
 
+            // This monitor sees every drop in the application, not only the
+            // sidebar's. Cards used to be raw draggables and were filtered out
+            // by isSortable above; now that they are sortables of their own,
+            // their drops arrive here too and would fall through onDragEnd to
+            // its "unknown drag type" warning, resetting sidebar state on the
+            // way. The sidebar owns two types, and nothing else is its business.
+            const draggedType = String(source.type ?? '')
+            if (draggedType !== 'category' && draggedType !== 'board') {
+                return
+            }
+
             // dnd-kit moves index/group as you drag, so by dragend they hold the
             // final position and initialIndex/initialGroup the starting one --
             // exactly the two halves of react-beautiful-dnd's DropResult, which
             // is what the handlers below are still written against.
             onDragEnd({
                 draggableId: String(source.id),
-                type: String(source.type ?? ''),
+                type: draggedType,
                 source: {
                     index: source.initialIndex,
                     droppableId: String(source.initialGroup ?? 'lhs-categories'),

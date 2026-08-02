@@ -4,6 +4,7 @@ import React, {type JSX, useRef, useState} from 'react'
 import {useIntl} from 'react-intl'
 import {generatePath, useHistory, useRouteMatch} from 'react-router-dom'
 import {useSortable} from '@dnd-kit/react/sortable'
+import {SortableKeyboardPlugin} from '@dnd-kit/dom/sortable'
 
 import {Board} from '../../blocks/board'
 import {BoardView, IViewType} from '../../blocks/boardView'
@@ -192,12 +193,15 @@ const SidebarBoardItem = (props: Props) => {
 
     const boardItemRef = useRef<HTMLDivElement>(null)
 
-    const {ref, handleRef, isDragging} = useSortable({
+    const {ref, isDragging} = useSortable({
         id: props.board.id,
         index: props.index,
         group: props.categoryBoards.id,
         type: 'board',
         accept: 'board',
+
+        // Left out everywhere, not only here: see hooks/sortable.tsx.
+        plugins: [SortableKeyboardPlugin],
     })
 
     const title = board.title || intl.formatMessage({id: 'Sidebar.untitled-board', defaultMessage: '(Untitled Board)'})
@@ -206,10 +210,7 @@ const SidebarBoardItem = (props: Props) => {
             ref={ref}
         >
             <div
-                ref={(el) => {
-                    handleRef(el)
-                    boardItemRef.current = el
-                }}
+                ref={boardItemRef}
                 className={`SidebarBoardItem subitem ${props.isActive ? 'active' : ''}`}
                 onClick={() => props.showBoard(board.id)}
             >
