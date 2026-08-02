@@ -33,6 +33,14 @@ type AgentEntry struct {
 	Env     map[string]string `json:"env,omitempty"`     // per-process env (CODEX_HOME, OPENAI_API_KEY, …)
 	Args    []string          `json:"args,omitempty"`    // extra CLI args (sandbox/approval, etc.)
 
+	// CLIArgs are extra arguments for the CLI behind the agent's adapter, for
+	// the things ACP has no word for — Claude's Remote Control is a flag of the
+	// CLI and nothing in the protocol, so no probe can find it. Handed over in
+	// session/new's `_meta`, in the namespace the adapter documents. Only kinds
+	// with such a channel accept them (see clihandoff.go); for an agent that is
+	// its own CLI, Args is the field that reaches it.
+	CLIArgs []string `json:"cliArgs,omitempty"`
+
 	// Options are the agent's own settings — an ACP session config option id
 	// mapped to the value the entry asks for ("fast": "on", "effort": "high").
 	// They are not a list of ours: an agent declares what it has in its answer

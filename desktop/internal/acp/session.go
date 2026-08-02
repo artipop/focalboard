@@ -538,6 +538,10 @@ func (m *Manager) openConnection(ctx context.Context, s *Session) (*acpsdk.Clien
 	sess, err := conn.NewSession(ctx, acpsdk.NewSessionRequest{
 		Cwd:        s.Worktree.Path,
 		McpServers: acpMCPServers(specs),
+		// Extra arguments for the CLI behind the adapter, for what ACP has no
+		// word for (Remote Control). An argument the CLI does not know fails
+		// right here, with the CLI's own message.
+		Meta: sessionMeta(s.Agent),
 	})
 	if err != nil {
 		cleanup()

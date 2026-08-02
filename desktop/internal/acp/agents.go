@@ -43,6 +43,11 @@ func validateAgent(a AgentEntry) (AgentEntry, error) {
 	default:
 		return AgentEntry{}, fmt.Errorf("неизвестный тип агента %q (допустимо: %s)", a.Kind, strings.Join(AgentKinds, ", "))
 	}
+	cliArgs, err := validateCLIArgs(a)
+	if err != nil {
+		return AgentEntry{}, err
+	}
+	a.CLIArgs = cliArgs
 	a.Options = normalizeOptions(a.Options)
 	servers, err := validateMCPServers(a.MCPServers)
 	if err != nil {

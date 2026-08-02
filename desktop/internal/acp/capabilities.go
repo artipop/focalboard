@@ -187,6 +187,10 @@ func (m *Manager) probeAgentOptions(a AgentEntry) ([]AgentOption, error) {
 	sess, err := conn.NewSession(ctx, acpsdk.NewSessionRequest{
 		Cwd:        cwd,
 		McpServers: []acpsdk.McpServer{},
+		// The same hand-over a real session makes, so an argument the CLI does
+		// not know is reported while the agent is being edited rather than on
+		// the first card it takes.
+		Meta: sessionMeta(a),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("session/new: %s", net.redactProxySecret(err.Error()))

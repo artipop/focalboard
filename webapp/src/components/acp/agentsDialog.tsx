@@ -58,6 +58,10 @@ type AgentEntry = {
     // asked for ({"fast": "on"}). Which ones exist is the agent's answer, not
     // a list of ours — see AgentOption below.
     options?: {[id: string]: string}
+
+    // Arguments for the CLI behind the agent's adapter, for what ACP has no
+    // word for. Remote Control is the reason it exists.
+    cliArgs?: string[]
 }
 
 // One setting the agent itself declares (Fast mode, effort, permission mode),
@@ -80,6 +84,55 @@ const MODEL_OPTION_ID = 'model'
 // A boolean option is drawn as the same dropdown as a select, so "leave it as
 // the agent has it" stays expressible alongside on and off.
 const booleanValues = [{value: 'on'}, {value: 'off'}]
+
+// Kinds whose adapter hands arguments on to a CLI behind it (session/new's
+// `_meta`). For every other kind the agent *is* the CLI, so "Extra CLI args"
+// above already reaches it and this field would be a second way to say it.
+const CLI_HANDOFF_KINDS = ['claude']
+
+// Remote Control — driving this agent's sessions from claude.ai or the phone —
+// is a flag of the CLI and nothing in ACP, so the probe cannot find it and it is
+// named here. The rest of the CLI's flags stay hand-typed: keeping a list of
+// somebody else's releases in step is not something to promise.
+const REMOTE_CONTROL_FLAG = '--remote-control'
+const REMOTE_CONTROL_NAME_FLAG = '--remote-control-session-name-prefix'
+
+// remoteControlOf reads the toggle and the name back out of the arguments, so
+// there is one place the setting lives and the raw field stays the truth.
+export function remoteControlOf(cliArgs?: string[]): {on: boolean, name: string} {
+    const argv = cliArgs || []
+    const at = argv.indexOf(REMOTE_CONTROL_NAME_FLAG)
+    return {
+        on: argv.includes(REMOTE_CONTROL_FLAG),
+        name: at >= 0 ? (argv[at + 1] || '') : '',
+    }
+}
+
+// withRemoteControl writes the toggle and the name back into the arguments,
+// leaving everything else the user typed exactly where it was.
+export function withRemoteControl(cliArgs: string[] | undefined, on: boolean, name: string): string[] {
+    const rest: string[] = []
+    const argv = cliArgs || []
+    for (let i = 0; i < argv.length; i++) {
+        if (argv[i] === REMOTE_CONTROL_FLAG) {
+            continue
+        }
+        if (argv[i] === REMOTE_CONTROL_NAME_FLAG) {
+            i++ // its value goes with it
+            continue
+        }
+        rest.push(argv[i])
+    }
+    if (!on) {
+        return rest
+    }
+
+    // The name is kept exactly as typed — trimming it here would eat the space
+    // the moment somebody types one, since every keystroke goes back through
+    // the arguments. Whitespace is dropped when the entry is saved.
+    const named = name.trim() ? [REMOTE_CONTROL_NAME_FLAG, name] : []
+    return [REMOTE_CONTROL_FLAG, ...named, ...rest]
+}
 
 // Whether a kind can be started on this machine, as the manager reports it.
 export type AdapterStatus = {
@@ -262,6 +315,11 @@ const AgentsDialog = (props: Props) => {
     const [serversText, setServersText] = useState('')
     const [argsText, setArgsText] = useState('')
     const [commandText, setCommandText] = useState('')
+
+    // Arguments for the CLI behind the adapter, kept as the text the user typed:
+    // the Remote Control switch below edits this and nothing else, so there is
+    // one place the setting lives.
+    const [cliArgsText, setCliArgsText] = useState('')
     const [editingName, setEditingName] = useState<string | null>(null)
     const [adapters, setAdapters] = useState<AdapterStatus[]>([])
     const [installing, setInstalling] = useState('')
@@ -414,7 +472,8 @@ const AgentsDialog = (props: Props) => {
         env: textToEnv(envText),
         args: splitArgv(argsText),
         command: splitArgv(commandText),
-    }), [form, envText, argsText, commandText])
+        cliArgs: splitArgv(cliArgsText),
+    }), [form, envText, argsText, commandText, cliArgsText])
 
     // The agent is asked when the form opens and when the kind changes — the
     // moments its answer can differ. The launch details (binary, command,
@@ -426,6 +485,7 @@ const AgentsDialog = (props: Props) => {
         setServersText('')
         setArgsText('')
         setCommandText('')
+        setCliArgsText('')
         setEditingName(null)
         setError('')
         forgetOptions()
@@ -438,6 +498,7 @@ const AgentsDialog = (props: Props) => {
         setServersText(serversToText(agent.mcpServers))
         setArgsText(joinArgv(agent.args))
         setCommandText(joinArgv(agent.command))
+        setCliArgsText(joinArgv(agent.cliArgs))
         setEditingName(agent.name)
         setError('')
         forgetOptions()
@@ -568,6 +629,12 @@ const AgentsDialog = (props: Props) => {
     // The model is asked for by the field above, so it is not asked for twice.
     const tunableOptions = agentOptions.filter((o) => o.id !== MODEL_OPTION_ID)
     const modelOption = agentOptions.find((o) => o.id === MODEL_OPTION_ID)
+
+    // The switch is a reading of the arguments rather than a state of its own,
+    // so typing the flag by hand and ticking the box are the same thing.
+    const remoteControl = remoteControlOf(splitArgv(cliArgsText))
+    const setRemoteControl = (on: boolean, name: string) =>
+        setCliArgsText(joinArgv(withRemoteControl(splitArgv(cliArgsText), on, name)))
 
     return (
         <Dialog
@@ -732,6 +799,45 @@ const AgentsDialog = (props: Props) => {
                                     {intl.formatMessage({id: 'Agents.options-failed', defaultMessage: 'Could not ask the agent what it supports: {error}'}, {error: probeError})}
                                 </div>}
                         </div>
+
+                        {/* What the CLI behind the adapter can do and the
+                            protocol has no word for. Only for the kinds whose
+                            adapter passes arguments on: for the rest the agent
+                            is the CLI, and "Extra CLI args" already reaches it. */}
+                        {CLI_HANDOFF_KINDS.includes(form.kind) &&
+                            <div className='AgentsDialog__options'>
+                                <div className='AgentsDialog__optionsHeader'>
+                                    <span>{intl.formatMessage({id: 'Agents.cli', defaultMessage: 'What the protocol has no word for'})}</span>
+                                </div>
+                                <label className='AgentsDialog__checkbox'>
+                                    <input
+                                        type='checkbox'
+                                        checked={remoteControl.on}
+                                        onChange={(e) => setRemoteControl(e.target.checked, remoteControl.name)}
+                                    />
+                                    {intl.formatMessage({id: 'Agents.remote-control', defaultMessage: 'Remote control — drive this agent\'s sessions from claude.ai or the Claude app'})}
+                                </label>
+                                {remoteControl.on &&
+                                    <label>
+                                        {intl.formatMessage({id: 'Agents.remote-control-name', defaultMessage: 'Session name prefix in claude.ai (optional)'})}
+                                        <input
+                                            value={remoteControl.name}
+                                            placeholder={board.title}
+                                            onChange={(e) => setRemoteControl(true, e.target.value)}
+                                        />
+                                    </label>}
+                                <label>
+                                    {intl.formatMessage({id: 'Agents.cli-args', defaultMessage: 'Arguments for the CLI behind the adapter'})}
+                                    <input
+                                        value={cliArgsText}
+                                        placeholder={'--fallback-model sonnet'}
+                                        onChange={(e) => setCliArgsText(e.target.value)}
+                                    />
+                                </label>
+                                <div className='AgentsDialog__hint'>
+                                    {intl.formatMessage({id: 'Agents.cli-args-hint', defaultMessage: 'Handed to the CLI at session start. An argument it does not know shows up here as its own error when the agent is rechecked, not later on a card.'})}
+                                </div>
+                            </div>}
 
                         <label>
                             {intl.formatMessage({id: 'Agents.prompt', defaultMessage: 'Agent system prompt'})}

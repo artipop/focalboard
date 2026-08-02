@@ -148,6 +148,18 @@
         }
     }
 
+    // A switch reads across, not down like the rest of the form's labels.
+    .AgentsDialog__form label.AgentsDialog__checkbox {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+
+        input {
+            width: auto;
+            flex: none;
+        }
+    }
+
     .AgentsDialog__option {
         display: flex;
         flex-direction: column;

@@ -9,7 +9,7 @@ import {wrapIntl} from '../../testUtils'
 import {TestBlockFactory} from '../../test/testBlockFactory'
 import mutator from '../../mutator'
 
-import AgentsDialog, {isAgentsAvailable, textToServers, keptOptions} from './agentsDialog'
+import AgentsDialog, {isAgentsAvailable, textToServers, keptOptions, remoteControlOf, withRemoteControl} from './agentsDialog'
 
 jest.mock('../../mutator')
 const mockedMutator = jest.mocked(mutator)
@@ -527,5 +527,88 @@ describe('components/acp/agentsDialog', () => {
             {id: 'effort', name: 'Effort', type: 'select', current: 'default', values: [{value: 'high'}]},
         ])
         expect(kept).toEqual({effort: 'high'})
+    })
+
+    // Remote Control is a flag of the CLI behind the adapter and nothing in ACP,
+    // so the probe cannot find it: it is named in the form and handed over in
+    // session/new's _meta. Only for the kinds whose adapter passes arguments on.
+    test('turns remote control on for claude and saves it as a CLI argument', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([{name: 'clyde', kind: 'claude'}])),
+            ListProxies: jest.fn().mockResolvedValue('[]'),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AgentOptions: jest.fn().mockResolvedValue('[]'),
+            AddAgent: jest.fn(),
+            UpdateAgent: jest.fn().mockResolvedValue('{}'),
+            RemoveAgent: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByText('clyde')).toBeInTheDocument())
+        userEvent.click(screen.getAllByRole('button', {name: 'Edit'})[0])
+
+        const toggle = await screen.findByRole('checkbox', {name: /Remote control/})
+        expect(toggle).not.toBeChecked()
+        userEvent.click(toggle)
+
+        // The name appears only once it is switched on, and it is one setting:
+        // both end up in the arguments field.
+        userEvent.type(await screen.findByRole('textbox', {name: /Session name prefix/}), 'my board')
+        expect(screen.getByRole('textbox', {name: /Arguments for the CLI/})).toHaveValue('--remote-control --remote-control-session-name-prefix "my board"')
+
+        userEvent.click(screen.getByRole('button', {name: 'Save'}))
+        await waitFor(() => expect(bindings.UpdateAgent).toHaveBeenCalled())
+        expect(JSON.parse(bindings.UpdateAgent.mock.calls[0][0]).cliArgs).toEqual([
+            '--remote-control', '--remote-control-session-name-prefix', 'my board',
+        ])
+    })
+
+    test('offers no remote control for a kind whose adapter cannot pass it on', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([{name: 'cx', kind: 'codex'}])),
+            ListProxies: jest.fn().mockResolvedValue('[]'),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AgentOptions: jest.fn().mockResolvedValue('[]'),
+            AddAgent: jest.fn(),
+            UpdateAgent: jest.fn(),
+            RemoveAgent: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByText('cx')).toBeInTheDocument())
+        userEvent.click(screen.getAllByRole('button', {name: 'Edit'})[0])
+
+        await waitFor(() => expect(screen.getByRole('button', {name: 'Save'})).toBeInTheDocument())
+        expect(screen.queryByRole('checkbox', {name: /Remote control/})).not.toBeInTheDocument()
+    })
+
+    // The switch is a reading of the arguments, not a state beside them, so
+    // typing the flag by hand and ticking the box are the same thing.
+    test('the remote control switch and the arguments are one setting', () => {
+        expect(remoteControlOf(['--remote-control', '--verbose'])).toEqual({on: true, name: ''})
+        expect(remoteControlOf(['--verbose'])).toEqual({on: false, name: ''})
+        expect(remoteControlOf(['--remote-control', '--remote-control-session-name-prefix', 'x'])).toEqual({on: true, name: 'x'})
+
+        // Switching it off leaves everything else where it was.
+        expect(withRemoteControl(['--verbose', '--remote-control', '--remote-control-session-name-prefix', 'x'], false, 'x')).toEqual(['--verbose'])
+        expect(withRemoteControl(['--verbose'], true, 'my board')).toEqual(['--remote-control', '--remote-control-session-name-prefix', 'my board', '--verbose'])
+
+        // Kept as typed: trimming here would eat the space as it is typed.
+        expect(withRemoteControl([], true, 'my ')).toEqual(['--remote-control', '--remote-control-session-name-prefix', 'my '])
+        expect(withRemoteControl(['--verbose'], true, '')).toEqual(['--remote-control', '--verbose'])
     })
 })

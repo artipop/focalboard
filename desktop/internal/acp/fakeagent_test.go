@@ -115,6 +115,11 @@ func (f *fakeAgent) NewSession(ctx context.Context, params acpsdk.NewSessionRequ
 	if servers, err := json.Marshal(params.McpServers); err == nil {
 		f.record("mcp.json", string(servers))
 	}
+	// What a client hands the adapter for the CLI behind it (Remote Control and
+	// friends) travels in _meta, which is what the hand-over tests read back.
+	if meta, err := json.Marshal(params.Meta); err == nil {
+		f.record("meta.json", string(meta))
+	}
 	f.record("env.txt", strings.Join(os.Environ(), "\n"))
 	// The modes and the model option are spelled the way the codex adapter
 	// spells them: it starts read-only, calls the working mode "agent", and

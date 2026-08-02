@@ -172,8 +172,26 @@ agent that gains a setting shows it after *Recheck* without an update here.
   missing or the account is not logged in. Everything else on the form still
   saves.
 
-Remote control (driving a Claude session from claude.ai) is not among them: no
-ACP adapter offers it, and nothing is shown here that cannot actually be set.
+### What the protocol has no word for
+
+Remote control — driving an agent's sessions from claude.ai or the Claude app —
+is not on that list: it is a flag of the CLI itself rather than a setting of the
+protocol, so the agent cannot be asked about it. It is therefore named by hand:
+a Claude agent has a **Remote control** checkbox in the same dialog and, if you
+want one, a prefix for the session name it will appear under in claude.ai. It
+works through a door the adapter documents for itself — the arguments reach the
+real `claude` process when the session starts.
+
+Next to it is **Arguments for the CLI behind the adapter**, where anything else
+goes (`--fallback-model sonnet`). We keep no list of those flags: it is somebody
+else's CLI and it changes without us. Getting one wrong is cheap — an argument
+the CLI does not know fails the session start in its own words (`unknown option
+'--nonsense'`), and you see it when the agent is rechecked rather than later on
+a card.
+
+For the other kinds the agent *is* the CLI, so its flags go in the ordinary
+**Extra CLI args** field and there is no remote control checkbox — their
+adapters have no such channel.
 
 ## When nothing happens
 
