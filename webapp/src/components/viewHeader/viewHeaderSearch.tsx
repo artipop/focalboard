@@ -1,10 +1,10 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useState, useRef, useEffect, useMemo} from 'react'
+import React, {type JSX, useState, useRef, useEffect} from 'react'
 import {useRouteMatch} from 'react-router-dom'
 import {useIntl} from 'react-intl'
 import {useHotkeys} from 'react-hotkeys-hook'
-import {debounce} from 'lodash'
+import debounce from 'lodash/debounce'
 
 import CompassIcon from '../../widgets/icons/compassIcon'
 import Editable from '../../widgets/editable'
@@ -26,8 +26,7 @@ const ViewHeaderSearch = (): JSX.Element => {
         dispatch(setSearchText(value))
     }
 
-    const debouncedDispatchSearchText = useMemo(
-        () => debounce(dispatchSearchText, 200), [])
+    const debouncedDispatchSearchText = debounce(dispatchSearchText, 200)
 
     useEffect(() => {
         const viewId = match.params?.viewId

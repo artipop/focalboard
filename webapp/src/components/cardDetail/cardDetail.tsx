@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useCallback, useEffect, useRef, useState, Fragment, useMemo} from 'react'
+import React, {type JSX, useCallback, useEffect, useRef, useState, Fragment, useMemo} from 'react'
 import {FormattedMessage, useIntl, IntlShape} from 'react-intl'
 
 import {BlockIcons} from '../../blockIcons'
@@ -153,10 +153,6 @@ const CardDetail = (props: Props): JSX.Element|null => {
         dispatch(setCurrentCard(card.id))
     }, [card.id])
 
-    if (!card) {
-        return null
-    }
-
     const blocks = useMemo(() => props.contents.flatMap((value: Block | Block[]): BlockData<any> => {
         const v: Block = Array.isArray(value) ? value[0] : value
 
@@ -194,6 +190,10 @@ const CardDetail = (props: Props): JSX.Element|null => {
             contentType: v?.type,
         }
     }), [props.contents])
+
+    if (!card) {
+        return null
+    }
 
     return (
         <>

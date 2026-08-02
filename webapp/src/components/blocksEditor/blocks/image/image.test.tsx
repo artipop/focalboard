@@ -13,7 +13,7 @@ jest.mock('../../../../octoClient')
 
 describe('components/blocksEditor/blocks/image', () => {
     test('should match Display snapshot', async () => {
-        const mockedOcto = mocked(octoClient, true)
+        const mockedOcto = mocked(octoClient)
         mockedOcto.getFileAsDataUrl.mockResolvedValue({url: 'test.jpg'})
         const Component = ImageBlock.Display
         const {container} = render(
@@ -80,9 +80,9 @@ describe('components/blocksEditor/blocks/image', () => {
             />,
         )
 
-        expect(onSave).not.toBeCalled()
+        expect(onSave).not.toHaveBeenCalled()
         const input = screen.getByTestId('image-input')
         fireEvent.change(input, {target: {files: ['test-file']}})
-        expect(onSave).toBeCalledWith({file: 'test-file'})
+        expect(onSave).toHaveBeenCalledWith({file: 'test-file'})
     })
 })

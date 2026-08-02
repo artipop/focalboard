@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useCallback} from 'react'
+import React, {type JSX} from 'react'
 import {FormattedMessage} from 'react-intl'
 
 import {IPropertyTemplate} from '../../blocks/board'
@@ -25,7 +25,7 @@ const ViewHeaderSortMenu = (props: Props) => {
     const sortDisplayOptions = properties?.map((o) => ({id: o.id, name: o.name}))
     sortDisplayOptions?.unshift({id: Constants.titleColumnId, name: 'Name'})
 
-    const sortChanged = useCallback((propertyId: string) => {
+    const sortChanged = (propertyId: string) => {
         let newSortOptions: ISortOption[] = []
         if (activeView.fields.sortOptions && activeView.fields.sortOptions[0] && activeView.fields.sortOptions[0].propertyId === propertyId) {
             // Already sorting by name, so reverse it
@@ -38,20 +38,20 @@ const ViewHeaderSortMenu = (props: Props) => {
             ]
         }
         mutator.changeViewSortOptions(activeView.boardId, activeView.id, activeView.fields.sortOptions, newSortOptions)
-    }, [activeView.id, activeView.fields.sortOptions])
+    }
 
-    const onManualSort = useCallback(() => {
+    const onManualSort = () => {
         // This sets the manual card order to the currently displayed order
         // Note: Perform this as a single update to change both properties correctly
         const newView = {...activeView, fields: {...activeView.fields}}
         newView.fields.cardOrder = orderedCards.map((o) => o.id || '') || []
         newView.fields.sortOptions = []
         mutator.updateBlock(activeView.boardId, newView, activeView, 'reorder')
-    }, [activeView, orderedCards])
+    }
 
-    const onRevertSort = useCallback(() => {
+    const onRevertSort = () => {
         mutator.changeViewSortOptions(activeView.boardId, activeView.id, activeView.fields.sortOptions, [])
-    }, [activeView.id, activeView.fields.sortOptions])
+    }
 
     return (
         <MenuWrapper>

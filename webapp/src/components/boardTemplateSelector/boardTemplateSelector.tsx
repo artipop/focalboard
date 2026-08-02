@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useEffect, useState, useCallback, useMemo} from 'react'
+import React, {useEffect, useState} from 'react'
 import {FormattedMessage, useIntl} from 'react-intl'
 import {useHistory, useRouteMatch} from 'react-router-dom'
 import {useHotkeys} from 'react-hotkeys-hook'
@@ -56,12 +56,15 @@ const BoardTemplateSelector = (props: Props) => {
 
     useHotkeys('esc', () => props.onClose?.())
 
-    const showBoard = useCallback(async (boardId) => {
+    const showBoard = async (boardId: string | null) => {
+        if (!boardId) {
+            return
+        }
         Utils.showBoard(boardId, match, history)
         if (onClose) {
             onClose()
         }
-    }, [match, history, onClose])
+    }
 
     useEffect(() => {
         if (octoClient.teamId !== Constants.globalTeamId && globalTemplates.length === 0) {
@@ -69,7 +72,7 @@ const BoardTemplateSelector = (props: Props) => {
         }
     }, [octoClient.teamId])
 
-    const onBoardTemplateDelete = useCallback((template: Board) => {
+    const onBoardTemplateDelete = (template: Board) => {
         TelemetryClient.trackEvent(TelemetryCategory, TelemetryActions.DeleteBoardTemplate, {board: template.id})
         mutator.deleteBoard(
             template,
@@ -79,10 +82,10 @@ const BoardTemplateSelector = (props: Props) => {
                 showBoard(template.id)
             },
         )
-    }, [showBoard])
+    }
 
     const unsortedTemplates = useAppSelector(getTemplates)
-    const templates = useMemo(() => Object.values(unsortedTemplates).sort((a: Board, b: Board) => a.createAt - b.createAt), [unsortedTemplates])
+    const templates = Object.values(unsortedTemplates).sort((a: Board, b: Board) => a.createAt - b.createAt)
     const allTemplates = globalTemplates.concat(templates).filter((template) => template.title === VISIBLE_TEMPLATE_TITLE)
 
     const resetTour = async () => {

@@ -1,10 +1,9 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`src/components/kanban/kanbanColumnHeader return kanbanColumnHeader and click on menuwrapper 1`] = `
 <div>
   <div
     class="octo-board-header-cell KanbanColumnHeader"
-    draggable="true"
     style="opacity: 1;"
   >
     <span
@@ -349,7 +348,6 @@ exports[`src/components/kanban/kanbanColumnHeader return kanbanColumnHeader and 
 <div>
   <div
     class="octo-board-header-cell KanbanColumnHeader"
-    draggable="true"
     style="opacity: 1;"
   >
     <span
@@ -409,7 +407,6 @@ exports[`src/components/kanban/kanbanColumnHeader should match snapshot 1`] = `
 <div>
   <div
     class="octo-board-header-cell KanbanColumnHeader"
-    draggable="true"
     style="opacity: 1;"
   >
     <span
@@ -469,7 +466,6 @@ exports[`src/components/kanban/kanbanColumnHeader should match snapshot readonly
 <div>
   <div
     class="octo-board-header-cell KanbanColumnHeader"
-    draggable="true"
     style="opacity: 1;"
   >
     <span

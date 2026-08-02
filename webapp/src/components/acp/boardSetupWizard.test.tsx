@@ -94,7 +94,7 @@ describe('components/acp/boardSetupWizard steps', () => {
     test('the repository step will not pass until there is one', async () => {
         const bindings = stubBindings()
         renderWizard()
-        await waitFor(() => expect(bindings.ListAgentRepos).toBeCalled())
+        await waitFor(() => expect(bindings.ListAgentRepos).toHaveBeenCalled())
 
         expect(screen.getByRole('button', {name: 'Next'})).toBeDisabled()
 
@@ -102,7 +102,7 @@ describe('components/acp/boardSetupWizard steps', () => {
         await waitFor(() => expect(screen.getByDisplayValue('webapp')).toBeInTheDocument())
 
         userEvent.click(screen.getByRole('button', {name: 'Next'}))
-        await waitFor(() => expect(bindings.AddAgentRepo).toBeCalledWith('webapp', '/Users/me/src/webapp'))
+        await waitFor(() => expect(bindings.AddAgentRepo).toHaveBeenCalledWith('webapp', '/Users/me/src/webapp'))
 
         // And having added it, the wizard is on the agent step.
         await waitFor(() => expect(screen.getByText('Kind')).toBeInTheDocument())
@@ -111,7 +111,7 @@ describe('components/acp/boardSetupWizard steps', () => {
     test('a refusal from Go is shown rather than swallowed', async () => {
         const bindings = stubBindings({AddAgentRepo: jest.fn().mockRejectedValue('/Users/me/src не является git-репозиторием')})
         renderWizard()
-        await waitFor(() => expect(bindings.ListAgentRepos).toBeCalled())
+        await waitFor(() => expect(bindings.ListAgentRepos).toHaveBeenCalled())
 
         userEvent.click(screen.getByRole('button', {name: 'Choose a folder…'}))
         await waitFor(() => expect(screen.getByDisplayValue('webapp')).toBeInTheDocument())
@@ -133,9 +133,9 @@ describe('components/acp/boardSetupWizard steps', () => {
         await waitFor(() => expect(screen.getByText('Kind')).toBeInTheDocument())
 
         userEvent.click(screen.getByRole('button', {name: 'Next'}))
-        await waitFor(() => expect(bindings.AddAgent).toBeCalled())
+        await waitFor(() => expect(bindings.AddAgent).toHaveBeenCalled())
         expect(JSON.parse(bindings.AddAgent.mock.calls[0][0])).toEqual({name: 'claude', kind: 'claude'})
-        expect(bindings.SyncAgentUsers).toBeCalled()
+        expect(bindings.SyncAgentUsers).toHaveBeenCalled()
     })
 
     test('deploy and testing are skippable, and the end takes the board’s automation', async () => {
@@ -157,12 +157,12 @@ describe('components/acp/boardSetupWizard steps', () => {
         userEvent.click(screen.getByRole('button', {name: 'Skip'}))
 
         await waitFor(() => expect(screen.getByRole('button', {name: 'Done'})).toBeInTheDocument())
-        expect(bindings.AddDeployTarget).not.toBeCalled()
-        expect(bindings.UpdateAgent).not.toBeCalled()
+        expect(bindings.AddDeployTarget).not.toHaveBeenCalled()
+        expect(bindings.UpdateAgent).not.toHaveBeenCalled()
 
         userEvent.click(screen.getByRole('button', {name: 'Done'}))
-        await waitFor(() => expect(bindings.SeedBoardAutomation).toBeCalled())
-        expect(onClose).toBeCalled()
+        await waitFor(() => expect(bindings.SeedBoardAutomation).toHaveBeenCalled())
+        expect(onClose).toHaveBeenCalled()
     })
 
     test('the browser server is offered ready to accept', async () => {
@@ -180,7 +180,7 @@ describe('components/acp/boardSetupWizard steps', () => {
 
         await waitFor(() => expect(screen.getByText(/browser MCP server/)).toBeInTheDocument())
         userEvent.click(screen.getByRole('button', {name: 'Save'}))
-        await waitFor(() => expect(bindings.UpdateAgent).toBeCalled())
+        await waitFor(() => expect(bindings.UpdateAgent).toHaveBeenCalled())
 
         const saved = JSON.parse(bindings.UpdateAgent.mock.calls[0][0])
         expect(saved.name).toBe('claude')

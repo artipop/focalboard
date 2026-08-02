@@ -190,7 +190,7 @@ describe('components/sidebarCategory', () => {
         const subItems = container.querySelectorAll('.subitem')
         expect(subItems).toBeDefined()
         userEvent.click(subItems[0] as Element)
-        expect(mockTemplateClose).toBeCalled()
+        expect(mockTemplateClose).toHaveBeenCalled()
     })
 
     test('sidebar template close other', () => {
@@ -221,6 +221,6 @@ describe('components/sidebarCategory', () => {
         const subItems = container.querySelectorAll('.category-title')
         expect(subItems).toBeDefined()
         userEvent.click(subItems[0] as Element)
-        expect(mockTemplateClose).not.toBeCalled()
+        expect(mockTemplateClose).not.toHaveBeenCalled()
     })
 })

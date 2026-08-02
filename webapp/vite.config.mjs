@@ -17,6 +17,12 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 const staticDir = path.join(root, 'static');
 const outDir = path.join(root, 'pack');
 
+// React Compiler roughly doubles a build (7s -> 15s here), which is felt most in
+// `wails dev`, where it sits between saving a file and the window reloading.
+// NO_REACT_COMPILER=1 turns it off for a faster loop, or to tell a compiler bug
+// apart from one of ours. Release builds always have it on.
+const compilerEnabled = !process.env.NO_REACT_COMPILER;
+
 // Where `npm run dev` proxies the API: the standalone server's default port
 // from config.json, i.e. whatever `make watch` is running in another terminal.
 const devServerURL = 'http://localhost:8000';
@@ -93,9 +99,31 @@ export default defineConfig(({mode}) => {
                 idInterpolationPattern: '[sha512:contenthash:base64:6]',
             }),
             react({
-                // React 17 with tsconfig's classic `jsx: "react"` — every source
-                // file already imports React.
+                // tsconfig still asks for the classic `jsx: "react"` transform, and
+                // every source file imports React itself.
                 jsxRuntime: 'classic',
+
+                babel: {
+                    plugins: compilerEnabled ? [
+                        // React Compiler, inferring which components and hooks it
+                        // can memoise on its own. `panicThreshold: 'none'` makes it
+                        // skip anything it cannot prove instead of failing the
+                        // build, so a component that breaks the Rules of React
+                        // simply stays as written -- see the react-hooks warnings
+                        // in eslint.config.mjs for what those are.
+                        ['babel-plugin-react-compiler', {
+                            target: '19',
+                            compilationMode: 'infer',
+                            panicThreshold: 'none',
+                            logger: process.env.REACT_COMPILER_LOG ? {
+                                logEvent(filename, event) {
+                                    // eslint-disable-next-line no-console
+                                    console.log(JSON.stringify({filename, kind: event.kind, fnName: event.fnLoc && event.fnName, detail: event.detail && (event.detail.reason || event.detail.description)}))
+                                },
+                            } : null,
+                        }],
+                    ] : [],
+                },
             }),
             focalboardHtml(),
             focalboardStatic(),

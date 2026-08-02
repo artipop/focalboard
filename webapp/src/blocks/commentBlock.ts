@@ -13,4 +13,4 @@ function createCommentBlock(block?: Block): CommentBlock {
     }
 }
 
-export {CommentBlock, createCommentBlock}
+export {type CommentBlock, createCommentBlock}

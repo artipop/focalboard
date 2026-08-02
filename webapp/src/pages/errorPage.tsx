@@ -2,7 +2,7 @@
 // See LICENSE.txt for license information.
 import React, {useCallback} from 'react'
 import {useHistory, useLocation} from 'react-router-dom'
-import {FormattedMessage} from 'react-intl'
+import {FormattedMessage, useIntl} from 'react-intl'
 
 import ErrorIllustration from '../svg/error-illustration'
 
@@ -15,7 +15,8 @@ const ErrorPage = () => {
     const history = useHistory()
     const queryParams = new URLSearchParams(useLocation().search)
     const errid = queryParams.get('id')
-    const errorDef = errorDefFromId(errid as ErrorId)
+    const intl = useIntl()
+    const errorDef = errorDefFromId(errid as ErrorId, intl)
 
     const handleButtonClick = useCallback((path: string | ((params: URLSearchParams) => string)) => {
         let url = '/'

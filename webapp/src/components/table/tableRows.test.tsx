@@ -83,7 +83,7 @@ describe('components/table/TableRows', () => {
 
         const open = getByText(/Open/i)
         fireEvent.click(open)
-        expect(callback).toBeCalled()
+        expect(callback).toHaveBeenCalled()
         expect(container).toMatchSnapshot()
     })
 })

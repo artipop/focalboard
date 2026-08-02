@@ -238,9 +238,10 @@ export function useSessionStream(match: StreamMatch, onSession?: (payload: any) 
                     // An answered prompt replaces the pending one it resolves.
                     if (!payload.pending) {
                         const idx = prev.findIndex((e) => e.kind === 'permission' && e.requestId)
-                        if (idx >= 0) {
+                        const pending = idx >= 0 ? prev[idx] : undefined
+                        if (pending?.kind === 'permission') {
                             const next = [...prev]
-                            next[idx] = {...prev[idx], requestId: undefined, options: undefined, decision: payload.decision}
+                            next[idx] = {...pending, requestId: undefined, options: undefined, decision: payload.decision}
                             return next
                         }
                     }

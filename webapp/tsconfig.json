@@ -17,10 +17,7 @@
         "skipLibCheck": true,
         "baseUrl": "src",
         "outDir": "./dist",
-        "moduleResolution": "node",
-        "paths": {
-            "@lexical/react/*": ["../node_modules/@lexical/react/dist/*"]
-        }
+        "moduleResolution": "bundler",
     },
     "include": [
         "."

@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {useCallback, useState} from 'react'
+import React, {type JSX, useCallback, useState} from 'react'
 import {useIntl} from 'react-intl'
 
 import {ActionMeta, SingleValue, MultiValue} from 'react-select'
@@ -29,7 +29,7 @@ const ConfirmPerson = (props: PropertyProps): JSX.Element => {
 
     const allowManageBoardRoles = useHasPermissions(board.teamId, board.id, [Permission.ManageBoardRoles])
     const allowAddUsers = !me?.is_guest && (allowManageBoardRoles || board.type === BoardTypeOpen)
-    const changePropertyValue = useCallback((newValue) => mutator.changePropertyValue(board.id, card, propertyTemplate.id, newValue), [board.id, card, propertyTemplate.id])
+    const changePropertyValue = useCallback((newValue: string | string[]) => mutator.changePropertyValue(board.id, card, propertyTemplate.id, newValue), [board.id, card, propertyTemplate.id])
     const emptyDisplayValue = props.showEmptyPlaceholder ? intl.formatMessage({id: 'ConfirmPerson.empty', defaultMessage: 'Empty'}) : ''
 
     let userIDs: string[] = []

@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {forwardRef, useImperativeHandle, useLayoutEffect, useRef} from 'react'
+import React, {type JSX, forwardRef, useImperativeHandle, useLayoutEffect, useRef} from 'react'
 
 import './editable.scss'
 
@@ -42,7 +42,7 @@ export type ElementProps = {
 export function useEditable(
     props: EditableProps,
     focusableRef: React.Ref<Focusable>,
-    elementRef: React.RefObject<ElementType>): ElementProps {
+    elementRef: React.RefObject<ElementType | null>): ElementProps {
     const saveOnBlur = useRef<boolean>(true)
 
     const save = (saveType: 'onEnter'|'onEsc'|'onBlur'): void => {

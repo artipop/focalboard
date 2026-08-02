@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {useState, useRef} from 'react'
+import React, {type JSX, useState, useRef} from 'react'
 import Select from 'react-select'
 import {useIntl, FormattedMessage} from 'react-intl'
 

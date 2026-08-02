@@ -3,7 +3,7 @@
 
 // The Wails-generated Go bindings are PascalCase methods, not constructors.
 /* eslint-disable new-cap */
-import React, {useCallback, useEffect, useMemo, useState} from 'react'
+import React, {useEffect, useState} from 'react'
 import {useIntl} from 'react-intl'
 
 import {Board, IPropertyTemplate} from '../../blocks/board'
@@ -113,19 +113,16 @@ const WorkflowsDialog = (props: Props) => {
     const [editingName, setEditingName] = useState<string | null>(null)
     const [error, setError] = useState('')
 
-    const selectProperties = useMemo(
-        () => board.cardProperties.filter((p: IPropertyTemplate) => p.type === 'select'),
-        [board.cardProperties],
-    )
+    const selectProperties = board.cardProperties.filter((p: IPropertyTemplate) => p.type === 'select')
 
     // Columns are offered from the board itself: a stage pointing at a column
     // nobody has would only fail later, when a card cannot be moved into it.
-    const columnOptions = useMemo(() => {
+    const columnOptions = (() => {
         const property = selectProperties.find((p) => p.name === form?.property) || selectProperties[0]
         return property?.options?.map((o) => o.value) || []
-    }, [selectProperties, form?.property])
+    })()
 
-    const refresh = useCallback(async () => {
+    const refresh = async () => {
         if (!bindings?.ListFlows) {
             return
         }
@@ -143,13 +140,13 @@ const WorkflowsDialog = (props: Props) => {
         } catch (e) {
             setError(String(e))
         }
-    }, [bindings, board.id])
+    }
 
     useEffect(() => {
         refresh()
     }, [refresh])
 
-    const startAdd = useCallback(() => {
+    const startAdd = () => {
         setForm({
             name: '',
             property: selectProperties[0]?.name || '',
@@ -158,23 +155,23 @@ const WorkflowsDialog = (props: Props) => {
         })
         setEditingName(null)
         setError('')
-    }, [selectProperties])
+    }
 
     // A route the install ships with, opened in the editor rather than saved
     // behind the user's back: the graph is there to be looked at first.
-    const startFromTemplate = useCallback((flow: Flow) => {
+    const startFromTemplate = (flow: Flow) => {
         setForm({...flow, nodes: [...(flow.nodes || [])], edges: [...(flow.edges || [])]})
         setEditingName(null)
         setError('')
-    }, [])
+    }
 
-    const startEdit = useCallback((flow: Flow) => {
+    const startEdit = (flow: Flow) => {
         setForm({...flow, nodes: [...(flow.nodes || [])], edges: [...(flow.edges || [])]})
         setEditingName(flow.name)
         setError('')
-    }, [])
+    }
 
-    const saveForm = useCallback(async () => {
+    const saveForm = async () => {
         if (!bindings || !form) {
             return
         }
@@ -191,9 +188,9 @@ const WorkflowsDialog = (props: Props) => {
         } catch (e) {
             setError(String(e))
         }
-    }, [bindings, form, editingName, refresh])
+    }
 
-    const removeFlow = useCallback(async (name: string) => {
+    const removeFlow = async (name: string) => {
         if (!bindings?.RemoveFlow) {
             return
         }
@@ -204,7 +201,7 @@ const WorkflowsDialog = (props: Props) => {
         } catch (e) {
             setError(String(e))
         }
-    }, [bindings, refresh])
+    }
 
     const updateForm = (patch: Partial<Flow>) => setForm((f) => (f ? {...f, ...patch} : f))
 

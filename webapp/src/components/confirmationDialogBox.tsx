@@ -73,4 +73,4 @@ export const ConfirmationDialogBox = (props: Props) => {
 }
 
 export default ConfirmationDialogBox
-export {ConfirmationDialogBoxProps}
+export {type ConfirmationDialogBoxProps}

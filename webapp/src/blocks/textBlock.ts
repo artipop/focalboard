@@ -14,4 +14,4 @@ function createTextBlock(block?: Block): TextBlock {
     }
 }
 
-export {TextBlock, createTextBlock}
+export {type TextBlock, createTextBlock}

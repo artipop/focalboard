@@ -1,10 +1,9 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`components/table/TableRow should match snapshot 1`] = `
 <div>
   <div
     class="TableRow octo-table-row"
-    draggable="true"
     style="opacity: 1;"
   >
     <div
@@ -82,7 +81,6 @@ exports[`components/table/TableRow should match snapshot, collapsed tree 1`] = `
 <div>
   <div
     class="TableRow octo-table-row hidden"
-    draggable="true"
     style="opacity: 1;"
   >
     <div
@@ -160,7 +158,6 @@ exports[`components/table/TableRow should match snapshot, display properties 1`]
 <div>
   <div
     class="TableRow octo-table-row"
-    draggable="true"
     style="opacity: 1;"
   >
     <div
@@ -276,7 +273,6 @@ exports[`components/table/TableRow should match snapshot, isSelected 1`] = `
 <div>
   <div
     class="TableRow octo-table-row selected"
-    draggable="true"
     style="opacity: 1;"
   >
     <div
@@ -354,7 +350,6 @@ exports[`components/table/TableRow should match snapshot, read-only 1`] = `
 <div>
   <div
     class="TableRow octo-table-row readonly"
-    draggable="true"
     style="opacity: 1;"
   >
     <div
@@ -403,7 +398,6 @@ exports[`components/table/TableRow should match snapshot, resizing column 1`] = 
 <div>
   <div
     class="TableRow octo-table-row"
-    draggable="true"
     style="opacity: 1;"
   >
     <div

@@ -30,4 +30,4 @@ function createFilterGroup(o?: FilterGroup): FilterGroup {
     }
 }
 
-export {FilterGroup, FilterGroupOperation, createFilterGroup, isAFilterGroupInstance}
+export {type FilterGroup, type FilterGroupOperation, createFilterGroup, isAFilterGroupInstance}

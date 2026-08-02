@@ -10,4 +10,4 @@ interface ITeam {
     readonly updateAt?: number
 }
 
-export {ITeam}
+export {type ITeam}

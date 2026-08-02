@@ -79,10 +79,12 @@ const CardBadges = (props: Props) => {
     const contents = useAppSelector(getCardContents(card.id))
     const comments = useAppSelector(getCardComments(card.id))
     const badges = useMemo(() => calculateBadges(contents, comments), [contents, comments])
+    const intl = useIntl()
+
     if (!hasBadges(badges)) {
         return null
     }
-    const intl = useIntl()
+
     const {checkboxes} = badges
     return (
         <div className={`CardBadges ${className || ''}`}>

@@ -23,12 +23,17 @@ import KanbanCard from './kanbanCard'
 jest.mock('../../mutator')
 jest.mock('../../utils')
 jest.mock('../../telemetry/telemetryClient')
-const mockedUtils = mocked(Utils, true)
-const mockedMutator = mocked(Mutator, true)
+const mockedUtils = mocked(Utils)
+const mockedMutator = mocked(Mutator)
 
 describe('src/components/kanban/kanbanCard', () => {
     const board = TestBlockFactory.createBoard()
     const card = TestBlockFactory.createCard(board)
+
+    // Utils is mocked here, so createGuid returns undefined and the card would
+    // have no id -- which dnd-kit reads as `source?.id === this.id`, i.e. every
+    // card claiming to be the one being dragged. Give it one.
+    card.id = 'card_id_1'
     const propertyTemplate: IPropertyTemplate = {
         id: 'id',
         name: 'name',
@@ -75,6 +80,37 @@ describe('src/components/kanban/kanbanCard', () => {
     }
     const store = mockStateStore([], state)
     beforeEach(jest.clearAllMocks)
+
+    // The native HTML5 attribute, left over from react-dnd's HTML5 backend.
+    // dnd-kit drags on pointer events, and when it finds a natively draggable
+    // element it stands aside for the browser -- it binds `dragstart` to its own
+    // cancel. So the browser began a native drag nobody handles, sent
+    // pointercancel, and dnd-kit called off a drag that had never started: a
+    // pointerdown with nothing after it, not even a pointerup. Whether the
+    // native drag or the five-pixel threshold got there first came down to how
+    // fast the hand moved, which is what made it look random.
+    test('does not offer the card to the browser own drag and drop', () => {
+        const {container} = render(wrapDNDIntl(
+            <ReduxProvider store={store}>
+                <KanbanCard
+                    card={card}
+                    board={board}
+                    visiblePropertyTemplates={[propertyTemplate]}
+                    visibleBadges={false}
+                    isSelected={false}
+                    readonly={false}
+                    onDrop={jest.fn()}
+                    showCard={jest.fn()}
+                    isManualSort={false}
+                    index={0}
+                    groupId='group-1'
+                />
+            </ReduxProvider>,
+        ), {wrapper: MemoryRouter})
+
+        expect(container.querySelector('[draggable="true"]')).toBeNull()
+    })
+
     test('should match snapshot', () => {
         const {container} = render(wrapDNDIntl(
             <ReduxProvider store={store}>
@@ -88,6 +124,8 @@ describe('src/components/kanban/kanbanCard', () => {
                     onDrop={jest.fn()}
                     showCard={jest.fn()}
                     isManualSort={false}
+                    index={0}
+                    groupId='group-1'
                 />
             </ReduxProvider>,
         ), {wrapper: MemoryRouter})
@@ -106,6 +144,8 @@ describe('src/components/kanban/kanbanCard', () => {
                     onDrop={jest.fn()}
                     showCard={jest.fn()}
                     isManualSort={false}
+                    index={0}
+                    groupId='group-1'
                 />
             </ReduxProvider>,
         ), {wrapper: MemoryRouter})
@@ -124,6 +164,8 @@ describe('src/components/kanban/kanbanCard', () => {
                     onDrop={jest.fn()}
                     showCard={jest.fn()}
                     isManualSort={false}
+                    index={0}
+                    groupId='group-1'
                 />
             </ReduxProvider>,
         ), {wrapper: MemoryRouter})
@@ -144,7 +186,7 @@ describe('src/components/kanban/kanbanCard', () => {
         expect(confirmButton).toBeDefined()
         userEvent.click(confirmButton)
 
-        expect(mockedMutator.deleteBlock).toBeCalledWith(card, 'delete card')
+        expect(mockedMutator.deleteBlock).toHaveBeenCalledWith(card, 'delete card')
     })
 
     test('return kanbanCard and click on duplicate menu ', () => {
@@ -160,6 +202,8 @@ describe('src/components/kanban/kanbanCard', () => {
                     onDrop={jest.fn()}
                     showCard={jest.fn()}
                     isManualSort={false}
+                    index={0}
+                    groupId='group-1'
                 />
             </ReduxProvider>,
         ), {wrapper: MemoryRouter})
@@ -170,7 +214,7 @@ describe('src/components/kanban/kanbanCard', () => {
         const elementButtonDuplicate = within(elementMenuWrapper).getByRole('button', {name: 'Duplicate'})
         expect(elementButtonDuplicate).not.toBeNull()
         userEvent.click(elementButtonDuplicate)
-        expect(mockedMutator.duplicateCard).toBeCalledTimes(1)
+        expect(mockedMutator.duplicateCard).toHaveBeenCalledTimes(1)
     })
 
     test('return kanbanCard and click on copy link menu ', () => {
@@ -186,6 +230,8 @@ describe('src/components/kanban/kanbanCard', () => {
                     onDrop={jest.fn()}
                     showCard={jest.fn()}
                     isManualSort={false}
+                    index={0}
+                    groupId='group-1'
                 />
             </ReduxProvider>,
         ), {wrapper: MemoryRouter})
@@ -196,6 +242,6 @@ describe('src/components/kanban/kanbanCard', () => {
         const elementButtonCopyLink = within(elementMenuWrapper).getByRole('button', {name: 'Copy link'})
         expect(elementButtonCopyLink).not.toBeNull()
         userEvent.click(elementButtonCopyLink)
-        expect(mockedUtils.copyTextToClipboard).toBeCalledTimes(1)
+        expect(mockedUtils.copyTextToClipboard).toHaveBeenCalledTimes(1)
     })
 })

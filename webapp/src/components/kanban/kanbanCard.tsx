@@ -1,11 +1,11 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useState, useCallback, useMemo} from 'react'
+import React, {useState} from 'react'
 import {useIntl} from 'react-intl'
 
 import {Board, IPropertyTemplate} from '../../blocks/board'
 import {Card} from '../../blocks/card'
-import {useSortable} from '../../hooks/sortable'
+import {useListSortable} from '../../hooks/sortable'
 import mutator from '../../mutator'
 import TelemetryClient, {TelemetryActions, TelemetryCategory} from '../../telemetry/telemetryClient'
 import {Utils} from '../../utils'
@@ -31,12 +31,18 @@ type Props = {
     onDrop: (srcCard: Card, dstCard: Card) => void
     showCard: (cardId?: string) => void
     isManualSort: boolean
+
+    // Where the card sits, which is what a drag changes: dnd-kit needs the list
+    // and the place in it to tell a move between columns from a reorder within
+    // one, rather than only that something was released over something else.
+    index: number
+    groupId: string
 }
 
 const KanbanCard = (props: Props) => {
     const {card, board} = props
     const intl = useIntl()
-    const [isDragging, isOver, cardRef] = useSortable('card', card, !props.readonly, props.onDrop)
+    const [isDragging, isOver, cardRef] = useListSortable('card', card, !props.readonly, props.onDrop, {id: card.id, index: props.index, group: props.groupId})
     const visiblePropertyTemplates = props.visiblePropertyTemplates || []
     let className = props.isSelected ? 'KanbanCard selected' : 'KanbanCard'
     if (props.isManualSort && isOver) {
@@ -44,16 +50,16 @@ const KanbanCard = (props: Props) => {
     }
 
     const [showConfirmationDialogBox, setShowConfirmationDialogBox] = useState<boolean>(false)
-    const handleDeleteCard = useCallback(() => {
+    const handleDeleteCard = () => {
         if (!card) {
             Utils.assertFailure()
             return
         }
         TelemetryClient.trackEvent(TelemetryCategory, TelemetryActions.DeleteCard, {board: board.id, card: card.id})
         mutator.deleteBlock(card, 'delete card')
-    }, [card, board.id])
+    }
 
-    const confirmDialogProps: ConfirmationDialogBoxProps = useMemo(() => {
+    const confirmDialogProps: ConfirmationDialogBoxProps = (() => {
         return {
             heading: intl.formatMessage({id: 'CardDialog.delete-confirmation-dialog-heading', defaultMessage: 'Confirm card delete!'}),
             confirmButtonText: intl.formatMessage({id: 'CardDialog.delete-confirmation-dialog-button-text', defaultMessage: 'Delete'}),
@@ -62,9 +68,9 @@ const KanbanCard = (props: Props) => {
                 setShowConfirmationDialogBox(false)
             },
         }
-    }, [handleDeleteCard])
+    })()
 
-    const handleDeleteButtonOnClick = useCallback(() => {
+    const handleDeleteButtonOnClick = () => {
         // user trying to delete a card with blank name
         // but content present cannot be deleted without
         // confirmation dialog
@@ -73,20 +79,19 @@ const KanbanCard = (props: Props) => {
             return
         }
         setShowConfirmationDialogBox(true)
-    }, [handleDeleteCard, card.title, card?.fields?.contentOrder?.length])
+    }
 
-    const handleOnClick = useCallback((e: React.MouseEvent) => {
+    const handleOnClick = (e: React.MouseEvent) => {
         if (props.onClick) {
             props.onClick(e, card)
         }
-    }, [props.onClick, card])
+    }
 
     return (
         <>
             <div
-                ref={props.readonly ? () => null : cardRef}
+                ref={props.readonly ? undefined : cardRef}
                 className={`${className}`}
-                draggable={!props.readonly}
                 style={{opacity: isDragging ? 0.5 : 1}}
                 onClick={handleOnClick}
             >

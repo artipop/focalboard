@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {createContext, ReactElement, ReactNode, useContext, useMemo, useState, useCallback} from 'react'
+import React, {createContext, ReactElement, ReactNode, useContext, useState} from 'react'
 
 import {useIntl} from 'react-intl'
 
@@ -44,7 +44,7 @@ export const CardDetailProvider = (props: CardDetailProps): ReactElement => {
         autoAdded: false,
     })
     const {card} = props
-    const addBlock = useCallback(async (handler: ContentHandler, index: number, auto: boolean) => {
+    const addBlock = async (handler: ContentHandler, index: number, auto: boolean) => {
         const block = await handler.createBlock(card.boardId, intl)
         block.parentId = card.id
         block.boardId = card.boardId
@@ -65,9 +65,9 @@ export const CardDetailProvider = (props: CardDetailProps): ReactElement => {
             const insertedBlock = await mutator.insertBlock(block.boardId, block, description, afterRedo, beforeUndo)
             setLastAddedBlock({id: insertedBlock.id, autoAdded: auto})
         })
-    }, [card.boardId, card.id, card.fields.contentOrder])
+    }
 
-    const deleteBlock = useCallback(async (block: Block, index: number) => {
+    const deleteBlock = async (block: Block, index: number) => {
         const contentOrder = card.fields.contentOrder.slice()
         contentOrder.splice(index, 1)
         const description = intl.formatMessage({id: 'ContentBlock.DeleteAction', defaultMessage: 'delete'})
@@ -75,14 +75,14 @@ export const CardDetailProvider = (props: CardDetailProps): ReactElement => {
             await mutator.deleteBlock(block, description)
             await mutator.changeCardContentOrder(card.boardId, card.id, card.fields.contentOrder, contentOrder, description)
         })
-    }, [card.boardId, card.id, card.fields.contentOrder])
+    }
 
-    const contextValue = useMemo(() => ({
+    const contextValue = {
         card,
         lastAddedBlock,
         addBlock,
         deleteBlock,
-    }), [card, lastAddedBlock, addBlock, deleteBlock])
+    }
 
     return (
         <CardDetailContext.Provider value={contextValue}>

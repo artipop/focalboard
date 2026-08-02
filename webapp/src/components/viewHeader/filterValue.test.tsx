@@ -23,7 +23,7 @@ import propsRegistry from '../../properties'
 import FilterValue from './filterValue'
 
 jest.mock('../../mutator')
-const mockedMutator = mocked(mutator, true)
+const mockedMutator = mocked(mutator)
 
 const board = TestBlockFactory.createBoard()
 const activeView = TestBlockFactory.createBoardView(board)
@@ -82,7 +82,7 @@ describe('components/viewHeader/filterValue', () => {
         userEvent.click(buttonElement)
         const switchStatus = screen.getAllByText('Status')[1]
         userEvent.click(switchStatus)
-        expect(mockedMutator.changeViewFilter).toBeCalledTimes(1)
+        expect(mockedMutator.changeViewFilter).toHaveBeenCalledTimes(1)
         expect(container).toMatchSnapshot()
     })
     test('return filterValue and click Status with Status not in filter', () => {
@@ -104,7 +104,7 @@ describe('components/viewHeader/filterValue', () => {
         userEvent.click(buttonElement)
         const switchStatus = screen.getAllByText('Status')[0]
         userEvent.click(switchStatus)
-        expect(mockedMutator.changeViewFilter).toBeCalledTimes(1)
+        expect(mockedMutator.changeViewFilter).toHaveBeenCalledTimes(1)
         expect(container).toMatchSnapshot()
     })
     test('return filterValue and verify that menu is not closed after clicking on the item', () => {

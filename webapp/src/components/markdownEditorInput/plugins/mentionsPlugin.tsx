@@ -11,7 +11,7 @@ import {
 } from '@lexical/react/LexicalTypeaheadMenuPlugin'
 import {$createTextNode, $getSelection, $isRangeSelection, TextNode} from 'lexical'
 
-import {debounce} from 'lodash'
+import debounce from 'lodash/debounce'
 
 import {useAppSelector} from '../../../store/hooks'
 import {IUser} from '../../../user'

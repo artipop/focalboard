@@ -10,8 +10,7 @@ import {Card} from './card'
 
 const BoardTypeOpen = 'O'
 const BoardTypePrivate = 'P'
-const boardTypes = [BoardTypeOpen, BoardTypePrivate]
-type BoardTypes = typeof boardTypes[number]
+type BoardTypes = typeof BoardTypeOpen | typeof BoardTypePrivate
 
 enum MemberRole {
     Viewer = 'viewer',
@@ -314,17 +313,17 @@ function createPatchesFromBoardsAndBlocks(updatedBoard: Board, oldBoard: Board, 
 }
 
 export {
-    Board,
-    BoardPatch,
-    BoardMember,
-    BoardsAndBlocks,
-    BoardsAndBlocksPatch,
-    PropertyTypeEnum,
-    IPropertyOption,
-    IPropertyTemplate,
-    BoardGroup,
+    type Board,
+    type BoardPatch,
+    type BoardMember,
+    type BoardsAndBlocks,
+    type BoardsAndBlocksPatch,
+    type PropertyTypeEnum,
+    type IPropertyOption,
+    type IPropertyTemplate,
+    type BoardGroup,
     createBoard,
-    BoardTypes,
+    type BoardTypes,
     BoardTypeOpen,
     BoardTypePrivate,
     MemberRole,

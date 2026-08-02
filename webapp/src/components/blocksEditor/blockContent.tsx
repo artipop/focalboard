@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React from 'react'
-import {useDrag, useDrop} from 'react-dnd'
+import React, {useId, useRef} from 'react'
+import {useDraggable, useDragOperation, useDroppable} from '@dnd-kit/react'
 
 import GripIcon from '../../widgets/icons/grip'
 
@@ -27,32 +27,46 @@ type Props = {
 function BlockContent(props: Props) {
     const {block, editing, setEditing, onSave, contentOrder, boardId} = props
 
-    const [{isDragging}, drag, preview] = useDrag(() => ({
+    // Kept as raw draggable/droppable rather than useSortable because this block
+    // needs to know *which* block is being dragged while hovering, to say whether
+    // the drop would land above or below it. react-dnd read that off the monitor;
+    // dnd-kit exposes it through the live drag operation.
+    const id = useId()
+    const ref = useRef<HTMLDivElement>(null)
+    const gripRef = useRef<HTMLSpanElement>(null)
+
+    const {isDragging} = useDraggable({
+        id: `block-drag-${id}`,
         type: 'block',
-        item: block,
-        collect: (monitor) => ({
-            isDragging: Boolean(monitor.isDragging()),
-        }),
-    }), [block, contentOrder])
-    const [{isOver, draggingUp}, drop] = useDrop(
-        () => ({
-            accept: 'block',
-            drop: (item: BlockData) => {
-                if (item.id !== block.id) {
-                    if (contentOrder.indexOf(item.id || '') > contentOrder.indexOf(block.id || '')) {
-                        props.onMove(item, block, null)
-                    } else {
-                        props.onMove(item, null, block)
-                    }
+        element: ref,
+        handle: gripRef,
+        data: {item: block},
+    })
+
+    const {isDropTarget} = useDroppable({
+        id: `block-drop-${id}`,
+        type: 'block',
+        accept: 'block',
+        element: ref,
+        data: {
+            item: block,
+            handler: (src: BlockData) => {
+                if (src.id === block.id) {
+                    return
+                }
+                if (contentOrder.indexOf(src.id || '') > contentOrder.indexOf(block.id || '')) {
+                    props.onMove(src, block, null)
+                } else {
+                    props.onMove(src, null, block)
                 }
             },
-            collect: (monitor) => ({
-                isOver: Boolean(monitor.isOver()) && (monitor.getItem() as BlockData).id! !== block.id,
-                draggingUp: (monitor.getItem() as BlockData)?.id && contentOrder.indexOf((monitor.getItem() as BlockData).id!) > contentOrder.indexOf(block.id || ''),
-            }),
-        }),
-        [block, props.onMove, contentOrder],
-    )
+        },
+    })
+
+    const {source} = useDragOperation()
+    const draggedId = (source?.data as {item?: BlockData} | undefined)?.item?.id
+    const isOver = isDropTarget && draggedId !== block.id
+    const draggingUp = Boolean(draggedId) && contentOrder.indexOf(draggedId || '') > contentOrder.indexOf(block.id || '')
 
     if (editing && editing.id === block.id) {
         return (
@@ -75,7 +89,7 @@ function BlockContent(props: Props) {
         const DisplayContent = contentType.Display
         return (
             <div
-                ref={drop}
+                ref={ref}
                 data-testid='block-content'
                 className={`BlockContent ${isOver && draggingUp ? 'over-up' : ''}  ${isOver && !draggingUp ? 'over-down' : ''}`}
                 key={block.id}
@@ -99,14 +113,11 @@ function BlockContent(props: Props) {
                 </span>
                 <span
                     className='action'
-                    ref={drag}
+                    ref={gripRef}
                 >
                     <GripIcon/>
                 </span>
-                <div
-                    className='content'
-                    ref={preview}
-                >
+                <div className='content'>
                     <DisplayContent
                         value={block.value}
                         onChange={() => null}

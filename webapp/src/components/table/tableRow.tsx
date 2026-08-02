@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useEffect, useRef, useState, useMemo, useCallback} from 'react'
+import React, {useEffect, useRef, useState} from 'react'
 import {FormattedMessage, useIntl} from 'react-intl'
 
 import {Card} from '../../blocks/card'
@@ -62,32 +62,30 @@ const TableRow = (props: Props) => {
         }
     }, [])
 
-    const onClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const onClick = (e: React.MouseEvent<HTMLDivElement>) => {
         props.onClick && props.onClick(e, card)
-    }, [card, props.onClick])
+    }
 
-    const onSaveWithEnter = useCallback(() => {
+    const onSaveWithEnter = () => {
         if (props.isLastCard) {
             props.addCard(groupById ? card.fields.properties[groupById!] as string : '')
         }
-    }, [groupById && card.fields.properties[groupById!], props.isLastCard, props.addCard])
+    }
 
-    const onSave = useCallback((saveType) => {
+    const onSave = (saveType: 'onEnter' | 'onEsc' | 'onBlur') => {
         if (card.title !== title) {
             mutator.changeBlockTitle(props.board.id, card.id, card.title, title)
             if (saveType === 'onEnter') {
                 onSaveWithEnter()
             }
         }
-    }, [card.title, title, onSaveWithEnter, board.id, card.id])
+    }
 
-    const onTitleChange = useCallback((newTitle: string) => {
+    const onTitleChange = (newTitle: string) => {
         setTitle(newTitle)
-    }, [title, setTitle])
+    }
 
-    const visiblePropertyTemplates = useMemo(() => (
-        visiblePropertyIds.map((id) => board.cardProperties.find((t) => t.id === id)).filter((i) => i) as IPropertyTemplate[]
-    ), [board.cardProperties, visiblePropertyIds])
+    const visiblePropertyTemplates = visiblePropertyIds.map((id) => board.cardProperties.find((t) => t.id === id)).filter((i) => i) as IPropertyTemplate[]
 
     let className = props.isSelected ? 'TableRow octo-table-row selected' : 'TableRow octo-table-row'
     if (isOver) {
@@ -114,16 +112,16 @@ const TableRow = (props: Props) => {
         className += ' readonly'
     }
 
-    const handleDeleteCard = useCallback(async () => {
+    const handleDeleteCard = async () => {
         if (!card) {
             Utils.assertFailure()
             return
         }
         TelemetryClient.trackEvent(TelemetryCategory, TelemetryActions.DeleteCard, {board: board.id, card: card.id})
         await mutator.deleteBlock(card, 'delete card')
-    }, [card, board.id])
+    }
 
-    const confirmDialogProps: ConfirmationDialogBoxProps = useMemo(() => {
+    const confirmDialogProps: ConfirmationDialogBoxProps = (() => {
         return {
             heading: intl.formatMessage({id: 'CardDialog.delete-confirmation-dialog-heading', defaultMessage: 'Confirm card delete!'}),
             confirmButtonText: intl.formatMessage({id: 'CardDialog.delete-confirmation-dialog-button-text', defaultMessage: 'Delete'}),
@@ -132,9 +130,9 @@ const TableRow = (props: Props) => {
                 setShowConfirmationDialogBox(false)
             },
         }
-    }, [handleDeleteCard])
+    })()
 
-    const handleDeleteButtonOnClick = useCallback(() => {
+    const handleDeleteButtonOnClick = () => {
         // user trying to delete a card with blank name
         // but content present cannot be deleted without
         // confirmation dialog
@@ -143,7 +141,7 @@ const TableRow = (props: Props) => {
             return
         }
         setShowConfirmationDialogBox(true)
-    }, [card.title, card.fields.contentOrder, handleDeleteCard])
+    }
 
     return (
         <div

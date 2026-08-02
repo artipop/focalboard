@@ -1,9 +1,10 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useCallback, useRef, useState} from 'react'
+import React, {type JSX, useRef, useState} from 'react'
 import {useIntl} from 'react-intl'
 import {generatePath, useHistory, useRouteMatch} from 'react-router-dom'
-import {Draggable} from 'react-beautiful-dnd'
+import {useSortable} from '@dnd-kit/react/sortable'
+import {SortableKeyboardPlugin} from '@dnd-kit/dom/sortable'
 
 import {Board} from '../../blocks/board'
 import {BoardView, IViewType} from '../../blocks/boardView'
@@ -99,7 +100,7 @@ const SidebarBoardItem = (props: Props) => {
 
     const board = props.board
 
-    const handleDuplicateBoard = useCallback(async (asTemplate: boolean) => {
+    const handleDuplicateBoard = async (asTemplate: boolean) => {
         const blocksAndBoards = await mutator.duplicateBoard(
             board.id,
             undefined,
@@ -138,7 +139,7 @@ const SidebarBoardItem = (props: Props) => {
         }
 
         Utils.showBoard(boardId, match, history)
-    }, [board.id])
+    }
 
     const showTemplatePicker = () => {
         // if the same board, reuse the match params
@@ -192,124 +193,125 @@ const SidebarBoardItem = (props: Props) => {
 
     const boardItemRef = useRef<HTMLDivElement>(null)
 
+    const {ref, isDragging} = useSortable({
+        id: props.board.id,
+        index: props.index,
+        group: props.categoryBoards.id,
+        type: 'board',
+        accept: 'board',
+
+        // Left out everywhere, not only here: see hooks/sortable.tsx.
+        plugins: [SortableKeyboardPlugin],
+    })
+
     const title = board.title || intl.formatMessage({id: 'Sidebar.untitled-board', defaultMessage: '(Untitled Board)'})
     return (
-        <Draggable
-            draggableId={props.board.id}
-            key={props.board.id}
-            index={props.index}
+        <div
+            ref={ref}
         >
-            {(provided, snapshot) => (
-                <div
-                    {...provided.draggableProps}
-                    ref={provided.innerRef}
-                >
-                    <div
-                        {...provided.dragHandleProps}
-                        className={`SidebarBoardItem subitem ${props.isActive ? 'active' : ''}`}
-                        onClick={() => props.showBoard(board.id)}
-                        ref={boardItemRef}
-                    >
-                        <div className='octo-sidebar-icon'>
-                            {board.icon || <CompassIcon icon='product-boards'/>}
-                        </div>
-                        <div
-                            className='octo-sidebar-title'
-                            title={title}
-                        >
-                            {title}
-                        </div>
-                        <div>
-                            <MenuWrapper
-                                className={boardsMenuOpen[board.id] ? 'menuOpen' : 'x'}
-                                stopPropagationOnToggle={true}
-                                onToggle={(open) => {
-                                    setBoardsMenuOpen((menuState) => {
-                                        const newState = {...menuState}
-                                        newState[board.id] = open
-                                        return newState
-                                    })
-                                }}
-                            >
-                                <IconButton icon={<OptionsIcon/>}/>
-                                <Menu
-                                    fixed={true}
-                                    position='auto'
-                                    parentRef={boardItemRef}
-                                >
-                                    <Menu.SubMenu
-                                        key={`moveBlock-${board.id}`}
-                                        id='moveBlock'
-                                        className='boardMoveToCategorySubmenu'
-                                        name={intl.formatMessage({id: 'SidebarCategories.BlocksMenu.Move', defaultMessage: 'Move To...'})}
-                                        icon={<CreateNewFolder/>}
-                                        position='auto'
-                                    >
-                                        {generateMoveToCategoryOptions(board.id)}
-                                    </Menu.SubMenu>
-                                    {!me?.is_guest &&
-                                        <Menu.Text
-                                            id='duplicateBoard'
-                                            name={intl.formatMessage({id: 'Sidebar.duplicate-board', defaultMessage: 'Duplicate board'})}
-                                            icon={<DuplicateIcon/>}
-                                            onClick={() => handleDuplicateBoard(board.isTemplate)}
-                                        />}
-                                    {!me?.is_guest &&
-                                        <Menu.Text
-                                            id='templateFromBoard'
-                                            name={intl.formatMessage({id: 'Sidebar.template-from-board', defaultMessage: 'New template from board'})}
-                                            icon={<AddIcon/>}
-                                            onClick={() => handleDuplicateBoard(true)}
-                                        />}
-                                    <Menu.Text
-                                        id='exportBoardArchive'
-                                        name={intl.formatMessage({id: 'ViewHeader.export-board-archive', defaultMessage: 'Export board archive'})}
-                                        icon={<CompassIcon icon='export-variant'/>}
-                                        onClick={() => Archiver.exportBoardArchive(board)}
-                                    />
-                                    <Menu.Text
-                                        id='hideBoard'
-                                        name={intl.formatMessage({id: 'HideBoard.MenuOption', defaultMessage: 'Hide board'})}
-                                        icon={<CloseIcon/>}
-                                        onClick={() => handleHideBoard()}
-                                    />
-                                    <BoardPermissionGate
-                                        boardId={board.id}
-                                        permissions={[Permission.DeleteBoard]}
-                                    >
-                                        <Menu.Text
-                                            key={`deleteBlock-${board.id}`}
-                                            id='deleteBlock'
-                                            className='text-danger'
-                                            name={intl.formatMessage({id: 'Sidebar.delete-board', defaultMessage: 'Delete board'})}
-                                            icon={<DeleteIcon/>}
-                                            onClick={() => {
-                                                props.onDeleteRequest(board)
-                                            }}
-                                        />
-                                    </BoardPermissionGate>
-                                </Menu>
-                            </MenuWrapper>
-                        </div>
-                    </div>
-                    {props.isActive && !snapshot.isDragging && !props.hideViews && boardViews.map((view: BoardView) => (
-                        <div
-                            key={view.id}
-                            className={`SidebarBoardItem sidebar-view-item ${view.id === currentViewId ? 'active' : ''}`}
-                            onClick={() => props.showView(view.id, board.id)}
-                        >
-                            {iconForViewType(view.fields.viewType)}
-                            <div
-                                className='octo-sidebar-title'
-                                title={view.title || intl.formatMessage({id: 'Sidebar.untitled-view', defaultMessage: '(Untitled View)'})}
-                            >
-                                {view.title || intl.formatMessage({id: 'Sidebar.untitled-view', defaultMessage: '(Untitled View)'})}
-                            </div>
-                        </div>
-                    ))}
+            <div
+                ref={boardItemRef}
+                className={`SidebarBoardItem subitem ${props.isActive ? 'active' : ''}`}
+                onClick={() => props.showBoard(board.id)}
+            >
+                <div className='octo-sidebar-icon'>
+                    {board.icon || <CompassIcon icon='product-boards'/>}
                 </div>
-            )}
-        </Draggable>
+                <div
+                    className='octo-sidebar-title'
+                    title={title}
+                >
+                    {title}
+                </div>
+                <div>
+                    <MenuWrapper
+                        className={boardsMenuOpen[board.id] ? 'menuOpen' : 'x'}
+                        stopPropagationOnToggle={true}
+                        onToggle={(open) => {
+                            setBoardsMenuOpen((menuState) => {
+                                const newState = {...menuState}
+                                newState[board.id] = open
+                                return newState
+                            })
+                        }}
+                    >
+                        <IconButton icon={<OptionsIcon/>}/>
+                        <Menu
+                            fixed={true}
+                            position='auto'
+                            parentRef={boardItemRef}
+                        >
+                            <Menu.SubMenu
+                                key={`moveBlock-${board.id}`}
+                                id='moveBlock'
+                                className='boardMoveToCategorySubmenu'
+                                name={intl.formatMessage({id: 'SidebarCategories.BlocksMenu.Move', defaultMessage: 'Move To...'})}
+                                icon={<CreateNewFolder/>}
+                                position='auto'
+                            >
+                                {generateMoveToCategoryOptions(board.id)}
+                            </Menu.SubMenu>
+                            {!me?.is_guest &&
+                                <Menu.Text
+                                    id='duplicateBoard'
+                                    name={intl.formatMessage({id: 'Sidebar.duplicate-board', defaultMessage: 'Duplicate board'})}
+                                    icon={<DuplicateIcon/>}
+                                    onClick={() => handleDuplicateBoard(board.isTemplate)}
+                                />}
+                            {!me?.is_guest &&
+                                <Menu.Text
+                                    id='templateFromBoard'
+                                    name={intl.formatMessage({id: 'Sidebar.template-from-board', defaultMessage: 'New template from board'})}
+                                    icon={<AddIcon/>}
+                                    onClick={() => handleDuplicateBoard(true)}
+                                />}
+                            <Menu.Text
+                                id='exportBoardArchive'
+                                name={intl.formatMessage({id: 'ViewHeader.export-board-archive', defaultMessage: 'Export board archive'})}
+                                icon={<CompassIcon icon='export-variant'/>}
+                                onClick={() => Archiver.exportBoardArchive(board)}
+                            />
+                            <Menu.Text
+                                id='hideBoard'
+                                name={intl.formatMessage({id: 'HideBoard.MenuOption', defaultMessage: 'Hide board'})}
+                                icon={<CloseIcon/>}
+                                onClick={() => handleHideBoard()}
+                            />
+                            <BoardPermissionGate
+                                boardId={board.id}
+                                permissions={[Permission.DeleteBoard]}
+                            >
+                                <Menu.Text
+                                    key={`deleteBlock-${board.id}`}
+                                    id='deleteBlock'
+                                    className='text-danger'
+                                    name={intl.formatMessage({id: 'Sidebar.delete-board', defaultMessage: 'Delete board'})}
+                                    icon={<DeleteIcon/>}
+                                    onClick={() => {
+                                        props.onDeleteRequest(board)
+                                    }}
+                                />
+                            </BoardPermissionGate>
+                        </Menu>
+                    </MenuWrapper>
+                </div>
+            </div>
+            {props.isActive && !isDragging && !props.hideViews && boardViews.map((view: BoardView) => (
+                <div
+                    key={view.id}
+                    className={`SidebarBoardItem sidebar-view-item ${view.id === currentViewId ? 'active' : ''}`}
+                    onClick={() => props.showView(view.id, board.id)}
+                >
+                    {iconForViewType(view.fields.viewType)}
+                    <div
+                        className='octo-sidebar-title'
+                        title={view.title || intl.formatMessage({id: 'Sidebar.untitled-view', defaultMessage: '(Untitled View)'})}
+                    >
+                        {view.title || intl.formatMessage({id: 'Sidebar.untitled-view', defaultMessage: '(Untitled View)'})}
+                    </div>
+                </div>
+            ))}
+        </div>
     )
 }
 

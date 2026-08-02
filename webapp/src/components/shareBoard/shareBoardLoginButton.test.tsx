@@ -34,7 +34,7 @@ describe('src/components/shareBoard/shareBoardLoginButton', () => {
     const savedLocation = window.location
 
     afterEach(() => {
-        window.location = savedLocation
+        window.location = savedLocation as string & Location
     })
 
     test('should match snapshot', async () => {

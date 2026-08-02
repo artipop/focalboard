@@ -28,9 +28,9 @@ jest.mock('../octoClient')
 beforeAll(mockDOM)
 
 describe('components/contentBlock', () => {
-    const mockedMutator = mocked(mutator, true)
-    const mockedUtils = mocked(Utils, true)
-    const mockedOcto = mocked(octoClient, true)
+    const mockedMutator = mocked(mutator)
+    const mockedUtils = mocked(Utils)
+    const mockedOcto = mocked(octoClient)
 
     mockedUtils.createGuid.mockReturnValue('test-id')
     mockedOcto.getFileAsDataUrl.mockResolvedValue({url: 'test.jpg'})
@@ -229,8 +229,8 @@ describe('components/contentBlock', () => {
         userEvent.click(buttonElement)
         const buttonMoveUp = screen.getByRole('button', {name: 'Move up'})
         userEvent.click(buttonMoveUp)
-        expect(mockedUtils.arrayMove).toBeCalledTimes(1)
-        expect(mockedMutator.changeCardContentOrder).toBeCalledTimes(1)
+        expect(mockedUtils.arrayMove).toHaveBeenCalledTimes(1)
+        expect(mockedMutator.changeCardContentOrder).toHaveBeenCalledTimes(1)
     })
 
     test('return commentBlock and click move down', async () => {
@@ -250,8 +250,8 @@ describe('components/contentBlock', () => {
         userEvent.click(buttonElement)
         const buttonMoveUp = screen.getByRole('button', {name: 'Move down'})
         userEvent.click(buttonMoveUp)
-        expect(mockedUtils.arrayMove).toBeCalledTimes(1)
-        expect(mockedMutator.changeCardContentOrder).toBeCalledTimes(1)
+        expect(mockedUtils.arrayMove).toHaveBeenCalledTimes(1)
+        expect(mockedMutator.changeCardContentOrder).toHaveBeenCalledTimes(1)
     })
 
     test('return commentBlock and click delete', async () => {
@@ -271,7 +271,7 @@ describe('components/contentBlock', () => {
         userEvent.click(buttonElement)
         const buttonMoveUp = screen.getByRole('button', {name: 'Delete'})
         userEvent.click(buttonMoveUp)
-        expect(mockedMutator.performAsUndoGroup).toBeCalledTimes(1)
+        expect(mockedMutator.performAsUndoGroup).toHaveBeenCalledTimes(1)
     })
 
     test('return commentBlock and click delete with another contentOrder', async () => {
@@ -292,6 +292,6 @@ describe('components/contentBlock', () => {
         userEvent.click(buttonElement)
         const buttonMoveUp = screen.getByRole('button', {name: 'Delete'})
         userEvent.click(buttonMoveUp)
-        expect(mockedMutator.performAsUndoGroup).toBeCalledTimes(1)
+        expect(mockedMutator.performAsUndoGroup).toHaveBeenCalledTimes(1)
     })
 })

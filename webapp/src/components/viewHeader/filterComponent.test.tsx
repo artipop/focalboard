@@ -20,7 +20,7 @@ import {wrapIntl, mockStateStore} from '../../testUtils'
 import FilterComponenet from './filterComponent'
 
 jest.mock('../../mutator')
-const mockedMutator = mocked(mutator, true)
+const mockedMutator = mocked(mutator)
 
 const board = TestBlockFactory.createBoard()
 const activeView = TestBlockFactory.createBoardView(board)
@@ -84,7 +84,7 @@ describe('components/viewHeader/filterComponent', () => {
         expect(container).toMatchSnapshot()
         const buttonAdd = screen.getByText('+ Add filter')
         userEvent.click(buttonAdd)
-        expect(mockedMutator.changeViewFilter).toBeCalledTimes(1)
+        expect(mockedMutator.changeViewFilter).toHaveBeenCalledTimes(1)
     })
 
     test('return filterComponent and filter by status', () => {
@@ -105,7 +105,7 @@ describe('components/viewHeader/filterComponent', () => {
         expect(container).toMatchSnapshot()
         const buttonStatus = screen.getByRole('button', {name: 'Status'})
         userEvent.click(buttonStatus)
-        expect(mockedMutator.changeViewFilter).toBeCalledTimes(1)
+        expect(mockedMutator.changeViewFilter).toHaveBeenCalledTimes(1)
     })
 
     test('return filterComponent and click is empty', () => {
@@ -125,6 +125,6 @@ describe('components/viewHeader/filterComponent', () => {
         expect(container).toMatchSnapshot()
         const buttonNotInclude = screen.getByRole('button', {name: 'is empty'})
         userEvent.click(buttonNotInclude)
-        expect(mockedMutator.changeViewFilter).toBeCalledTimes(1)
+        expect(mockedMutator.changeViewFilter).toHaveBeenCalledTimes(1)
     })
 })

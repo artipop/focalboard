@@ -1,10 +1,11 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {useCallback, useMemo, useState} from 'react'
+import React, {type JSX, useState} from 'react'
 import {useIntl} from 'react-intl'
 
-import FullCalendar, {EventChangeArg, EventInput, EventContentArg, DayCellContentArg} from '@fullcalendar/react'
+import FullCalendar from '@fullcalendar/react'
+import {EventChangeArg, EventInput, EventContentArg, DayCellContentArg} from '@fullcalendar/core'
 
 import interactionPlugin from '@fullcalendar/interaction'
 import dayGridPlugin from '@fullcalendar/daygrid'
@@ -79,51 +80,47 @@ const CalendarFullView = (props: Props): JSX.Element|null => {
     const [showConfirmationDialogBox, setShowConfirmationDialogBox] = useState<boolean>(false)
     const [cardItem, setCardItem] = useState<Card>()
 
-    const visiblePropertyTemplates = useMemo(() => (
-        board.cardProperties.filter((template: IPropertyTemplate) => activeView.fields.visiblePropertyIds.includes(template.id))
-    ), [board.cardProperties, activeView.fields.visiblePropertyIds])
+    const visiblePropertyTemplates = board.cardProperties.filter((template: IPropertyTemplate) => activeView.fields.visiblePropertyIds.includes(template.id))
 
     let {initialDate} = props
     if (!initialDate) {
         initialDate = new Date()
     }
 
-    const isEditable = useCallback((): boolean => {
+    const isEditable = (): boolean => {
         if (readonly || !dateDisplayProperty || propsRegistry.get(dateDisplayProperty.type).isReadOnly) {
             return false
         }
         return true
-    }, [readonly, dateDisplayProperty])
+    }
 
-    const myEventsList = useMemo(() => (
-        cards.flatMap((card): EventInput[] => {
-            const property = propsRegistry.get(dateDisplayProperty?.type || 'unknown')
+    const myEventsList = cards.flatMap((card): EventInput[] => {
+        const property = propsRegistry.get(dateDisplayProperty?.type || 'unknown')
 
-            let dateFrom = new Date(card.createAt || 0)
-            let dateTo = new Date(card.createAt || 0)
-            if (property instanceof DatePropertyType) {
-                const dateFromValue = property.getDateFrom(card.fields.properties[dateDisplayProperty?.id || ''], card)
-                if (!dateFromValue) {
-                    return []
-                }
-                dateFrom = dateFromValue
-                const dateToValue = property.getDateTo(card.fields.properties[dateDisplayProperty?.id || ''], card)
-                dateTo = dateToValue || new Date(dateFrom)
-
-                //full calendar end date is exclusive, so increment by 1 day.
-                dateTo.setDate(dateTo.getDate() + 1)
+        let dateFrom = new Date(card.createAt || 0)
+        let dateTo = new Date(card.createAt || 0)
+        if (property instanceof DatePropertyType) {
+            const dateFromValue = property.getDateFrom(card.fields.properties[dateDisplayProperty?.id || ''], card)
+            if (!dateFromValue) {
+                return []
             }
-            return [{
-                id: card.id,
-                title: card.title,
-                extendedProps: {icon: card.fields.icon},
-                properties: card.fields.properties,
-                allDay: true,
-                start: dateFrom,
-                end: dateTo,
-            }]
-        })
-    ), [cards, dateDisplayProperty])
+            dateFrom = dateFromValue
+            const dateToValue = property.getDateTo(card.fields.properties[dateDisplayProperty?.id || ''], card)
+            dateTo = dateToValue || new Date(dateFrom)
+
+            //full calendar end date is exclusive, so increment by 1 day.
+            dateTo.setDate(dateTo.getDate() + 1)
+        }
+        return [{
+            id: card.id,
+            title: card.title,
+            extendedProps: {icon: card.fields.icon},
+            properties: card.fields.properties,
+            allDay: true,
+            start: dateFrom,
+            end: dateTo,
+        }]
+    })
 
     const visibleBadges = activeView.fields.visiblePropertyIds.includes(Constants.badgesColumnId)
 
@@ -132,15 +129,15 @@ const CalendarFullView = (props: Props): JSX.Element|null => {
         setCardItem(card)
     }
 
-    const handleDeleteCard = useCallback(() => {
+    const handleDeleteCard = () => {
         if (!cardItem) {
             return
         }
         mutator.deleteBlock(cardItem, 'delete card')
         setShowConfirmationDialogBox(false)
-    }, [cardItem, board.id])
+    }
 
-    const confirmDialogProps: ConfirmationDialogBoxProps = useMemo(() => {
+    const confirmDialogProps: ConfirmationDialogBoxProps = (() => {
         return {
             heading: intl.formatMessage({id: 'CardDialog.delete-confirmation-dialog-heading', defaultMessage: 'Confirm card delete!'}),
             confirmButtonText: intl.formatMessage({id: 'CardDialog.delete-confirmation-dialog-button-text', defaultMessage: 'Delete'}),
@@ -149,7 +146,7 @@ const CalendarFullView = (props: Props): JSX.Element|null => {
                 setShowConfirmationDialogBox(false)
             },
         }
-    }, [handleDeleteCard])
+    })()
 
     const renderEventContent = (eventProps: EventContentArg): JSX.Element|null => {
         const {event} = eventProps
@@ -205,7 +202,7 @@ const CalendarFullView = (props: Props): JSX.Element|null => {
         )
     }
 
-    const eventChange = useCallback((eventProps: EventChangeArg) => {
+    const eventChange = (eventProps: EventChangeArg) => {
         const {event} = eventProps
         if (!event.start) {
             return
@@ -221,9 +218,9 @@ const CalendarFullView = (props: Props): JSX.Element|null => {
         if (card && dateDisplayProperty) {
             mutator.changePropertyValue(board.id, card, dateDisplayProperty.id, JSON.stringify(dateProperty))
         }
-    }, [cards, dateDisplayProperty])
+    }
 
-    const onNewEvent = useCallback((args: {start: Date, end: Date}) => {
+    const onNewEvent = (args: {start: Date, end: Date}) => {
         let dateProperty: DateProperty
         if (args.start === args.end) {
             dateProperty = createDatePropertyFromCalendarDate(args.start)
@@ -240,21 +237,21 @@ const CalendarFullView = (props: Props): JSX.Element|null => {
         }
 
         props.addCard(properties)
-    }, [props.addCard, dateDisplayProperty])
+    }
 
-    const toolbar = useMemo(() => ({
+    const toolbar = {
         left: 'title',
         center: '',
         right: 'dayGridWeek dayGridMonth prev,today,next',
-    }), [])
+    }
 
-    const buttonText = useMemo(() => ({
+    const buttonText = {
         today: intl.formatMessage({id: 'calendar.today', defaultMessage: 'TODAY'}),
         month: intl.formatMessage({id: 'calendar.month', defaultMessage: 'Month'}),
         week: intl.formatMessage({id: 'calendar.week', defaultMessage: 'Week'}),
-    }), [])
+    }
 
-    const dayCellContent = useCallback((args: DayCellContentArg): JSX.Element|null => {
+    const dayCellContent = (args: DayCellContentArg): JSX.Element|null => {
         return (
             <div className={'dateContainer ' + (canAddCards ? 'with-plus' : '')}>
                 <div
@@ -268,7 +265,7 @@ const CalendarFullView = (props: Props): JSX.Element|null => {
                 </div>
             </div>
         )
-    }, [dateDisplayProperty, canAddCards])
+    }
 
     return (
         <div

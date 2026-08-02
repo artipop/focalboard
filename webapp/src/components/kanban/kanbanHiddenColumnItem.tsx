@@ -1,9 +1,8 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-/* eslint-disable max-lines */
-import React from 'react'
+
+import React, {type JSX} from 'react'
 import {IntlShape} from 'react-intl'
-import {useDrop} from 'react-dnd'
 
 import mutator from '../../mutator'
 import Menu from '../../widgets/menu'
@@ -15,6 +14,7 @@ import {BoardGroup} from '../../blocks/board'
 import {BoardView} from '../../blocks/boardView'
 
 import Button from '../../widgets/buttons/button'
+import {useDropZone} from '../../hooks/sortable'
 
 type Props = {
     activeView: BoardView
@@ -28,15 +28,7 @@ export default function KanbanHiddenColumnItem(props: Props): JSX.Element {
     const {activeView, intl, group} = props
     const hiddenCardGroupId = 'hidden-card-group-id'
 
-    const [{isOver}, drop] = useDrop(() => ({
-        accept: 'card',
-        collect: (monitor) => ({
-            isOver: monitor.isOver(),
-        }),
-        drop: (item: Card) => {
-            props.onDrop(item)
-        },
-    }), [props.onDrop])
+    const [isOver, drop] = useDropZone<Card>('card', true, props.onDrop)
 
     let className = 'octo-board-hidden-item'
     if (isOver) {

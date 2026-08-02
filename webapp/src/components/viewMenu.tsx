@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useCallback} from 'react'
-import {injectIntl, IntlShape} from 'react-intl'
+import React from 'react'
+import {useIntl} from 'react-intl'
 import {generatePath, useHistory, useRouteMatch} from 'react-router-dom'
 
 import {Board, IPropertyTemplate} from '../blocks/board'
@@ -27,23 +27,23 @@ type Props = {
     board: Board
     activeView: BoardView
     views: BoardView[]
-    intl: IntlShape
     readonly: boolean
 }
 
 const ViewMenu = (props: Props) => {
+    const intl = useIntl()
     const history = useHistory()
     const match = useRouteMatch()
 
-    const showView = useCallback((viewId) => {
+    const showView = (viewId: string) => {
         let newPath = generatePath(Utils.getBoardPagePath(match.path), {...match.params, viewId: viewId || ''})
         if (props.readonly) {
             newPath += `?r=${Utils.getReadToken()}`
         }
         history.push(newPath)
-    }, [match, history])
+    }
 
-    const handleDuplicateView = useCallback(() => {
+    const handleDuplicateView = () => {
         const {board, activeView} = props
         Utils.log('duplicateView')
 
@@ -66,9 +66,9 @@ const ViewMenu = (props: Props) => {
                 showView(currentViewId)
             },
         )
-    }, [props.activeView, showView])
+    }
 
-    const handleDeleteView = useCallback(() => {
+    const handleDeleteView = () => {
         const {board, activeView, views} = props
         Utils.log('deleteView')
         TelemetryClient.trackEvent(TelemetryCategory, TelemetryActions.DeleteBoardView, {board: board.id, view: activeView.id})
@@ -78,9 +78,9 @@ const ViewMenu = (props: Props) => {
         if (nextView) {
             showView(nextView.id)
         }
-    }, [props.views, props.activeView, showView])
+    }
 
-    const handleViewClick = useCallback((id: string) => {
+    const handleViewClick = (id: string) => {
         const {views} = props
         Utils.log('view ' + id)
         const view = views.find((o) => o.id === id)
@@ -88,10 +88,10 @@ const ViewMenu = (props: Props) => {
         if (view) {
             showView(view.id)
         }
-    }, [props.views, showView])
+    }
 
-    const handleAddViewBoard = useCallback(() => {
-        const {board, activeView, intl} = props
+    const handleAddViewBoard = () => {
+        const {board, activeView} = props
         Utils.log('addview-board')
 
         TelemetryClient.trackEvent(TelemetryCategory, TelemetryActions.CreateBoardView, {board: board.id, view: activeView.id})
@@ -115,10 +115,10 @@ const ViewMenu = (props: Props) => {
             async () => {
                 showView(oldViewId)
             })
-    }, [props.activeView, props.board, props.intl, showView])
+    }
 
-    const handleAddViewTable = useCallback(() => {
-        const {board, activeView, intl} = props
+    const handleAddViewTable = () => {
+        const {board, activeView} = props
 
         Utils.log('addview-table')
 
@@ -146,10 +146,10 @@ const ViewMenu = (props: Props) => {
             async () => {
                 showView(oldViewId)
             })
-    }, [props.activeView, props.board, props.intl, showView])
+    }
 
-    const handleAddViewGallery = useCallback(() => {
-        const {board, activeView, intl} = props
+    const handleAddViewGallery = () => {
+        const {board, activeView} = props
 
         Utils.log('addview-gallery')
 
@@ -175,10 +175,10 @@ const ViewMenu = (props: Props) => {
             async () => {
                 showView(oldViewId)
             })
-    }, [props.board, props.activeView, props.intl, showView])
+    }
 
-    const handleAddViewCalendar = useCallback(() => {
-        const {board, activeView, intl} = props
+    const handleAddViewCalendar = () => {
+        const {board, activeView} = props
 
         Utils.log('addview-calendar')
 
@@ -208,9 +208,9 @@ const ViewMenu = (props: Props) => {
             async () => {
                 showView(oldViewId)
             })
-    }, [props.board, props.activeView, props.intl, showView])
+    }
 
-    const {views, intl} = props
+    const {views} = props
 
     const duplicateViewText = intl.formatMessage({
         id: 'View.DuplicateView',
@@ -324,4 +324,4 @@ const ViewMenu = (props: Props) => {
     )
 }
 
-export default injectIntl(React.memo(ViewMenu))
+export default React.memo(ViewMenu)

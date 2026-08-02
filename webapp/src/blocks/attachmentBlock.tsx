@@ -25,4 +25,4 @@ function createAttachmentBlock(block?: Block): AttachmentBlock {
     }
 }
 
-export {AttachmentBlock, createAttachmentBlock}
+export {type AttachmentBlock, createAttachmentBlock}

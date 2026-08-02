@@ -16,9 +16,7 @@ import configureStore from 'redux-mock-store'
 
 import {mocked} from 'jest-mock'
 
-import thunk from 'redux-thunk'
-
-import {wrapIntl} from '../../testUtils'
+import {wrapIntl, mockThunk as thunk} from '../../testUtils'
 
 import mutator from '../../mutator'
 
@@ -32,10 +30,10 @@ const w = (window as any)
 const oldBaseURL = w.baseURL
 
 jest.mock('../../mutator')
-const mockedMutator = mocked(mutator, true)
+const mockedMutator = mocked(mutator)
 
 jest.mock('../../octoClient')
-const mockedOctoClient = mocked(octoClient, true)
+const mockedOctoClient = mocked(octoClient)
 
 beforeEach(() => {
     jest.resetAllMocks()
@@ -136,8 +134,8 @@ describe('pages/welcome', () => {
         expect(exploreButton).toBeDefined()
         userEvent.click(exploreButton)
         await waitFor(() => {
-            expect(history.replace).toBeCalledWith('/team/team_id_1')
-            expect(mockedMutator.patchUserConfig).toBeCalledTimes(1)
+            expect(history.replace).toHaveBeenCalledWith('/team/team_id_1')
+            expect(mockedMutator.patchUserConfig).toHaveBeenCalledTimes(1)
         })
     })
 
@@ -169,7 +167,7 @@ describe('pages/welcome', () => {
 
         render(component)
         await waitFor(() => {
-            expect(history.replace).toBeCalledWith('/team/team_id_1')
+            expect(history.replace).toHaveBeenCalledWith('/team/team_id_1')
         })
     })
 
@@ -202,7 +200,7 @@ describe('pages/welcome', () => {
 
         render(component)
         await waitFor(() => {
-            expect(history.replace).toBeCalledWith('123')
+            expect(history.replace).toHaveBeenCalledWith('123')
         })
     })
 
@@ -237,8 +235,8 @@ describe('pages/welcome', () => {
         expect(exploreButton).toBeDefined()
         userEvent.click(exploreButton)
         await waitFor(() => {
-            expect(history.replace).toBeCalledWith('123')
-            expect(mockedMutator.patchUserConfig).toBeCalledTimes(1)
+            expect(history.replace).toHaveBeenCalledWith('123')
+            expect(mockedMutator.patchUserConfig).toHaveBeenCalledTimes(1)
         })
     })
 
@@ -262,8 +260,8 @@ describe('pages/welcome', () => {
         const exploreButton = screen.getByText('Take a tour')
         expect(exploreButton).toBeDefined()
         userEvent.click(exploreButton)
-        await waitFor(() => expect(mockedOctoClient.prepareOnboarding).toBeCalledTimes(1))
-        await waitFor(() => expect(history.replace).toBeCalledWith('/team/team_id_1/board_id_1'))
+        await waitFor(() => expect(mockedOctoClient.prepareOnboarding).toHaveBeenCalledTimes(1))
+        await waitFor(() => expect(history.replace).toHaveBeenCalledWith('/team/team_id_1/board_id_1'))
     })
 
     test('Welcome page skips tour on clicking no thanks option', async () => {
@@ -286,6 +284,6 @@ describe('pages/welcome', () => {
         const exploreButton = screen.getByText('No thanks, I\'ll figure it out myself')
         expect(exploreButton).toBeDefined()
         userEvent.click(exploreButton)
-        await waitFor(() => expect(history.replace).toBeCalledWith('/team/team_id_1'))
+        await waitFor(() => expect(history.replace).toHaveBeenCalledWith('/team/team_id_1'))
     })
 })

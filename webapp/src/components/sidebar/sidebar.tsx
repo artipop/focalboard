@@ -2,7 +2,8 @@
 // See LICENSE.txt for license information.
 import React, {useCallback, useEffect, useState} from 'react'
 import {FormattedMessage} from 'react-intl'
-import {DragDropContext, Droppable, DropResult} from 'react-beautiful-dnd'
+import {useDragDropMonitor} from '@dnd-kit/react'
+import {isSortable} from '@dnd-kit/react/sortable'
 
 import {getActiveThemeName, loadTheme} from '../../theme'
 import IconButton from '../../widgets/buttons/iconButton'
@@ -63,6 +64,15 @@ function getWindowDimensions() {
         width,
         height,
     }
+}
+
+// The shape react-beautiful-dnd reported a drop with. The handlers below are
+// written against it, so it outlives the library that named it.
+type DropResult = {
+    draggableId: string
+    type: string
+    source: {index: number, droppableId: string}
+    destination?: {index: number, droppableId: string}
 }
 
 const Sidebar = (props: Props) => {
@@ -162,10 +172,6 @@ const Sidebar = (props: Props) => {
             websocketClient.removeOnChange(onCategoryReorderHandler, 'categoryOrder')
         }
     }, [teamId])
-
-    if (!boards) {
-        return <div/>
-    }
 
     const hideSidebar = () => {
         if (!userHidden) {
@@ -285,6 +291,46 @@ const Sidebar = (props: Props) => {
         setIsCategoryBeingDragged(false)
     }, [team, sidebarCategories])
 
+    useDragDropMonitor({
+        onDragEnd(event) {
+            if (event.canceled) {
+                return
+            }
+            const source = event.operation.source
+            if (!source || !isSortable(source)) {
+                return
+            }
+
+            // This monitor sees every drop in the application, not only the
+            // sidebar's. Cards used to be raw draggables and were filtered out
+            // by isSortable above; now that they are sortables of their own,
+            // their drops arrive here too and would fall through onDragEnd to
+            // its "unknown drag type" warning, resetting sidebar state on the
+            // way. The sidebar owns two types, and nothing else is its business.
+            const draggedType = String(source.type ?? '')
+            if (draggedType !== 'category' && draggedType !== 'board') {
+                return
+            }
+
+            // dnd-kit moves index/group as you drag, so by dragend they hold the
+            // final position and initialIndex/initialGroup the starting one --
+            // exactly the two halves of react-beautiful-dnd's DropResult, which
+            // is what the handlers below are still written against.
+            onDragEnd({
+                draggableId: String(source.id),
+                type: draggedType,
+                source: {
+                    index: source.initialIndex,
+                    droppableId: String(source.initialGroup ?? 'lhs-categories'),
+                },
+                destination: {
+                    index: source.index,
+                    droppableId: String(source.group ?? 'lhs-categories'),
+                },
+            } as DropResult)
+        },
+    })
+
     const [draggedItemID, setDraggedItemID] = useState<string>('')
     const [isCategoryBeingDragged, setIsCategoryBeingDragged] = useState<boolean>(false)
 
@@ -368,42 +414,25 @@ const Sidebar = (props: Props) => {
 
             <BoardsSwitcher/>
 
-            <DragDropContext
-                onDragEnd={onDragEnd}
-            >
-                <Droppable
-                    droppableId='lhs-categories'
-                    type='category'
-                    key={sidebarCategories.length}
-                >
-                    {(provided) => (
-                        <div
-                            ref={provided.innerRef}
-                            {...provided.droppableProps}
-                            className='octo-sidebar-list'
-                        >
-                            {
-                                sidebarCategories.map((category, index) => (
-                                    <SidebarCategory
-                                        hideSidebar={hideSidebar}
-                                        key={category.id}
-                                        activeBoardID={props.activeBoardId}
-                                        activeViewID={activeViewID}
-                                        categoryBoards={category}
-                                        boards={getSortedCategoryBoards(category)}
-                                        allCategories={sidebarCategories}
-                                        index={index}
-                                        onBoardTemplateSelectorClose={props.onBoardTemplateSelectorClose}
-                                        draggedItemID={draggedItemID}
-                                        forceCollapse={isCategoryBeingDragged}
-                                    />
-                                ))
-                            }
-                            {provided.placeholder}
-                        </div>
-                    )}
-                </Droppable>
-            </DragDropContext>
+            <div className='octo-sidebar-list'>
+                {
+                    sidebarCategories.map((category, index) => (
+                        <SidebarCategory
+                            hideSidebar={hideSidebar}
+                            key={category.id}
+                            activeBoardID={props.activeBoardId}
+                            activeViewID={activeViewID}
+                            categoryBoards={category}
+                            boards={getSortedCategoryBoards(category)}
+                            allCategories={sidebarCategories}
+                            index={index}
+                            onBoardTemplateSelectorClose={props.onBoardTemplateSelectorClose}
+                            draggedItemID={draggedItemID}
+                            forceCollapse={isCategoryBeingDragged}
+                        />
+                    ))
+                }
+            </div>
 
             <div className='octo-spacer'/>
 

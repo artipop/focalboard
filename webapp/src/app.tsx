@@ -1,18 +1,15 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useEffect} from 'react'
+import React, {type JSX, useEffect} from 'react'
 import {IntlProvider} from 'react-intl'
-import {DndProvider} from 'react-dnd'
-import {HTML5Backend} from 'react-dnd-html5-backend'
-import {TouchBackend} from 'react-dnd-touch-backend'
 import {History} from 'history'
 
 import TelemetryClient from './telemetry/telemetryClient'
 
 import {getMessages} from './i18n'
+import {SortableProvider} from './hooks/sortable'
 import {FlashMessages} from './components/flashMessages'
 import NewVersionBanner from './components/newVersionBanner'
-import {Utils} from './utils'
 import {fetchMe, getMe} from './store/users'
 import {getLanguage, fetchLanguage} from './store/language'
 import {useAppSelector, useAppDispatch} from './store/hooks'
@@ -47,7 +44,7 @@ const App = (props: Props): JSX.Element => {
             locale={language.split(/[_]/)[0]}
             messages={getMessages(language)}
         >
-            <DndProvider backend={Utils.isMobile() ? TouchBackend : HTML5Backend}>
+            <SortableProvider>
                 <FlashMessages milliseconds={2000}/>
                 <div id='frame'>
                     <div id='main'>
@@ -55,7 +52,7 @@ const App = (props: Props): JSX.Element => {
                         <FocalboardRouter history={props.history}/>
                     </div>
                 </div>
-            </DndProvider>
+            </SortableProvider>
         </IntlProvider>
     )
 }

@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useCallback} from 'react'
+import React, {type JSX, useCallback} from 'react'
 import {FormattedMessage, IntlShape, useIntl} from 'react-intl'
 
 import {BlockTypes} from '../../blocks/block'
@@ -13,22 +13,26 @@ import {contentRegistry} from '../content/contentRegistry'
 
 import {useCardDetailContext} from './cardDetailContext'
 
-function addContentMenu(intl: IntlShape, type: BlockTypes): JSX.Element {
+function AddContentMenuItem(props: {intl: IntlShape, type: BlockTypes}): JSX.Element {
+    const {intl, type} = props
     const handler = contentRegistry.getHandler(type)
-    if (!handler) {
-        Utils.logError(`addContentMenu, unknown content type: ${type}`)
-        return <></>
-    }
     const cardDetail = useCardDetailContext()
     const addElement = useCallback(async () => {
+        if (!handler) {
+            return
+        }
         const {card} = cardDetail
         const index = card.fields.contentOrder.length
         cardDetail.addBlock(handler, index, false)
     }, [cardDetail, handler])
 
+    if (!handler) {
+        Utils.logError(`AddContentMenuItem, unknown content type: ${type}`)
+        return <></>
+    }
+
     return (
         <Menu.Text
-            key={type}
             id={type}
             name={handler.getDisplayText(intl)}
             icon={handler.getIcon()}
@@ -49,7 +53,13 @@ const CardDetailContentsMenu = () => {
                     />
                 </Button>
                 <Menu position='top'>
-                    {contentRegistry.contentTypes.map((type) => addContentMenu(intl, type))}
+                    {contentRegistry.contentTypes.map((type) => (
+                        <AddContentMenuItem
+                            key={type}
+                            intl={intl}
+                            type={type}
+                        />
+                    ))}
                 </Menu>
             </MenuWrapper>
         </div>

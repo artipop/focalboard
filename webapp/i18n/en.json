@@ -255,7 +255,6 @@
   "DeployTargets.subtitle": "Dokku hosts a card's branch is published to when it moves into the Deploy column. One branch becomes one app of its own, at “repository-branch.base-domain”.",
   "DeployTargets.title": "Deploy targets",
   "Dialog.closeDialog": "Close dialog",
-  "EditableDayPicker.today": "Today",
   "Error.mobileweb": "Mobile web support is currently in early beta. Not all functionality may be present.",
   "Error.websocket-closed": "Websocket connection closed, connection interrupted. If this persists, check your server or web proxy configuration.",
   "Filter.contains": "contains",

@@ -22,7 +22,20 @@ const card = TestBlockFactory.createCard()
 const icon = '👍'
 
 jest.mock('../mutator')
-const mockedMutator = mocked(mutator, true)
+
+// emoji-mart 5 renders inside a shadow root, which Testing Library cannot query.
+// The unit under test is what blockIconSelector does with a chosen emoji, not how
+// the picker draws itself, so the picker is reduced to a button that reports one.
+jest.mock('../widgets/emojiPicker', () => ({
+    __esModule: true,
+    default: ({onSelect}: {onSelect: (emoji: string) => void}) => (
+        <button
+            aria-label='thumbsup'
+            onClick={() => onSelect('\u{1F44D}')}
+        />
+    ),
+}))
+const mockedMutator = mocked(mutator)
 
 describe('components/blockIconSelector', () => {
     beforeEach(() => {
@@ -79,7 +92,7 @@ describe('components/blockIconSelector', () => {
         const buttonRandom = screen.queryByRole('button', {name: 'Random'})
         expect(buttonRandom).not.toBeNull()
         userEvent.click(buttonRandom!)
-        expect(mockedMutator.changeBlockIcon).toBeCalledTimes(1)
+        expect(mockedMutator.changeBlockIcon).toHaveBeenCalledTimes(1)
     })
 
     test('return a new icon after click on EmojiPicker', () => {
@@ -101,8 +114,8 @@ describe('components/blockIconSelector', () => {
 
         const allButtonThumbUp = getAllByRole('button', {name: /thumbsup/i})
         userEvent.click(allButtonThumbUp[0])
-        expect(mockedMutator.changeBlockIcon).toBeCalledTimes(1)
-        expect(mockedMutator.changeBlockIcon).toBeCalledWith(card.boardId, card.id, card.fields.icon, '👍')
+        expect(mockedMutator.changeBlockIcon).toHaveBeenCalledTimes(1)
+        expect(mockedMutator.changeBlockIcon).toHaveBeenCalledWith(card.boardId, card.id, card.fields.icon, '👍')
     })
 
     test('return no icon after click on remove menu', () => {
@@ -116,8 +129,8 @@ describe('components/blockIconSelector', () => {
         const buttonRemove = screen.queryByRole('button', {name: 'Remove icon'})
         expect(buttonRemove).not.toBeNull()
         userEvent.click(buttonRemove!)
-        expect(mockedMutator.changeBlockIcon).toBeCalledTimes(1)
-        expect(mockedMutator.changeBlockIcon).toBeCalledWith(card.boardId, card.id, card.fields.icon, '', 'remove icon')
+        expect(mockedMutator.changeBlockIcon).toHaveBeenCalledTimes(1)
+        expect(mockedMutator.changeBlockIcon).toHaveBeenCalledWith(card.boardId, card.id, card.fields.icon, '', 'remove icon')
 
         //simulate reset icon
         card.fields.icon = ''

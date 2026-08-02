@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {useEffect, useRef, useState, useCallback} from 'react'
+import React, {type JSX, useEffect, useRef, useState, useCallback} from 'react'
 import {useIntl} from 'react-intl'
 
 import Editable, {Focusable} from '../../widgets/editable'
@@ -18,10 +18,6 @@ import {PropertyProps} from '../types'
 import './url.scss'
 
 const URLProperty = (props: PropertyProps): JSX.Element => {
-    if (!props.propertyTemplate) {
-        return <></>
-    }
-
     const [value, setValue] = useState(props.card.fields.properties[props.propertyTemplate.id || ''] || '')
     const [isEditing, setIsEditing] = useState(false)
     const isEmpty = !(props.propertyValue as string)?.trim()
@@ -54,6 +50,10 @@ const URLProperty = (props: PropertyProps): JSX.Element => {
             editableRef.current?.focus()
         }
     }, [isEditing])
+
+    if (!props.propertyTemplate) {
+        return <></>
+    }
 
     if (showEditable) {
         return (

@@ -17,7 +17,7 @@ import mutator from '../../mutator'
 import Comment from './comment'
 
 jest.mock('../../mutator')
-const mockedMutator = mocked(mutator, true)
+const mockedMutator = mocked(mutator)
 
 const board = TestBlockFactory.createBoard()
 const card = TestBlockFactory.createCard(board)
@@ -96,8 +96,8 @@ describe('components/cardDetail/comment', () => {
         expect(container).toMatchSnapshot()
         const buttonDelete = screen.getByRole('button', {name: 'Delete'})
         userEvent.click(buttonDelete)
-        expect(mockedMutator.deleteBlock).toBeCalledTimes(1)
-        expect(mockedMutator.deleteBlock).toBeCalledWith(comment)
+        expect(mockedMutator.deleteBlock).toHaveBeenCalledTimes(1)
+        expect(mockedMutator.deleteBlock).toHaveBeenCalledWith(comment)
     })
 
     test('return guest comment', () => {
@@ -149,7 +149,7 @@ describe('components/cardDetail/comment', () => {
         expect(container).toMatchSnapshot()
         const buttonDelete = screen.getByRole('button', {name: 'Delete'})
         userEvent.click(buttonDelete)
-        expect(mockedMutator.deleteBlock).toBeCalledTimes(1)
-        expect(mockedMutator.deleteBlock).toBeCalledWith(comment)
+        expect(mockedMutator.deleteBlock).toHaveBeenCalledTimes(1)
+        expect(mockedMutator.deleteBlock).toHaveBeenCalledWith(comment)
     })
 })

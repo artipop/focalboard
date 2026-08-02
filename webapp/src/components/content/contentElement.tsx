@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import {useCallback} from 'react'
+import {type JSX, useCallback} from 'react'
 
 import {ContentBlock} from '../../blocks/contentBlock'
 import {Utils} from '../../utils'
@@ -28,12 +28,11 @@ export default function ContentElement(props: Props): JSX.Element|null {
     const cardDetail = useCardDetailContext()
 
     const handler = contentRegistry.getHandler(block.type)
-    if (!handler) {
-        Utils.logError(`ContentElement, unknown content type: ${block.type}`)
-        return null
-    }
 
     const addElement = useCallback(() => {
+        if (!handler) {
+            return
+        }
         const index = cords.x + 1
         cardDetail.addBlock(handler, index, true)
     }, [cardDetail, cords, handler])
@@ -42,6 +41,11 @@ export default function ContentElement(props: Props): JSX.Element|null {
         const index = cords.x
         cardDetail.deleteBlock(block, index)
     }, [block, cords, cardDetail])
+
+    if (!handler) {
+        Utils.logError(`ContentElement, unknown content type: ${block.type}`)
+        return null
+    }
 
     return handler.createComponent(block, readonly, addElement, deleteElement)
 }

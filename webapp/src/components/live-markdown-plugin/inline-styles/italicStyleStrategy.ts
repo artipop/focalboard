@@ -8,9 +8,9 @@ const createItalicStyleStrategy = (): InlineStrategy => {
     const underscoreDelimitedRegex = '(?<!_)(_)(?!_)(.+?)(?<!_)_(?!_)' // _italic_
     const strongEmphasisRegex = '(\\*\\*\\*|___)(.+?)(\\*\\*\\*|___)' // ***bolditalic*** ___bolditalic___
     const boldWrappedAsteriskRegex =
-		'(?<=\\*\\*)(\\*)(?!\\*)(.*?[^\\*]+)(?<!\\*)\\*(?![^\\*]\\*)|(?<!\\*)(\\*)(?!\\*)(.*?[^\\*]+)(?<!\\*)\\*(?=\\*\\*)' // ***italic* and bold** **bold and *italic***
+        '(?<=\\*\\*)(\\*)(?!\\*)(.*?[^\\*]+)(?<!\\*)\\*(?![^\\*]\\*)|(?<!\\*)(\\*)(?!\\*)(.*?[^\\*]+)(?<!\\*)\\*(?=\\*\\*)' // ***italic* and bold** **bold and *italic***
     const boldWrappedUnderscoreRegex =
-		'(?<=__)(_)(?!_)(.*?[^_]+)(?<!_)_(?![^_]_)|(?<!_)(_)(?!_)(.*?[^_]+)(?<!_)_(?=__)' // ___italic_ and bold__ __bold and _italic___
+        '(?<=__)(_)(?!_)(.*?[^_]+)(?<!_)_(?![^_]_)|(?<!_)(_)(?!_)(.*?[^_]+)(?<!_)_(?=__)' // ___italic_ and bold__ __bold and _italic___
     let italicRegex: RegExp
     try {
         italicRegex = new RegExp(

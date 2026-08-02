@@ -46,7 +46,7 @@ test('OctoClient: insert blocks', async () => {
 
     await octoClient.insertBlocks('board-id', blocks)
 
-    expect(FetchMock.fn).toBeCalledTimes(1)
+    expect(FetchMock.fn).toHaveBeenCalledTimes(1)
     expect(FetchMock.fn).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
@@ -60,7 +60,7 @@ test('OctoClient: importFullArchive', async () => {
 
     await octoClient.importFullArchive(archive)
 
-    expect(FetchMock.fn).toBeCalledTimes(1)
+    expect(FetchMock.fn).toHaveBeenCalledTimes(1)
     expect(FetchMock.fn).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
@@ -87,7 +87,7 @@ test('OctoClient: GetFileInfo', async () => {
         extension: '.txt',
     })))
     await octoClient.getFileInfo('board-id', 'file-id')
-    expect(FetchMock.fn).toBeCalledTimes(1)
+    expect(FetchMock.fn).toHaveBeenCalledTimes(1)
     expect(FetchMock.fn).toHaveBeenCalledWith(
         'http://localhost/api/v2/files/teams/0/board-id/file-id/info',
         expect.objectContaining({

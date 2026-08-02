@@ -1,4 +1,4 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`components/boardTemplateSelector/boardTemplateSelectorPreview should be null without activeTemplate 1`] = `<div />`;
 
@@ -97,6 +97,7 @@ exports[`components/boardTemplateSelector/boardTemplateSelectorPreview should ma
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -190,7 +191,6 @@ exports[`components/boardTemplateSelector/boardTemplateSelectorPreview should ma
       >
         <div
           class="octo-board-header-cell KanbanColumnHeader"
-          draggable="true"
           style="opacity: 1;"
         >
           <span
@@ -199,7 +199,6 @@ exports[`components/boardTemplateSelector/boardTemplateSelectorPreview should ma
           >
             No name
           </span>
-          
           <div
             class="KanbanCalculation"
           >
@@ -238,7 +237,6 @@ exports[`components/boardTemplateSelector/boardTemplateSelectorPreview should ma
         </div>
         <div
           class="octo-board-header-cell KanbanColumnHeader"
-          draggable="true"
           style="opacity: 1;"
         >
           <span
@@ -290,7 +288,6 @@ exports[`components/boardTemplateSelector/boardTemplateSelectorPreview should ma
         </div>
         <div
           class="octo-board-header-cell KanbanColumnHeader"
-          draggable="true"
           style="opacity: 1;"
         >
           <span
@@ -361,7 +358,6 @@ exports[`components/boardTemplateSelector/boardTemplateSelectorPreview should ma
         >
           <div
             class="KanbanCard"
-            draggable="true"
             style="opacity: 1;"
           >
             <div

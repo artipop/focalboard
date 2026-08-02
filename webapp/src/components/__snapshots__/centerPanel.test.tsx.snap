@@ -1,4 +1,4 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`components/centerPanel Clicking on the Hidden card count should open a dailog 1`] = `
 <div>
@@ -172,6 +172,7 @@ exports[`components/centerPanel Clicking on the Hidden card count should open a 
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -213,7 +214,6 @@ exports[`components/centerPanel Clicking on the Hidden card count should open a 
           <input
             class="Editable "
             placeholder="Search cards"
-            value=""
           />
         </div>
         <div
@@ -299,7 +299,6 @@ exports[`components/centerPanel Clicking on the Hidden card count should open a 
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -320,7 +319,6 @@ exports[`components/centerPanel Clicking on the Hidden card count should open a 
                 >
                   No name
                 </span>
-                
               </div>
               <button
                 class="Button"
@@ -359,7 +357,6 @@ exports[`components/centerPanel Clicking on the Hidden card count should open a 
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -419,7 +416,6 @@ exports[`components/centerPanel Clicking on the Hidden card count should open a 
             </div>
             <div
               class="TableRow octo-table-row"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -492,7 +488,6 @@ exports[`components/centerPanel Clicking on the Hidden card count should open a 
             </div>
             <div
               class="TableRow octo-table-row"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -569,7 +564,6 @@ exports[`components/centerPanel Clicking on the Hidden card count should open a 
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -880,6 +874,7 @@ exports[`components/centerPanel return centerPanel and click on card to show car
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -921,7 +916,6 @@ exports[`components/centerPanel return centerPanel and click on card to show car
           <input
             class="Editable "
             placeholder="Search cards"
-            value=""
           />
         </div>
         <div
@@ -975,7 +969,6 @@ exports[`components/centerPanel return centerPanel and click on card to show car
       >
         <div
           class="octo-board-header-cell KanbanColumnHeader"
-          draggable="true"
           style="opacity: 1;"
         >
           <span
@@ -984,7 +977,6 @@ exports[`components/centerPanel return centerPanel and click on card to show car
           >
             No name
           </span>
-          
           <div
             class="KanbanCalculation"
           >
@@ -1026,7 +1018,6 @@ exports[`components/centerPanel return centerPanel and click on card to show car
         </div>
         <div
           class="octo-board-header-cell KanbanColumnHeader"
-          draggable="true"
           style="opacity: 1;"
         >
           <span
@@ -1081,7 +1072,6 @@ exports[`components/centerPanel return centerPanel and click on card to show car
         </div>
         <div
           class="octo-board-header-cell KanbanColumnHeader"
-          draggable="true"
           style="opacity: 1;"
         >
           <span
@@ -1168,7 +1158,6 @@ exports[`components/centerPanel return centerPanel and click on card to show car
         >
           <div
             class="KanbanCard"
-            draggable="true"
             style="opacity: 1;"
           >
             <div
@@ -1202,7 +1191,6 @@ exports[`components/centerPanel return centerPanel and click on card to show car
           </div>
           <div
             class="KanbanCard"
-            draggable="true"
             style="opacity: 1;"
           >
             <div
@@ -1433,6 +1421,7 @@ exports[`components/centerPanel return centerPanel and click on new card to edit
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -1474,7 +1463,6 @@ exports[`components/centerPanel return centerPanel and click on new card to edit
           <input
             class="Editable "
             placeholder="Search cards"
-            value=""
           />
         </div>
         <div
@@ -1560,7 +1548,6 @@ exports[`components/centerPanel return centerPanel and click on new card to edit
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -1581,7 +1568,6 @@ exports[`components/centerPanel return centerPanel and click on new card to edit
                 >
                   No name
                 </span>
-                
               </div>
               <button
                 class="Button"
@@ -1620,7 +1606,6 @@ exports[`components/centerPanel return centerPanel and click on new card to edit
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -1680,7 +1665,6 @@ exports[`components/centerPanel return centerPanel and click on new card to edit
             </div>
             <div
               class="TableRow octo-table-row"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -1753,7 +1737,6 @@ exports[`components/centerPanel return centerPanel and click on new card to edit
             </div>
             <div
               class="TableRow octo-table-row"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -1830,7 +1813,6 @@ exports[`components/centerPanel return centerPanel and click on new card to edit
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -2038,7 +2020,6 @@ exports[`components/centerPanel return centerPanel and press touch 1 with readon
           <input
             class="Editable "
             placeholder="Search cards"
-            value=""
           />
         </div>
       </div>
@@ -2081,7 +2062,6 @@ exports[`components/centerPanel return centerPanel and press touch 1 with readon
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -2102,7 +2082,6 @@ exports[`components/centerPanel return centerPanel and press touch 1 with readon
                 >
                   No name
                 </span>
-                
               </div>
               <button
                 class="Button"
@@ -2119,7 +2098,6 @@ exports[`components/centerPanel return centerPanel and press touch 1 with readon
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -2158,7 +2136,6 @@ exports[`components/centerPanel return centerPanel and press touch 1 with readon
             </div>
             <div
               class="TableRow octo-table-row readonly"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -2202,7 +2179,6 @@ exports[`components/centerPanel return centerPanel and press touch 1 with readon
             </div>
             <div
               class="TableRow octo-table-row readonly"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -2250,7 +2226,6 @@ exports[`components/centerPanel return centerPanel and press touch 1 with readon
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -2490,6 +2465,7 @@ exports[`components/centerPanel return centerPanel and press touch ctrl+d for on
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -2531,7 +2507,6 @@ exports[`components/centerPanel return centerPanel and press touch ctrl+d for on
           <input
             class="Editable "
             placeholder="Search cards"
-            value=""
           />
         </div>
         <div
@@ -2617,7 +2592,6 @@ exports[`components/centerPanel return centerPanel and press touch ctrl+d for on
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -2638,7 +2612,6 @@ exports[`components/centerPanel return centerPanel and press touch ctrl+d for on
                 >
                   No name
                 </span>
-                
               </div>
               <button
                 class="Button"
@@ -2677,7 +2650,6 @@ exports[`components/centerPanel return centerPanel and press touch ctrl+d for on
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -2737,7 +2709,6 @@ exports[`components/centerPanel return centerPanel and press touch ctrl+d for on
             </div>
             <div
               class="TableRow octo-table-row selected"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -2810,7 +2781,6 @@ exports[`components/centerPanel return centerPanel and press touch ctrl+d for on
             </div>
             <div
               class="TableRow octo-table-row"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -2887,7 +2857,6 @@ exports[`components/centerPanel return centerPanel and press touch ctrl+d for on
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -3148,6 +3117,7 @@ exports[`components/centerPanel return centerPanel and press touch del for one c
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -3189,7 +3159,6 @@ exports[`components/centerPanel return centerPanel and press touch del for one c
           <input
             class="Editable "
             placeholder="Search cards"
-            value=""
           />
         </div>
         <div
@@ -3275,7 +3244,6 @@ exports[`components/centerPanel return centerPanel and press touch del for one c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -3296,7 +3264,6 @@ exports[`components/centerPanel return centerPanel and press touch del for one c
                 >
                   No name
                 </span>
-                
               </div>
               <button
                 class="Button"
@@ -3335,7 +3302,6 @@ exports[`components/centerPanel return centerPanel and press touch del for one c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -3395,7 +3361,6 @@ exports[`components/centerPanel return centerPanel and press touch del for one c
             </div>
             <div
               class="TableRow octo-table-row selected"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -3468,7 +3433,6 @@ exports[`components/centerPanel return centerPanel and press touch del for one c
             </div>
             <div
               class="TableRow octo-table-row"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -3545,7 +3509,6 @@ exports[`components/centerPanel return centerPanel and press touch del for one c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -3806,6 +3769,7 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -3847,7 +3811,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
           <input
             class="Editable "
             placeholder="Search cards"
-            value=""
           />
         </div>
         <div
@@ -3933,7 +3896,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -3954,7 +3916,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
                 >
                   No name
                 </span>
-                
               </div>
               <button
                 class="Button"
@@ -3993,7 +3954,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -4053,7 +4013,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
             </div>
             <div
               class="TableRow octo-table-row selected"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -4126,7 +4085,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
             </div>
             <div
               class="TableRow octo-table-row"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -4203,7 +4161,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -4464,6 +4421,7 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -4505,7 +4463,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
           <input
             class="Editable "
             placeholder="Search cards"
-            value=""
           />
         </div>
         <div
@@ -4591,7 +4548,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -4612,7 +4568,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
                 >
                   No name
                 </span>
-                
               </div>
               <button
                 class="Button"
@@ -4651,7 +4606,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -4711,7 +4665,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
             </div>
             <div
               class="TableRow octo-table-row"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -4784,7 +4737,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
             </div>
             <div
               class="TableRow octo-table-row"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -4861,7 +4813,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -5122,6 +5073,7 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -5163,7 +5115,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
           <input
             class="Editable "
             placeholder="Search cards"
-            value=""
           />
         </div>
         <div
@@ -5249,7 +5200,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -5270,7 +5220,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
                 >
                   No name
                 </span>
-                
               </div>
               <button
                 class="Button"
@@ -5309,7 +5258,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -5369,7 +5317,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
             </div>
             <div
               class="TableRow octo-table-row selected"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -5442,7 +5389,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
             </div>
             <div
               class="TableRow octo-table-row"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -5519,7 +5465,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -5780,6 +5725,7 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -5821,7 +5767,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
           <input
             class="Editable "
             placeholder="Search cards"
-            value=""
           />
         </div>
         <div
@@ -5907,7 +5852,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -5928,7 +5872,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
                 >
                   No name
                 </span>
-                
               </div>
               <button
                 class="Button"
@@ -5967,7 +5910,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -6027,7 +5969,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
             </div>
             <div
               class="TableRow octo-table-row selected"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -6100,7 +6041,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
             </div>
             <div
               class="TableRow octo-table-row selected"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -6177,7 +6117,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -6438,6 +6377,7 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -6479,7 +6419,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
           <input
             class="Editable "
             placeholder="Search cards"
-            value=""
           />
         </div>
         <div
@@ -6565,7 +6504,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -6586,7 +6524,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
                 >
                   No name
                 </span>
-                
               </div>
               <button
                 class="Button"
@@ -6625,7 +6562,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -6685,7 +6621,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
             </div>
             <div
               class="TableRow octo-table-row"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -6758,7 +6693,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
             </div>
             <div
               class="TableRow octo-table-row"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -6835,7 +6769,6 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -7096,6 +7029,7 @@ exports[`components/centerPanel return centerPanel and select one card and click
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -7137,7 +7071,6 @@ exports[`components/centerPanel return centerPanel and select one card and click
           <input
             class="Editable "
             placeholder="Search cards"
-            value=""
           />
         </div>
         <div
@@ -7223,7 +7156,6 @@ exports[`components/centerPanel return centerPanel and select one card and click
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -7244,7 +7176,6 @@ exports[`components/centerPanel return centerPanel and select one card and click
                 >
                   No name
                 </span>
-                
               </div>
               <button
                 class="Button"
@@ -7283,7 +7214,6 @@ exports[`components/centerPanel return centerPanel and select one card and click
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -7343,7 +7273,6 @@ exports[`components/centerPanel return centerPanel and select one card and click
             </div>
             <div
               class="TableRow octo-table-row selected"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -7416,7 +7345,6 @@ exports[`components/centerPanel return centerPanel and select one card and click
             </div>
             <div
               class="TableRow octo-table-row"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -7493,7 +7421,6 @@ exports[`components/centerPanel return centerPanel and select one card and click
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -7754,6 +7681,7 @@ exports[`components/centerPanel return centerPanel and select one card and click
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -7795,7 +7723,6 @@ exports[`components/centerPanel return centerPanel and select one card and click
           <input
             class="Editable "
             placeholder="Search cards"
-            value=""
           />
         </div>
         <div
@@ -7881,7 +7808,6 @@ exports[`components/centerPanel return centerPanel and select one card and click
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -7902,7 +7828,6 @@ exports[`components/centerPanel return centerPanel and select one card and click
                 >
                   No name
                 </span>
-                
               </div>
               <button
                 class="Button"
@@ -7941,7 +7866,6 @@ exports[`components/centerPanel return centerPanel and select one card and click
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -8001,7 +7925,6 @@ exports[`components/centerPanel return centerPanel and select one card and click
             </div>
             <div
               class="TableRow octo-table-row"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -8074,7 +7997,6 @@ exports[`components/centerPanel return centerPanel and select one card and click
             </div>
             <div
               class="TableRow octo-table-row"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -8151,7 +8073,6 @@ exports[`components/centerPanel return centerPanel and select one card and click
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -8434,7 +8355,6 @@ exports[`components/centerPanel should match snapshot for Gallery 1`] = `
           <input
             class="Editable "
             placeholder="Search cards"
-            value=""
           />
         </div>
         <div
@@ -8484,7 +8404,6 @@ exports[`components/centerPanel should match snapshot for Gallery 1`] = `
     >
       <div
         class="GalleryCard"
-        draggable="true"
         style="opacity: 1;"
       >
         <div
@@ -8687,6 +8606,7 @@ exports[`components/centerPanel should match snapshot for Kanban 1`] = `
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -8728,7 +8648,6 @@ exports[`components/centerPanel should match snapshot for Kanban 1`] = `
           <input
             class="Editable "
             placeholder="Search cards"
-            value=""
           />
         </div>
         <div
@@ -8782,7 +8701,6 @@ exports[`components/centerPanel should match snapshot for Kanban 1`] = `
       >
         <div
           class="octo-board-header-cell KanbanColumnHeader"
-          draggable="true"
           style="opacity: 1;"
         >
           <span
@@ -8791,7 +8709,6 @@ exports[`components/centerPanel should match snapshot for Kanban 1`] = `
           >
             No name
           </span>
-          
           <div
             class="KanbanCalculation"
           >
@@ -8833,7 +8750,6 @@ exports[`components/centerPanel should match snapshot for Kanban 1`] = `
         </div>
         <div
           class="octo-board-header-cell KanbanColumnHeader"
-          draggable="true"
           style="opacity: 1;"
         >
           <span
@@ -8888,7 +8804,6 @@ exports[`components/centerPanel should match snapshot for Kanban 1`] = `
         </div>
         <div
           class="octo-board-header-cell KanbanColumnHeader"
-          draggable="true"
           style="opacity: 1;"
         >
           <span
@@ -8975,7 +8890,6 @@ exports[`components/centerPanel should match snapshot for Kanban 1`] = `
         >
           <div
             class="KanbanCard"
-            draggable="true"
             style="opacity: 1;"
           >
             <div
@@ -9206,6 +9120,7 @@ exports[`components/centerPanel should match snapshot for Kanban, not shared 1`]
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -9247,7 +9162,6 @@ exports[`components/centerPanel should match snapshot for Kanban, not shared 1`]
           <input
             class="Editable "
             placeholder="Search cards"
-            value=""
           />
         </div>
         <div
@@ -9301,7 +9215,6 @@ exports[`components/centerPanel should match snapshot for Kanban, not shared 1`]
       >
         <div
           class="octo-board-header-cell KanbanColumnHeader"
-          draggable="true"
           style="opacity: 1;"
         >
           <span
@@ -9310,7 +9223,6 @@ exports[`components/centerPanel should match snapshot for Kanban, not shared 1`]
           >
             No name
           </span>
-          
           <div
             class="KanbanCalculation"
           >
@@ -9352,7 +9264,6 @@ exports[`components/centerPanel should match snapshot for Kanban, not shared 1`]
         </div>
         <div
           class="octo-board-header-cell KanbanColumnHeader"
-          draggable="true"
           style="opacity: 1;"
         >
           <span
@@ -9407,7 +9318,6 @@ exports[`components/centerPanel should match snapshot for Kanban, not shared 1`]
         </div>
         <div
           class="octo-board-header-cell KanbanColumnHeader"
-          draggable="true"
           style="opacity: 1;"
         >
           <span
@@ -9494,7 +9404,6 @@ exports[`components/centerPanel should match snapshot for Kanban, not shared 1`]
         >
           <div
             class="KanbanCard"
-            draggable="true"
             style="opacity: 1;"
           >
             <div
@@ -9725,6 +9634,7 @@ exports[`components/centerPanel should match snapshot for Table 1`] = `
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -9766,7 +9676,6 @@ exports[`components/centerPanel should match snapshot for Table 1`] = `
           <input
             class="Editable "
             placeholder="Search cards"
-            value=""
           />
         </div>
         <div
@@ -9852,7 +9761,6 @@ exports[`components/centerPanel should match snapshot for Table 1`] = `
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -9873,7 +9781,6 @@ exports[`components/centerPanel should match snapshot for Table 1`] = `
                 >
                   No name
                 </span>
-                
               </div>
               <button
                 class="Button"
@@ -9912,7 +9819,6 @@ exports[`components/centerPanel should match snapshot for Table 1`] = `
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -9972,7 +9878,6 @@ exports[`components/centerPanel should match snapshot for Table 1`] = `
             </div>
             <div
               class="TableRow octo-table-row"
-              draggable="true"
               style="opacity: 1;"
             >
               <div
@@ -10049,7 +9954,6 @@ exports[`components/centerPanel should match snapshot for Table 1`] = `
           >
             <div
               class="octo-group-header-cell expanded"
-              draggable="true"
               style="opacity: 1;"
             >
               <div

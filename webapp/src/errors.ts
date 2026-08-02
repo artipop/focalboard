@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import {useIntl} from 'react-intl'
+import {IntlShape} from 'react-intl'
 
 import {UserSettings} from './userSettings'
 
@@ -28,7 +28,7 @@ type ErrorDef = {
     button2ClearHistory: boolean
 }
 
-function errorDefFromId(id: ErrorId | null): ErrorDef {
+function errorDefFromId(id: ErrorId | null, intl: IntlShape): ErrorDef {
     const errDef: ErrorDef = {
         title: '',
         button1Enabled: false,
@@ -42,8 +42,6 @@ function errorDefFromId(id: ErrorId | null): ErrorDef {
         button2Fill: false,
         button2ClearHistory: false,
     }
-
-    const intl = useIntl()
 
     switch (id) {
     case ErrorId.TeamUndefined: {
@@ -103,4 +101,4 @@ function errorDefFromId(id: ErrorId | null): ErrorDef {
     return errDef
 }
 
-export {ErrorId, ErrorDef, errorDefFromId}
+export {ErrorId, type ErrorDef, errorDefFromId}

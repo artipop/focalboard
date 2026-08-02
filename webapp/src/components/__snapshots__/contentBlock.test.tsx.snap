@@ -1,4 +1,4 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`components/contentBlock return commentBlock and click on menuwrapper 1`] = `
 <div>
@@ -203,7 +203,6 @@ exports[`components/contentBlock return commentBlock and click on menuwrapper 1`
         </div>
         <div
           class="dnd-handle"
-          draggable="true"
         >
           <svg
             class="GripIcon Icon"
@@ -258,7 +257,6 @@ exports[`components/contentBlock should match snapshot with commentBlock 1`] = `
         </div>
         <div
           class="dnd-handle"
-          draggable="true"
         >
           <svg
             class="GripIcon Icon"
@@ -336,7 +334,6 @@ exports[`components/contentBlock should match snapshot with dividerBlock 1`] = `
         </div>
         <div
           class="dnd-handle"
-          draggable="true"
         >
           <svg
             class="GripIcon Icon"
@@ -394,7 +391,6 @@ exports[`components/contentBlock should match snapshot with imageBlock 1`] = `
         </div>
         <div
           class="dnd-handle"
-          draggable="true"
         >
           <svg
             class="GripIcon Icon"
@@ -454,7 +450,6 @@ exports[`components/contentBlock should match snapshot with textBlock 1`] = `
         </div>
         <div
           class="dnd-handle"
-          draggable="true"
         >
           <svg
             class="GripIcon Icon"

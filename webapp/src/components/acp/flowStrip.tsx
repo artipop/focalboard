@@ -95,7 +95,7 @@ const FlowStrip = (props: Props) => {
     }
 
     const age = waited(flow.since, Date.now())
-    const since = age === null ? '' : sinceLabel(intl, age)
+    const since = age === null ? '' : sinceLabel(intl as Parameters<typeof sinceLabel>[0], age)
     const status = () => {
         if (flow.running) {
             return intl.formatMessage({id: 'FlowStrip.running', defaultMessage: 'working now'})

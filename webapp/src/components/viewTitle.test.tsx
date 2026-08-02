@@ -19,8 +19,8 @@ import ViewTitle from './viewTitle'
 jest.mock('../mutator')
 jest.mock('../utils')
 
-const mockedMutator = mocked(mutator, true)
-const mockedUtils = mocked(Utils, true)
+const mockedMutator = mocked(mutator)
+const mockedUtils = mocked(Utils)
 mockedUtils.createGuid.mockReturnValue('test-id')
 
 beforeAll(() => {
@@ -111,7 +111,7 @@ describe('components/viewTitle', () => {
         expect(container).toMatchSnapshot()
         const hideDescriptionButton = screen.getAllByRole('button')[0]
         userEvent.click(hideDescriptionButton)
-        expect(mockedMutator.showBoardDescription).toBeCalledTimes(1)
+        expect(mockedMutator.showBoardDescription).toHaveBeenCalledTimes(1)
     })
 
     test('hide description', async () => {
@@ -131,7 +131,7 @@ describe('components/viewTitle', () => {
         expect(container).toMatchSnapshot()
         const showDescriptionButton = screen.getAllByRole('button')[0]
         userEvent.click(showDescriptionButton)
-        expect(mockedMutator.showBoardDescription).toBeCalledTimes(1)
+        expect(mockedMutator.showBoardDescription).toHaveBeenCalledTimes(1)
     })
 
     test('add random icon', async () => {
@@ -151,7 +151,7 @@ describe('components/viewTitle', () => {
         expect(container).toMatchSnapshot()
         const randomIconButton = screen.getAllByRole('button')[0]
         userEvent.click(randomIconButton)
-        expect(mockedMutator.changeBoardIcon).toBeCalledTimes(1)
+        expect(mockedMutator.changeBoardIcon).toHaveBeenCalledTimes(1)
     })
 
     test('change title', async () => {
@@ -168,6 +168,6 @@ describe('components/viewTitle', () => {
         const titleInput = screen.getAllByRole('textbox')[0]
         userEvent.type(titleInput, 'other title')
         fireEvent.blur(titleInput)
-        expect(mockedMutator.changeBoardTitle).toBeCalledTimes(1)
+        expect(mockedMutator.changeBoardTitle).toHaveBeenCalledTimes(1)
     })
 })

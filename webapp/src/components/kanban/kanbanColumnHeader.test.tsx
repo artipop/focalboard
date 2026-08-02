@@ -14,7 +14,7 @@ import {IPropertyOption} from '../../blocks/board'
 
 import KanbanColumnHeader from './kanbanColumnHeader'
 jest.mock('../../mutator')
-const mockedMutator = mocked(Mutator, true)
+const mockedMutator = mocked(Mutator)
 describe('src/components/kanban/kanbanColumnHeader', () => {
     const intl = createIntl({locale: 'en-us'})
     const board = TestBlockFactory.createBoard()
@@ -125,7 +125,7 @@ describe('src/components/kanban/kanbanColumnHeader', () => {
         fireEvent.change(inputTitle, {target: {value: ''}})
         userEvent.type(inputTitle, 'New Title')
         fireEvent.blur(inputTitle)
-        expect(mockedPropertyNameChanged).toBeCalledWith(option, 'New Title')
+        expect(mockedPropertyNameChanged).toHaveBeenCalledWith(option, 'New Title')
         expect(container).toMatchSnapshot()
     })
     test('return kanbanColumnHeader and click on menuwrapper', () => {
@@ -181,7 +181,7 @@ describe('src/components/kanban/kanbanColumnHeader', () => {
         const buttonHide = within(buttonMenuWrapper).getByRole('button', {name: 'Hide'})
         expect(buttonHide).toBeDefined()
         userEvent.click(buttonHide)
-        expect(mockedMutator.hideViewColumn).toBeCalledTimes(1)
+        expect(mockedMutator.hideViewColumn).toHaveBeenCalledTimes(1)
     })
     test('return kanbanColumnHeader, click on menuwrapper and click on delete menu', () => {
         render(wrapDNDIntl(
@@ -210,7 +210,7 @@ describe('src/components/kanban/kanbanColumnHeader', () => {
         const buttonDelete = within(buttonMenuWrapper).getByRole('button', {name: 'Delete'})
         expect(buttonDelete).toBeDefined()
         userEvent.click(buttonDelete)
-        expect(mockedMutator.deletePropertyOption).toBeCalledTimes(1)
+        expect(mockedMutator.deletePropertyOption).toHaveBeenCalledTimes(1)
     })
     test('return kanbanColumnHeader, click on menuwrapper and click on blue color menu', () => {
         render(wrapDNDIntl(
@@ -239,7 +239,7 @@ describe('src/components/kanban/kanbanColumnHeader', () => {
         const buttonBlueColor = within(buttonMenuWrapper).getByRole('button', {name: 'Select Blue Color'})
         expect(buttonBlueColor).toBeDefined()
         userEvent.click(buttonBlueColor)
-        expect(mockedMutator.changePropertyOptionColor).toBeCalledTimes(1)
+        expect(mockedMutator.changePropertyOptionColor).toHaveBeenCalledTimes(1)
     })
 
     test('return kanbanColumnHeader and click to add card', () => {
@@ -267,7 +267,7 @@ describe('src/components/kanban/kanbanColumnHeader', () => {
         const buttonAddCard = container.querySelector('.AddIcon')?.parentElement
         expect(buttonAddCard).toBeDefined()
         userEvent.click(buttonAddCard!)
-        expect(mockedAddCard).toBeCalledTimes(1)
+        expect(mockedAddCard).toHaveBeenCalledTimes(1)
     })
     test('return kanbanColumnHeader and click KanbanCalculationMenu', () => {
         const mockedCalculationMenuOpen = jest.fn()
@@ -294,7 +294,7 @@ describe('src/components/kanban/kanbanColumnHeader', () => {
         const buttonKanbanCalculation = screen.getByText(/0/i).parentElement
         expect(buttonKanbanCalculation).toBeDefined()
         userEvent.click(buttonKanbanCalculation!)
-        expect(mockedCalculationMenuOpen).toBeCalledTimes(1)
+        expect(mockedCalculationMenuOpen).toHaveBeenCalledTimes(1)
     })
     test('return kanbanColumnHeader and click count on KanbanCalculationMenu', () => {
         render(wrapDNDIntl(
@@ -320,6 +320,6 @@ describe('src/components/kanban/kanbanColumnHeader', () => {
         const menuCountEmpty = screen.getByText('Count')
         expect(menuCountEmpty).toBeDefined()
         userEvent.click(menuCountEmpty)
-        expect(mockedMutator.changeViewKanbanCalculations).toBeCalledTimes(1)
+        expect(mockedMutator.changeViewKanbanCalculations).toHaveBeenCalledTimes(1)
     })
 })

@@ -12,7 +12,7 @@ import mutator from '../../mutator'
 import AgentsDialog, {isAgentsAvailable, textToServers} from './agentsDialog'
 
 jest.mock('../../mutator')
-const mockedMutator = jest.mocked(mutator, true)
+const mockedMutator = jest.mocked(mutator)
 
 const anyWindow = window as any
 
@@ -58,7 +58,7 @@ describe('components/acp/agentsDialog', () => {
         userEvent.type(screen.getByPlaceholderText('CODEX_HOME=/Users/me/.codex-work'), 'CODEX_HOME=/tmp/x')
 
         userEvent.click(screen.getByRole('button', {name: 'Save'}))
-        await waitFor(() => expect(bindings.AddAgent).toBeCalled())
+        await waitFor(() => expect(bindings.AddAgent).toHaveBeenCalled())
         const payload = JSON.parse(bindings.AddAgent.mock.calls[0][0])
         expect(payload).toMatchObject({name: 'codex-a', kind: 'codex', env: {CODEX_HOME: '/tmp/x'}})
     })
@@ -99,7 +99,7 @@ describe('components/acp/agentsDialog', () => {
         userEvent.selectOptions(screen.getAllByRole('combobox')[1], 'office')
 
         userEvent.click(screen.getByRole('button', {name: 'Save'}))
-        await waitFor(() => expect(bindings.AddAgent).toBeCalled())
+        await waitFor(() => expect(bindings.AddAgent).toHaveBeenCalled())
         const payload = JSON.parse(bindings.AddAgent.mock.calls[0][0])
         expect(payload).toMatchObject({
             name: 'proxied',
@@ -143,7 +143,7 @@ describe('components/acp/agentsDialog', () => {
         expect(screen.getByPlaceholderText('junie --acp=true')).toHaveValue('')
 
         userEvent.click(screen.getByRole('button', {name: 'Save'}))
-        await waitFor(() => expect(bindings.AddAgent).toBeCalled())
+        await waitFor(() => expect(bindings.AddAgent).toHaveBeenCalled())
         const payload = JSON.parse(bindings.AddAgent.mock.calls[0][0])
         expect(payload).toMatchObject({name: 'junie-a', kind: 'junie', command: []})
     })
@@ -171,7 +171,7 @@ describe('components/acp/agentsDialog', () => {
 
         // Opening the dialog is enough: the accounts and board memberships are
         // provisioned for the board being looked at.
-        await waitFor(() => expect(bindings.SyncAgentUsers).toBeCalledWith(board.id))
+        await waitFor(() => expect(bindings.SyncAgentUsers).toHaveBeenCalledWith(board.id))
         await waitFor(() => expect(screen.getByText('Codex Acct1')).toBeInTheDocument())
 
         // And a newly registered agent is provisioned right after it is saved.
@@ -180,8 +180,8 @@ describe('components/acp/agentsDialog', () => {
         userEvent.type(screen.getByPlaceholderText('Name (matches the "Agent" option)'), 'claude')
         userEvent.click(screen.getByRole('button', {name: 'Save'}))
 
-        await waitFor(() => expect(bindings.AddAgent).toBeCalled())
-        await waitFor(() => expect(bindings.SyncAgentUsers).toBeCalledTimes(2))
+        await waitFor(() => expect(bindings.AddAgent).toHaveBeenCalled())
+        await waitFor(() => expect(bindings.SyncAgentUsers).toHaveBeenCalledTimes(2))
     })
 
     test('carries the proxy registry in a folded-away section', async () => {
@@ -261,7 +261,7 @@ describe('components/acp/agentsDialog', () => {
         await waitFor(() => expect(screen.getByText('codex-a')).toBeInTheDocument())
 
         userEvent.click(screen.getByRole('button', {name: 'Sync to board'}))
-        await waitFor(() => expect(mockedMutator.updateBoardCardProperties).toBeCalledTimes(1))
+        await waitFor(() => expect(mockedMutator.updateBoardCardProperties).toHaveBeenCalledTimes(1))
 
         const newProps = mockedMutator.updateBoardCardProperties.mock.calls[0][2]
         const agentProp = newProps.find((p) => p.name === 'Agent')!
@@ -299,7 +299,7 @@ describe('components/acp/agentsDialog', () => {
         fireEvent.change(field, {target: {value: '{"mcpServers": {"playwright": {"command": "npx", "args": ["-y", "@playwright/mcp@latest"]}}}'}})
 
         userEvent.click(screen.getByRole('button', {name: 'Save'}))
-        await waitFor(() => expect(bindings.AddAgent).toBeCalled())
+        await waitFor(() => expect(bindings.AddAgent).toHaveBeenCalled())
         expect(JSON.parse(bindings.AddAgent.mock.calls[0][0])).toMatchObject({
             name: 'jojo',
             mcpServers: {playwright: {command: 'npx', args: ['-y', '@playwright/mcp@latest']}},
@@ -343,7 +343,7 @@ describe('components/acp/agentsDialog', () => {
 
         // Saving half a configuration is worse than not saving it.
         await waitFor(() => expect(screen.getByText(/must be valid JSON/)).toBeInTheDocument())
-        expect(bindings.AddAgent).not.toBeCalled()
+        expect(bindings.AddAgent).not.toHaveBeenCalled()
     })
 
     test('round-trips the MCP server list through the form', async () => {
@@ -375,7 +375,7 @@ describe('components/acp/agentsDialog', () => {
             JSON.stringify({mcpServers: {playwright: {command: 'npx', args: ['-y', '@playwright/mcp@latest']}}}, null, 2),
         ))
         userEvent.click(screen.getByRole('button', {name: 'Save'}))
-        await waitFor(() => expect(bindings.UpdateAgent).toBeCalled())
+        await waitFor(() => expect(bindings.UpdateAgent).toHaveBeenCalled())
         expect(JSON.parse(bindings.UpdateAgent.mock.calls[0][0])).toMatchObject({
             mcpServers: {playwright: {command: 'npx', args: ['-y', '@playwright/mcp@latest']}},
         })

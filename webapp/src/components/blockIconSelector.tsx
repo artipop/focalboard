@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useCallback} from 'react'
+import React from 'react'
 
 import {BlockIcons} from '../blockIcons'
 import {Card} from '../blocks/card'
@@ -17,12 +17,12 @@ type Props = {
 const BlockIconSelector = (props: Props) => {
     const {block, size} = props
 
-    const onSelectEmoji = useCallback((emoji: string) => {
+    const onSelectEmoji = (emoji: string) => {
         mutator.changeBlockIcon(block.boardId, block.id, block.fields.icon, emoji)
         document.body.click()
-    }, [block.id, block.fields.icon])
-    const onAddRandomIcon = useCallback(() => mutator.changeBlockIcon(block.boardId, block.id, block.fields.icon, BlockIcons.shared.randomIcon()), [block.id, block.fields.icon])
-    const onRemoveIcon = useCallback(() => mutator.changeBlockIcon(block.boardId, block.id, block.fields.icon, '', 'remove icon'), [block.id, block.fields.icon])
+    }
+    const onAddRandomIcon = () => mutator.changeBlockIcon(block.boardId, block.id, block.fields.icon, BlockIcons.shared.randomIcon())
+    const onRemoveIcon = () => mutator.changeBlockIcon(block.boardId, block.id, block.fields.icon, '', 'remove icon')
 
     if (!block.fields.icon) {
         return null

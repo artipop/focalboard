@@ -61,7 +61,7 @@ describe('/components/confirmationDialogBox', () => {
         )
 
         userEvent.click(result.getByTitle('Confirm'))
-        expect(dialogProps.onConfirm).toBeCalledTimes(1)
+        expect(dialogProps.onConfirm).toHaveBeenCalledTimes(1)
     })
 
     it('confirm button (with passed prop text), run onConfirm Function once', () => {
@@ -77,7 +77,7 @@ describe('/components/confirmationDialogBox', () => {
             resultWithConfirmBtnText.getByTitle(dialogPropsWithCnfrmBtnText.confirmButtonText),
         )
 
-        expect(dialogPropsWithCnfrmBtnText.onConfirm).toBeCalledTimes(1)
+        expect(dialogPropsWithCnfrmBtnText.onConfirm).toHaveBeenCalledTimes(1)
     })
 
     it('cancel button click runs onClose function', () => {
@@ -88,6 +88,6 @@ describe('/components/confirmationDialogBox', () => {
         ))
 
         userEvent.click(result.getByTitle('Cancel'))
-        expect(dialogProps.onClose).toBeCalledTimes(1)
+        expect(dialogProps.onClose).toHaveBeenCalledTimes(1)
     })
 })
