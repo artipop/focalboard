@@ -2,8 +2,10 @@
 // See LICENSE.txt for license information.
 
 import React, {type JSX, useState, useRef} from 'react'
-import Select from 'react-select'
 import {useIntl, FormattedMessage} from 'react-intl'
+
+import Combobox from '../widgets/combobox'
+import type {ComboboxOption} from '../combobox'
 
 import {MemberRole} from '../blocks/board'
 
@@ -95,21 +97,23 @@ const ConfirmAddUserForNotifications = (props: Props): JSX.Element => {
                     />
                 </label>
             </div>
-            <Select
+            <Combobox
                 className='select'
-                getOptionLabel={(o: {id: MemberRole, label: string}) => o.label}
-                getOptionValue={(o: {id: MemberRole, label: string}) => o.id}
-                styles={{menuPortal: (base) => ({...base, zIndex: 9999})}}
-                menuPortalTarget={document.body}
+                classNamePrefix='select'
+                portalTarget={document.body}
                 isDisabled={!allowManageBoardRoles}
-                options={roleOptions}
-                onChange={(option) => {
+                isSearchable={false}
+                options={roleOptions.map((o) => ({id: o.id, label: o.label, data: o}))}
+                onChange={(value) => {
                     if (allowManageBoardRoles) {
-                        setNewUserRole(option?.id || props.minimumRole)
-                        userRole.current = option?.id || props.minimumRole
+                        const role = (value as ComboboxOption<{id: MemberRole}> | null)?.data.id || props.minimumRole
+                        setNewUserRole(role)
+                        userRole.current = role
                     }
                 }}
-                value={roleOptions.find((o) => o.id === newUserRole)}
+                value={roleOptions.
+                    filter((o) => o.id === newUserRole).
+                    map((o) => ({id: o.id, label: o.label, data: o}))[0] || null}
             />
         </div>
     )

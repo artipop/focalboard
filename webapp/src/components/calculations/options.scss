@@ -1,0 +1,23 @@
+// The calculation footer draws its own value and uses the combobox only for the
+// menu, so the value container is hidden -- but the control itself stays in the
+// layout, at zero height, because it is what the menu is anchored to.
+.CalculationOptions {
+    .CalculationOptions__control {
+        width: 100%;
+    }
+
+    .CalculationOptions__value-container {
+        display: none;
+        pointer-events: none;
+    }
+}
+
+.CalculationOptions__menu {
+    width: max-content;
+    min-width: 100%;
+
+    // Each option is a component of the caller's, which brings its own padding.
+    .CalculationOptions__option {
+        padding: 0;
+    }
+}

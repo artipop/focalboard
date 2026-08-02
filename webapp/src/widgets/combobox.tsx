@@ -66,6 +66,12 @@ type Props<T> = {
     matches?: (option: ComboboxOption<T>, query: string) => boolean
     renderOption?: (option: ComboboxOption<T>, context: ComboboxContext) => React.ReactNode
 
+    // Set when what `renderOption` draws is not a row to pick but a menu of its
+    // own -- the calculation options open a submenu and commit their own value.
+    // react-select said this by handing a custom Option its `innerProps` and
+    // letting it ignore them; said out loud, it is one flag.
+    optionsOwnTheirClicks?: boolean
+
     onChange: (value: ComboboxOption<T> | Array<ComboboxOption<T>> | null, action: ComboboxAction) => void
     onCreate?: (label: string) => void
     onBlur?: () => void
@@ -252,6 +258,7 @@ function Combobox<T>(props: Props<T>): JSX.Element {
                     return (
                         <div
                             key={row.key}
+                            id={`${listId}-option-${index}`}
                             className={names.join(' ')}
                             role='option'
                             aria-selected={isSelected}
@@ -260,7 +267,7 @@ function Combobox<T>(props: Props<T>): JSX.Element {
                             // the menu is still there when the click lands on
                             // it; the click is what chooses.
                             onMouseDown={(event) => event.preventDefault()}
-                            onClick={() => choose(row.option)}
+                            onClick={props.optionsOwnTheirClicks ? undefined : () => choose(row.option)}
                             onMouseEnter={() => setHighlight(index)}
                         >
                             {label(row.option, 'menu')}
@@ -329,6 +336,7 @@ function Combobox<T>(props: Props<T>): JSX.Element {
                         role='combobox'
                         aria-expanded={isOpen}
                         aria-controls={listId}
+                        aria-activedescendant={highlight >= 0 ? `${listId}-option-${highlight}` : undefined}
                         aria-label={props.ariaLabel}
                         autoComplete='off'
                         autoFocus={props.autoFocus}

@@ -2,15 +2,13 @@
 // See LICENSE.txt for license information.
 import React, {type JSX} from 'react'
 
-import Select, {components, DropdownIndicatorProps} from 'react-select'
-
-import {CSSObject} from '@emotion/serialize'
-
 import {useIntl, IntlShape} from 'react-intl'
 
-import {getSelectBaseStyle} from '../../theme'
-import ChevronUp from '../../widgets/icons/chevronUp'
+import Combobox from '../../widgets/combobox'
+import type {ComboboxOption} from '../../combobox'
 import {IPropertyTemplate} from '../../blocks/board'
+
+import './options.scss'
 
 export type Option = {
     label: string
@@ -114,51 +112,6 @@ function generateTypesByOption(): Map<string, string[]> {
     return mapping
 }
 
-const baseStyles = getSelectBaseStyle()
-
-const styles = {
-    ...baseStyles,
-    dropdownIndicator: (provided: CSSObject): CSSObject => ({
-        ...baseStyles.dropdownIndicator(provided),
-        pointerEvents: 'none',
-    }),
-    control: (): CSSObject => ({
-        border: 0,
-        width: '100%',
-        margin: '0',
-        display: 'flex',
-        flexDirection: 'row',
-    }),
-    menu: (provided: CSSObject): CSSObject => ({
-        ...provided,
-        minWidth: '100%',
-        width: 'max-content',
-        background: 'rgb(var(--center-channel-bg-rgb))',
-        left: '0',
-        marginBottom: '0',
-    }),
-    singleValue: (provided: CSSObject): CSSObject => ({
-        ...baseStyles.singleValue(provided),
-        opacity: '0.8',
-        fontSize: '12px',
-        right: '0',
-        textTransform: 'uppercase',
-    }),
-    valueContainer: (provided: CSSObject): CSSObject => ({
-        ...baseStyles.valueContainer(provided),
-        display: 'none',
-        pointerEvents: 'none',
-    }),
-}
-
-const DropdownIndicator = (props: DropdownIndicatorProps<Option, false>) => {
-    return (
-        <components.DropdownIndicator {...props}>
-            <ChevronUp/>
-        </components.DropdownIndicator>
-    )
-}
-
 // Calculation option props shared by all implementations of calculation options
 export type CommonCalculationOptionProps = {
     value: string
@@ -177,32 +130,38 @@ type BaseCalculationOptionProps = CommonCalculationOptionProps & {
 export const CalculationOptions = (props: BaseCalculationOptionProps): JSX.Element => {
     const intl = useIntl()
 
+    // The kanban footer draws the value itself and uses this only as a menu, so
+    // the control is hidden and the menu is open for as long as it is mounted.
+    const Slot = props.components?.Option
+
     return (
-        <Select
-            styles={styles}
-            value={Options[props.value]}
-            isMulti={false}
-            isClearable={true}
-            name={'calculation_options'}
-            className={'CalculationOptions'}
-            classNamePrefix={'CalculationOptions'}
-            options={props.options}
-            menuPlacement={'auto'}
+        <Combobox
+            className='CalculationOptions'
+            classNamePrefix='CalculationOptions'
             isSearchable={false}
-            components={{DropdownIndicator, ...(props.components || {})}}
-            defaultMenuIsOpen={props.menuOpen}
-            autoFocus={false}
-            formatOptionLabel={(option: Option, meta) => {
-                return meta.context === 'menu' ? optionLabelString(option, intl) : optionDisplayNameString(option, intl)
-            }}
-            onMenuClose={() => {
-                if (props.onClose) {
-                    props.onClose()
+            menuIsOpen={props.menuOpen}
+            optionsOwnTheirClicks={Boolean(Slot)}
+            options={props.options.map((option) => ({
+                id: option.value,
+                label: optionLabelString(option, intl),
+                data: option,
+            }))}
+            value={Options[props.value] ? {
+                id: props.value,
+                label: optionDisplayNameString(Options[props.value], intl),
+                data: Options[props.value],
+            } : null}
+            renderOption={(option, context) => {
+                if (context === 'value') {
+                    return optionDisplayNameString(option.data as Option, intl)
                 }
+                return Slot ? <Slot data={option.data}/> : optionLabelString(option.data as Option, intl)
             }}
-            onChange={(item) => {
-                if (item?.value) {
-                    props.onChange(item.value)
+            onBlur={props.onClose}
+            onChange={(value) => {
+                const chosen = value as ComboboxOption<Option> | null
+                if (chosen?.data.value) {
+                    props.onChange(chosen.data.value)
                 }
             }}
         />

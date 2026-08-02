@@ -170,7 +170,7 @@ describe('components/calculations/Calculation', () => {
             </Wrapper>,
         )
 
-        const countMenuOption = container.querySelector('#react-select-2-option-1')
+        const countMenuOption = container.querySelectorAll('[role="option"]')[1]
         userEvent.click(countMenuOption as Element)
         expect(container).toMatchSnapshot()
         expect(onMenuOpen).not.toHaveBeenCalled()
