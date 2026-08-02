@@ -116,6 +116,9 @@ const (
 	EventChunk      = "acp:chunk"
 	EventTool       = "acp:tool"
 	EventPermission = "acp:permission"
+	// EventElicitation is a form the agent asked the user to fill in — its own
+	// question with options, or an MCP server's. See elicitation.go.
+	EventElicitation = "acp:elicitation"
 	// EventPrompt echoes a user turn back to every attached console, so a
 	// second console shows what was typed into the first one.
 	EventPrompt = "acp:prompt"

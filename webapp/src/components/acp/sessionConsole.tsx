@@ -171,6 +171,20 @@ const SessionConsole = (props: Props) => {
         }
     }, [bindings, session, setError])
 
+    // The agent's own question, answered as a form. Same shape as a permission
+    // answer: the console knows the request id and hands back what was filled in.
+    const answerForm = useCallback(async (requestId: string, content: {[key: string]: unknown}) => {
+        if (!session || !bindings?.AnswerElicitation) {
+            return
+        }
+        setError('')
+        try {
+            await bindings.AnswerElicitation(session.id, requestId, JSON.stringify(content))
+        } catch (e) {
+            setError(String(e))
+        }
+    }, [bindings, session, setError])
+
     const cancel = useCallback(async () => {
         if (!bindings?.CancelSession) {
             return
@@ -301,6 +315,7 @@ const SessionConsole = (props: Props) => {
                 <Transcript
                     entries={entries}
                     onAnswer={answer}
+                    onAnswerForm={answerForm}
                 />}
 
             {live &&

@@ -177,6 +177,17 @@ const PlanningDialog = (props: Props) => {
         }
     }, [bindings, sessionId, setError])
 
+    const answerForm = useCallback(async (requestId: string, content: {[key: string]: unknown}) => {
+        if (!sessionId || !bindings?.AnswerElicitation) {
+            return
+        }
+        try {
+            await bindings.AnswerElicitation(sessionId, requestId, JSON.stringify(content))
+        } catch (e) {
+            setError(String(e))
+        }
+    }, [bindings, sessionId, setError])
+
     // Ask the agent to boil the conversation down, then show it for review
     // rather than writing it to the board straight away.
     const compose = useCallback(async () => {
@@ -287,6 +298,7 @@ const PlanningDialog = (props: Props) => {
                         <Transcript
                             entries={entries}
                             onAnswer={answer}
+                            onAnswerForm={answerForm}
                         />
                         <div className='SessionConsole__composer'>
                             <textarea

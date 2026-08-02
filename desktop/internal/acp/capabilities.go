@@ -174,11 +174,11 @@ func (m *Manager) probeAgentOptions(a AgentEntry) ([]AgentOption, error) {
 
 	conn := acpsdk.NewClientSideConnection(probeClient{}, proc.Stdin, proc.Stdout)
 	conn.SetLogger(m.sdkLogger("probe"))
+	// The same capabilities a real session declares, so what the agent reports
+	// here is what a real session would get.
 	if _, err := conn.Initialize(ctx, acpsdk.InitializeRequest{
-		ProtocolVersion: acpsdk.ProtocolVersionNumber,
-		ClientCapabilities: acpsdk.ClientCapabilities{
-			Fs: acpsdk.FileSystemCapabilities{ReadTextFile: true, WriteTextFile: true},
-		},
+		ProtocolVersion:    acpsdk.ProtocolVersionNumber,
+		ClientCapabilities: clientCapabilities(),
 	}); err != nil {
 		return nil, fmt.Errorf("initialize: %s", net.redactProxySecret(err.Error()))
 	}

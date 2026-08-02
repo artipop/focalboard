@@ -113,6 +113,73 @@
     }
 }
 
+// The agent's own question, as a form. Framed like a permission prompt, for the
+// same reason: it is the one thing on screen waiting for the person.
+.SessionConsole__entry--form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-radius: 4px;
+    padding: 8px;
+    border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+
+    .SessionConsole__formMessage {
+        font-weight: 600;
+    }
+
+    .SessionConsole__formField {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .SessionConsole__formLabel {
+        font-size: 12px;
+        color: rgba(var(--center-channel-color-rgb), 0.72);
+    }
+
+    .SessionConsole__formOption {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+        cursor: pointer;
+
+        input {
+            margin-top: 3px;
+        }
+    }
+
+    .SessionConsole__formOptionTitle {
+        display: block;
+    }
+
+    .SessionConsole__formOptionHint {
+        display: block;
+        font-size: 12px;
+        color: rgba(var(--center-channel-color-rgb), 0.64);
+    }
+
+    .SessionConsole__formInput {
+        border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+        border-radius: 4px;
+        padding: 4px 6px;
+        background: rgb(var(--center-channel-bg-rgb));
+        color: rgb(var(--center-channel-color-rgb));
+        font-family: inherit;
+    }
+}
+
+// Answered, or declined because nobody was watching: a note, not a prompt.
+.SessionConsole__entry--formSettled {
+    border: 0;
+    padding: 2px 0;
+    gap: 2px;
+
+    .SessionConsole__formMessage {
+        font-weight: 400;
+    }
+}
+
 .SessionConsole__entry--permission {
     display: flex;
     flex-direction: column;

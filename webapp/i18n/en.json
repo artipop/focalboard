@@ -395,6 +395,8 @@
   "SessionConsole.close": "Close session",
   "SessionConsole.deploy": "Deploy",
   "SessionConsole.deploy-status": "deploy: {status}",
+  "SessionConsole.form-answer": "Answer",
+  "SessionConsole.form-unanswerable": "The agent asked a question this console cannot show",
   "SessionConsole.open": "Open session",
   "SessionConsole.open-here": "Open here",
   "SessionConsole.permission-by-policy": "{decision} — automatically, by the tool policy",

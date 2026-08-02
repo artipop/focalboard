@@ -395,6 +395,8 @@
   "SessionConsole.close": "Закрыть сессию",
   "SessionConsole.deploy": "Деплой",
   "SessionConsole.deploy-status": "деплой: {status}",
+  "SessionConsole.form-answer": "Ответить",
+  "SessionConsole.form-unanswerable": "Агент задал вопрос, который эта консоль показать не может",
   "SessionConsole.open": "Открыть сессию",
   "SessionConsole.open-here": "Открыть здесь",
   "SessionConsole.permission-by-policy": "{decision} — автоматически, по политике инструментов",

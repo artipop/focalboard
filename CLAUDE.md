@@ -215,9 +215,29 @@ the session config option the protocol itself defines (`selectSessionModel`, mat
 `session/new` says it offers). Codex also starts read-only, so its session is switched into
 `agent` (`selectSessionMode`), or the turn is spent explaining that nothing can be edited.
 
-The claude adapter disables the `AskUserQuestion` tool unless the client advertises form
-elicitation, which we do not yet — so an agent that wants to ask states the question in its answer
-instead. See `desktop/internal/acp/TODO.md`.
+### An agent asking the user something
+
+An agent that needs a decision mid-task asks for it as a form — ACP's elicitation
+(`internal/acp/elicitation.go`), which the claude adapter uses both for its own
+`AskUserQuestion` tool and for any MCP server's elicitation. The tool is only offered to a client
+that says it can draw one: the adapter's rule is
+`disallowedTools = elicitationSupport.form ? [] : ["AskUserQuestion"]`, so a silent client gets an
+agent that can only state the question in its answer. `clientCapabilities` says we can, and the
+`--disallowedTools AskUserQuestion` in the spawned CLI's argv disappears accordingly.
+
+Nothing on our side knows about `AskUserQuestion`: what arrives is a JSON Schema and what goes
+back is an object keyed by the schema's own property names, which is why an MCP server's
+elicitation works the same. `elicitationForm` flattens the schema into fields the console draws
+without further interpretation — a select where the property lists its values (`oneOf`, `enum`, or
+`items.anyOf` for several answers), a text/number/boolean input otherwise — and sorts them by key,
+since a JSON object has no order and the same form should read the same twice. A free-text field
+the adapter marks with `_askUserQuestionCustomAnswer` is drawn under the question it answers
+instead of.
+
+A session with no console declines at once rather than holding the turn until the prompt times
+out, exactly as with a permission request; the card keeps the record of what was asked. The
+console renders the form (`ElicitationFormEntry` in `sessionStream.tsx`) and answers through
+`AnswerElicitation`.
 
 ### Per-agent settings
 

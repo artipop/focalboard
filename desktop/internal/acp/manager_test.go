@@ -120,6 +120,22 @@ func (e *fakeEmitter) pendingPermissionID() string {
 	return ""
 }
 
+// pendingElicitation returns the payload of the form the UI was asked to show,
+// or nil while none is waiting.
+func (e *fakeEmitter) pendingElicitation() map[string]any {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	for i, name := range e.events {
+		if name != EventElicitation {
+			continue
+		}
+		if p := e.payloads[i]; p != nil && p["pending"] == true {
+			return p
+		}
+	}
+	return nil
+}
+
 // fakeReader serves one card to the "open a console" path.
 type fakeReader struct{ ev CardMoved }
 

@@ -593,6 +593,15 @@ func (a *App) AnswerPermission(sessionID, requestID, optionID string) error {
 	return a.mgr.AnswerPermission(sessionID, requestID, optionID)
 }
 
+// AnswerElicitation delivers what the user filled into a form the agent asked
+// for. contentJSON is an object keyed by the field keys the form carried.
+func (a *App) AnswerElicitation(sessionID, requestID, contentJSON string) error {
+	if a.mgr == nil {
+		return errACPDisabled
+	}
+	return a.mgr.AnswerElicitation(sessionID, requestID, contentJSON)
+}
+
 // AttachSession marks the console as watching a session, keeping it alive
 // between turns. Returns false when the session is no longer live.
 func (a *App) AttachSession(sessionID string) bool {

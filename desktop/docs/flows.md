@@ -172,6 +172,16 @@ agent that gains a setting shows it after *Recheck* without an update here.
   missing or the account is not logged in. Everything else on the form still
   saves.
 
+### When the agent asks you something
+
+An agent that needs a decision — which database, which of two approaches — asks it as a small
+form in the session console: the question, the options with their explanations, and a free-text
+box if none of them fits. Answer it and the turn carries on.
+
+It only asks when somebody is watching. A card-triggered session with no console open has nobody
+to answer, so the question is declined immediately and the card records what was asked, rather
+than the agent waiting out the prompt timeout. Open the card's console if you want to be asked.
+
 ### What the protocol has no word for
 
 Remote control — driving an agent's sessions from claude.ai or the Claude app —

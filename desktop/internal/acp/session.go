@@ -526,10 +526,8 @@ func (m *Manager) openConnection(ctx context.Context, s *Session) (*acpsdk.Clien
 	}
 
 	if _, err := conn.Initialize(ctx, acpsdk.InitializeRequest{
-		ProtocolVersion: acpsdk.ProtocolVersionNumber,
-		ClientCapabilities: acpsdk.ClientCapabilities{
-			Fs: acpsdk.FileSystemCapabilities{ReadTextFile: true, WriteTextFile: true},
-		},
+		ProtocolVersion:    acpsdk.ProtocolVersionNumber,
+		ClientCapabilities: clientCapabilities(),
 	}); err != nil {
 		cleanup()
 		return nil, "", nil, fmt.Errorf("initialize: %w", err)

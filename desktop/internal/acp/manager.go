@@ -42,6 +42,9 @@ type Manager struct {
 	permMu sync.Mutex
 	perms  map[string]pendingPermission // request ID → prompt awaiting a human
 
+	elicitMu sync.Mutex
+	elicits  map[string]pendingElicitation // request ID → form awaiting a human
+
 	// What an agent says it can be configured with, keyed by how it is
 	// launched. Asking costs an agent startup, and the dialog asks whenever a
 	// form is opened. See capabilities.go.
