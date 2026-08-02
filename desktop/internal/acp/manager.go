@@ -42,6 +42,12 @@ type Manager struct {
 	permMu sync.Mutex
 	perms  map[string]pendingPermission // request ID → prompt awaiting a human
 
+	// What an agent says it can be configured with, keyed by how it is
+	// launched. Asking costs an agent startup, and the dialog asks whenever a
+	// form is opened. See capabilities.go.
+	optionsMu    sync.Mutex
+	optionsCache map[string][]AgentOption
+
 	watchers []vcs.Watcher // repository watchers feeding the flow engine
 
 	sem     chan struct{}

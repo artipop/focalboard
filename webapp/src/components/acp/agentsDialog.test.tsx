@@ -9,7 +9,7 @@ import {wrapIntl} from '../../testUtils'
 import {TestBlockFactory} from '../../test/testBlockFactory'
 import mutator from '../../mutator'
 
-import AgentsDialog, {isAgentsAvailable, textToServers} from './agentsDialog'
+import AgentsDialog, {isAgentsAvailable, textToServers, keptOptions, remoteControlOf, withRemoteControl} from './agentsDialog'
 
 jest.mock('../../mutator')
 const mockedMutator = jest.mocked(mutator)
@@ -419,5 +419,196 @@ describe('components/acp/agentsDialog', () => {
         expect(JSON.parse(bindings.UpdateAgent.mock.calls[0][0])).toMatchObject({
             mcpServers: {playwright: {command: 'npx', args: ['-y', '@playwright/mcp@latest']}},
         })
+    })
+
+    // Some agents have settings of their own — Fast mode, an effort level — and
+    // some have none. Which ones exist is the agent's own answer, asked of it
+    // over ACP, so the form offers exactly those and nothing else.
+    test('offers the settings the agent declares, and saves the chosen value', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([{name: 'clyde', kind: 'claude'}])),
+            ListProxies: jest.fn().mockResolvedValue('[]'),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AgentOptions: jest.fn().mockResolvedValue(JSON.stringify([
+                {id: 'model', name: 'Model', type: 'select', current: 'opus', values: [{value: 'opus', name: 'Opus'}]},
+                {id: 'fast', name: 'Fast mode', description: 'Faster responses on supported models', type: 'select', current: 'off', values: [{value: 'on', name: 'On'}, {value: 'off', name: 'Off'}]},
+            ])),
+            AddAgent: jest.fn(),
+            UpdateAgent: jest.fn().mockResolvedValue('{}'),
+            RemoveAgent: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByText('clyde')).toBeInTheDocument())
+        userEvent.click(screen.getAllByRole('button', {name: 'Edit'})[0])
+
+        await waitFor(() => expect(bindings.AgentOptions).toHaveBeenCalled())
+        expect(bindings.AgentOptions.mock.calls[0][1]).toBe(false)
+
+        // The model is asked for by its own field, so it is not asked twice.
+        const fast = await screen.findByRole('combobox', {name: 'Fast mode'})
+        expect(screen.queryByRole('combobox', {name: 'Model'})).not.toBeInTheDocument()
+
+        userEvent.selectOptions(fast, 'on')
+        userEvent.click(screen.getByRole('button', {name: 'Save'}))
+        await waitFor(() => expect(bindings.UpdateAgent).toHaveBeenCalled())
+        expect(JSON.parse(bindings.UpdateAgent.mock.calls[0][0]).options).toEqual({fast: 'on'})
+    })
+
+    test('offers nothing for an agent that declares nothing', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([{name: 'plain', kind: 'junie'}])),
+            ListProxies: jest.fn().mockResolvedValue('[]'),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AgentOptions: jest.fn().mockResolvedValue('[]'),
+            AddAgent: jest.fn(),
+            UpdateAgent: jest.fn().mockResolvedValue('{}'),
+            RemoveAgent: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByText('plain')).toBeInTheDocument())
+        userEvent.click(screen.getAllByRole('button', {name: 'Edit'})[0])
+
+        await waitFor(() => expect(screen.getByText('This agent has no settings of its own.')).toBeInTheDocument())
+
+        // Only the two the form always has: the kind and the proxy.
+        expect(screen.getAllByRole('combobox')).toHaveLength(2)
+    })
+
+    // The answer is cached, so "Recheck" is how an agent is asked again after
+    // its account or adapter changed.
+    test('rechecks what the agent supports on demand', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([{name: 'clyde', kind: 'claude'}])),
+            ListProxies: jest.fn().mockResolvedValue('[]'),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AgentOptions: jest.fn().mockResolvedValue('[]'),
+            AddAgent: jest.fn(),
+            UpdateAgent: jest.fn(),
+            RemoveAgent: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByText('clyde')).toBeInTheDocument())
+        userEvent.click(screen.getAllByRole('button', {name: 'Edit'})[0])
+        await waitFor(() => expect(bindings.AgentOptions).toHaveBeenCalledTimes(1))
+
+        userEvent.click(screen.getByRole('button', {name: 'Recheck'}))
+        await waitFor(() => expect(bindings.AgentOptions).toHaveBeenCalledTimes(2))
+        expect(bindings.AgentOptions.mock.calls[1][1]).toBe(true)
+    })
+
+    // Switching an entry from an agent that has Fast mode to one that has not
+    // must not leave a setting behind that nothing shows and nothing applies.
+    test('keptOptions drops what the agent does not offer', () => {
+        const kept = keptOptions({fast: 'on', effort: 'high'}, [
+            {id: 'effort', name: 'Effort', type: 'select', current: 'default', values: [{value: 'high'}]},
+        ])
+        expect(kept).toEqual({effort: 'high'})
+    })
+
+    // Remote Control is a flag of the CLI behind the adapter and nothing in ACP,
+    // so the probe cannot find it: it is named in the form and handed over in
+    // session/new's _meta. Only for the kinds whose adapter passes arguments on.
+    test('turns remote control on for claude and saves it as a CLI argument', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([{name: 'clyde', kind: 'claude'}])),
+            ListProxies: jest.fn().mockResolvedValue('[]'),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AgentOptions: jest.fn().mockResolvedValue('[]'),
+            AddAgent: jest.fn(),
+            UpdateAgent: jest.fn().mockResolvedValue('{}'),
+            RemoveAgent: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByText('clyde')).toBeInTheDocument())
+        userEvent.click(screen.getAllByRole('button', {name: 'Edit'})[0])
+
+        const toggle = await screen.findByRole('checkbox', {name: /Remote control/})
+        expect(toggle).not.toBeChecked()
+        userEvent.click(toggle)
+
+        // The name appears only once it is switched on, and it is one setting:
+        // both end up in the arguments field.
+        userEvent.type(await screen.findByRole('textbox', {name: /Session name prefix/}), 'my board')
+        expect(screen.getByRole('textbox', {name: /Arguments for the CLI/})).toHaveValue('--remote-control --remote-control-session-name-prefix "my board"')
+
+        userEvent.click(screen.getByRole('button', {name: 'Save'}))
+        await waitFor(() => expect(bindings.UpdateAgent).toHaveBeenCalled())
+        expect(JSON.parse(bindings.UpdateAgent.mock.calls[0][0]).cliArgs).toEqual([
+            '--remote-control', '--remote-control-session-name-prefix', 'my board',
+        ])
+    })
+
+    test('offers no remote control for a kind whose adapter cannot pass it on', async () => {
+        const bindings = {
+            ListAgents: jest.fn().mockResolvedValue(JSON.stringify([{name: 'cx', kind: 'codex'}])),
+            ListProxies: jest.fn().mockResolvedValue('[]'),
+            GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
+            SetAgentSystemPrompt: jest.fn(),
+            AgentOptions: jest.fn().mockResolvedValue('[]'),
+            AddAgent: jest.fn(),
+            UpdateAgent: jest.fn(),
+            RemoveAgent: jest.fn(),
+        }
+        anyWindow.go = {main: {App: bindings}}
+
+        render(wrapIntl(
+            <AgentsDialog
+                board={board}
+                onClose={jest.fn()}
+            />,
+        ))
+        await waitFor(() => expect(screen.getByText('cx')).toBeInTheDocument())
+        userEvent.click(screen.getAllByRole('button', {name: 'Edit'})[0])
+
+        await waitFor(() => expect(screen.getByRole('button', {name: 'Save'})).toBeInTheDocument())
+        expect(screen.queryByRole('checkbox', {name: /Remote control/})).not.toBeInTheDocument()
+    })
+
+    // The switch is a reading of the arguments, not a state beside them, so
+    // typing the flag by hand and ticking the box are the same thing.
+    test('the remote control switch and the arguments are one setting', () => {
+        expect(remoteControlOf(['--remote-control', '--verbose'])).toEqual({on: true, name: ''})
+        expect(remoteControlOf(['--verbose'])).toEqual({on: false, name: ''})
+        expect(remoteControlOf(['--remote-control', '--remote-control-session-name-prefix', 'x'])).toEqual({on: true, name: 'x'})
+
+        // Switching it off leaves everything else where it was.
+        expect(withRemoteControl(['--verbose', '--remote-control', '--remote-control-session-name-prefix', 'x'], false, 'x')).toEqual(['--verbose'])
+        expect(withRemoteControl(['--verbose'], true, 'my board')).toEqual(['--remote-control', '--remote-control-session-name-prefix', 'my board', '--verbose'])
+
+        // Kept as typed: trimming here would eat the space as it is typed.
+        expect(withRemoteControl([], true, 'my ')).toEqual(['--remote-control', '--remote-control-session-name-prefix', 'my '])
+        expect(withRemoteControl(['--verbose'], true, '')).toEqual(['--remote-control', '--verbose'])
     })
 })

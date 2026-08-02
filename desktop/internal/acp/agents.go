@@ -43,6 +43,12 @@ func validateAgent(a AgentEntry) (AgentEntry, error) {
 	default:
 		return AgentEntry{}, fmt.Errorf("неизвестный тип агента %q (допустимо: %s)", a.Kind, strings.Join(AgentKinds, ", "))
 	}
+	cliArgs, err := validateCLIArgs(a)
+	if err != nil {
+		return AgentEntry{}, err
+	}
+	a.CLIArgs = cliArgs
+	a.Options = normalizeOptions(a.Options)
 	servers, err := validateMCPServers(a.MCPServers)
 	if err != nil {
 		return AgentEntry{}, fmt.Errorf("агент %q: %w", a.Name, err)
@@ -98,6 +104,28 @@ func validateMCPServers(servers map[string]AgentMCPServer) (map[string]AgentMCPS
 		out[name] = srv
 	}
 	return out, nil
+}
+
+// normalizeOptions drops the empties. An option left blank means "whatever the
+// agent starts with", which is what leaving it out says, and saying it twice
+// only leaves the config file harder to read. Values are kept verbatim: what a
+// value id may look like is the agent's business, not ours.
+func normalizeOptions(options map[string]string) map[string]string {
+	if len(options) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(options))
+	for id, value := range options {
+		id, value = strings.TrimSpace(id), strings.TrimSpace(value)
+		if id == "" || value == "" {
+			continue
+		}
+		out[id] = value
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // validMCPName mirrors what a tool name may carry: the server name becomes the

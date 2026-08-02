@@ -132,6 +132,48 @@
         }
     }
 
+    // What this agent says it can be configured with. Set apart from the launch
+    // fields above it, because it is answered by the agent rather than typed.
+    .AgentsDialog__options {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        padding: 10px;
+        border: 1px solid rgba(var(--center-channel-color-rgb), 0.12);
+        border-radius: 4px;
+        background: rgba(var(--center-channel-color-rgb), 0.04);
+
+        .AgentsDialog__hint {
+            font-weight: 400;
+        }
+    }
+
+    // A switch reads across, not down like the rest of the form's labels.
+    .AgentsDialog__form label.AgentsDialog__checkbox {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+
+        input {
+            width: auto;
+            flex: none;
+        }
+    }
+
+    .AgentsDialog__option {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .AgentsDialog__optionsHeader {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font-weight: 600;
+    }
+
     .AgentsDialog__error {
         color: rgb(var(--error-text-color-rgb, 210, 75, 78));
         padding-top: 8px;

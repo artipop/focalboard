@@ -153,6 +153,46 @@ Nothing here takes the board away from you:
   that is asking for one outright, so the assignee rule does not apply;
 - **Deploy** next to the branch publishes it without moving the card.
 
+## Settings an agent has of its own
+
+Agents differ in what they can be told beyond the task: Claude has **Fast mode**,
+an **effort** level and a permission **mode**; Codex has a mode and a model and
+neither of the other two. Nothing about that is written down on our side — the
+*Agents…* dialog starts the agent you are editing, asks it what it supports and
+shows exactly that. So an agent without Fast mode has no Fast mode switch, and an
+agent that gains a setting shows it after *Recheck* without an update here.
+
+- the answer is remembered per agent, so opening the form is instant; **Recheck**
+  asks again, which is what to press after changing an account or updating an
+  adapter;
+- a setting left at *As the agent has it* is not sent at all;
+- a setting is applied after the model and the mode this app would have chosen,
+  so what you pick here wins;
+- "Could not ask the agent…" means the agent would not start — the adapter is
+  missing or the account is not logged in. Everything else on the form still
+  saves.
+
+### What the protocol has no word for
+
+Remote control — driving an agent's sessions from claude.ai or the Claude app —
+is not on that list: it is a flag of the CLI itself rather than a setting of the
+protocol, so the agent cannot be asked about it. It is therefore named by hand:
+a Claude agent has a **Remote control** checkbox in the same dialog and, if you
+want one, a prefix for the session name it will appear under in claude.ai. It
+works through a door the adapter documents for itself — the arguments reach the
+real `claude` process when the session starts.
+
+Next to it is **Arguments for the CLI behind the adapter**, where anything else
+goes (`--fallback-model sonnet`). We keep no list of those flags: it is somebody
+else's CLI and it changes without us. Getting one wrong is cheap — an argument
+the CLI does not know fails the session start in its own words (`unknown option
+'--nonsense'`), and you see it when the agent is rechecked rather than later on
+a card.
+
+For the other kinds the agent *is* the CLI, so its flags go in the ordinary
+**Extra CLI args** field and there is no remote control checkbox — their
+adapters have no such channel.
+
 ## When nothing happens
 
 | What you see | Why |

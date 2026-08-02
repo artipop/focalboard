@@ -538,6 +538,10 @@ func (m *Manager) openConnection(ctx context.Context, s *Session) (*acpsdk.Clien
 	sess, err := conn.NewSession(ctx, acpsdk.NewSessionRequest{
 		Cwd:        s.Worktree.Path,
 		McpServers: acpMCPServers(specs),
+		// Extra arguments for the CLI behind the adapter, for what ACP has no
+		// word for (Remote Control). An argument the CLI does not know fails
+		// right here, with the CLI's own message.
+		Meta: sessionMeta(s.Agent),
 	})
 	if err != nil {
 		cleanup()
@@ -545,6 +549,9 @@ func (m *Manager) openConnection(ctx context.Context, s *Session) (*acpsdk.Clien
 	}
 	m.selectSessionMode(ctx, s, conn, sess, launch.mode)
 	m.selectSessionModel(ctx, s, conn, sess)
+	// Last, so what the user chose on the agent outranks what the kind's table
+	// would have set.
+	m.applyAgentOptions(ctx, s, conn, sess)
 	worktreePath := ""
 	if s.usedWorktree {
 		worktreePath = s.Worktree.Path
