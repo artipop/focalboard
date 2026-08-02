@@ -236,6 +236,25 @@ func NewStore(config *config.Configuration, isSingleUser bool, logger mlog.Logge
 	if err != nil {
 		return nil, err
 	}
+
+	// SQLite locks the whole table for a write, and a second connection writing
+	// at the same moment does not wait -- it fails outright with "database table
+	// is locked". That is SQLITE_LOCKED, which _busy_timeout does not retry; it
+	// only retries SQLITE_BUSY. One connection is the usual remedy and costs
+	// nothing for a store that is one file on one machine.
+	//
+	// Dragging a card is exactly the case that provokes it: the card's property
+	// and the view's card order are written at the same moment, one of the two
+	// came back 500, and the browser, which says nothing about a failed write,
+	// went on showing a board the server had never agreed to -- which looks,
+	// from the outside, exactly like drag and drop having stopped working.
+	//
+	// After the migrations, not before: the migration engine holds a connection
+	// while opening another, and capping the pool at one deadlocks it on start.
+	if config.DBType == appModel.SqliteDBType {
+		sqlDB.SetMaxOpenConns(1)
+	}
+
 	return db, nil
 }
 
