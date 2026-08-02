@@ -3,8 +3,8 @@
 import React, {useEffect, useState} from 'react'
 import {FormattedMessage, useIntl} from 'react-intl'
 import {useHistory, useRouteMatch} from 'react-router-dom'
-import {useHotkeys} from 'react-hotkeys-hook'
 
+import {useHotkeys} from '../../hooks/hotkeys'
 import CompassIcon from '../../widgets/icons/compassIcon'
 
 import {Board} from '../../blocks/board'

@@ -3,9 +3,9 @@
 import React, {type JSX, useState, useRef, useEffect} from 'react'
 import {useRouteMatch} from 'react-router-dom'
 import {useIntl} from 'react-intl'
-import {useHotkeys} from 'react-hotkeys-hook'
 import debounce from 'lodash/debounce'
 
+import {useHotkeys} from '../../hooks/hotkeys'
 import CompassIcon from '../../widgets/icons/compassIcon'
 import Editable from '../../widgets/editable'
 

@@ -273,7 +273,7 @@ describe('components/centerPanel', () => {
             ))
 
             //touch '1'
-            fireEvent.keyDown(baseElement, {keyCode: 49})
+            fireEvent.keyDown(baseElement, {key: '1', code: 'Digit1'})
             expect(container).toMatchSnapshot()
         })
 
@@ -303,7 +303,7 @@ describe('components/centerPanel', () => {
             expect(container).toMatchSnapshot()
 
             //escape
-            fireEvent.keyDown(baseElement, {keyCode: 27})
+            fireEvent.keyDown(baseElement, {key: 'Escape'})
             expect(container).toMatchSnapshot()
         })
         test('press touch esc for two cards selected', async () => {
@@ -341,7 +341,7 @@ describe('components/centerPanel', () => {
             expect(container).toMatchSnapshot()
 
             //escape
-            fireEvent.keyDown(baseElement, {keyCode: 27})
+            fireEvent.keyDown(baseElement, {key: 'Escape'})
             expect(container).toMatchSnapshot()
         })
         test('press touch del for one card selected', () => {
@@ -369,7 +369,7 @@ describe('components/centerPanel', () => {
             expect(container).toMatchSnapshot()
 
             //delete
-            fireEvent.keyDown(baseElement, {keyCode: 8})
+            fireEvent.keyDown(baseElement, {key: 'Backspace'})
             expect(mockedMutator.performAsUndoGroup).toHaveBeenCalledTimes(1)
         })
         test('press touch ctrl+d for one card selected', () => {
@@ -397,7 +397,7 @@ describe('components/centerPanel', () => {
             expect(container).toMatchSnapshot()
 
             //ctrl+d
-            fireEvent.keyDown(baseElement, {ctrlKey: true, keyCode: 68})
+            fireEvent.keyDown(baseElement, {ctrlKey: true, key: 'd', code: 'KeyD'})
             expect(mockedMutator.performAsUndoGroup).toHaveBeenCalledTimes(1)
         })
         test('click on card to show card', () => {

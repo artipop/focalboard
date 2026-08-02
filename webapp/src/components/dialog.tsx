@@ -2,8 +2,8 @@
 // See LICENSE.txt for license information.
 import React, {type JSX, useRef} from 'react'
 import {useIntl} from 'react-intl'
-import {useHotkeys} from 'react-hotkeys-hook'
 
+import {useHotkeys} from '../hooks/hotkeys'
 import IconButton from '../widgets/buttons/iconButton'
 import CloseIcon from '../widgets/icons/close'
 import OptionsIcon from '../widgets/icons/options'

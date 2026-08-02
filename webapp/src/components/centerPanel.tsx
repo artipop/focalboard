@@ -3,8 +3,8 @@
 /* eslint-disable max-lines */
 import React, {useState, useEffect} from 'react'
 import {useIntl} from 'react-intl'
-import {useHotkeys} from 'react-hotkeys-hook'
 
+import {useHotkeys} from '../hooks/hotkeys'
 import {ClientConfig} from '../config/clientConfig'
 
 import {Block} from '../blocks/block'
@@ -122,7 +122,7 @@ const CenterPanel = (props: Props) => {
             setSelectedCardIds([])
             e.stopPropagation()
         }
-    }, [selectedCardIds, props.readonly])
+    })
 
     useHotkeys('ctrl+d', (e: KeyboardEvent) => {
         if (e.target !== document.body || props.readonly) {
@@ -151,7 +151,7 @@ const CenterPanel = (props: Props) => {
             e.stopPropagation()
             e.preventDefault()
         }
-    }, [selectedCardIds, props.readonly, props.cards, props.board.id])
+    })
 
     useHotkeys('del,backspace', (e: KeyboardEvent) => {
         if (e.target !== document.body || props.readonly) {
@@ -178,7 +178,7 @@ const CenterPanel = (props: Props) => {
             setSelectedCardIds([])
             e.stopPropagation()
         }
-    }, [selectedCardIds, props.readonly, props.cards])
+    })
 
     const showCard = (cardId?: string) => {
         if (selectedCardIds.length > 0) {

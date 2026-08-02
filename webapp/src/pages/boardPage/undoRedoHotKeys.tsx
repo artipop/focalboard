@@ -1,8 +1,8 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import {useHotkeys} from 'react-hotkeys-hook'
 import {useIntl} from 'react-intl'
 
+import {useHotkeys} from '../../hooks/hotkeys'
 import {sendFlashMessage} from '../../components/flashMessages'
 import mutator from '../../mutator'
 import {Utils} from '../../utils'

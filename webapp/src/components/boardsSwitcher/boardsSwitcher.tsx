@@ -37,13 +37,13 @@ const BoardsSwitcher = (): JSX.Element => {
                                        onboardingTourStep === SidebarTourSteps.SEARCH_FOR_BOARDS.toString()
 
     // We need this keyboard handling (copied from Mattermost webapp) instead of
-    // using react-hotkeys-hook as react-hotkeys-hook is unable to handle keyboard shortcuts that
-    // the browser uses when the user is focused in an input field.
+    // `useHotkeys`, which deliberately leaves a shortcut alone while the user is
+    // typing in an input field.
     //
     // For example, you press Cmd + k, then type something in the search input field. Pressing Cmd + k again
-    // is expected to close the board switcher, however, with react-hotkeys-hook it doesn't.
-    // This is because Cmd + k is a Firefox shortcut and react-hotkeys-hook is
-    // unable to override it if the user is focused on any input field.
+    // is expected to close the board switcher, and a shortcut that stands aside for
+    // the focused field never sees it. Cmd + k is also a Firefox shortcut, so the
+    // handler has to be the one preventing the browser's own default.
     const handleQuickSwitchKeyPress = (e: KeyboardEvent) => {
         if (Utils.cmdOrCtrlPressed(e) && !e.shiftKey && Utils.isKeyPressed(e, Constants.keyCodes.K)) {
             if (!e.altKey) {

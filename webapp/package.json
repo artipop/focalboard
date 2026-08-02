@@ -61,7 +61,6 @@
 		"react": "19.2.8",
 		"react-day-picker": "^10.0.1",
 		"react-dom": "19.2.8",
-		"react-hotkeys-hook": "^3.4.4",
 		"react-intl": "^10.1.19",
 		"react-redux": "^9.3.0",
 		"react-router-dom": "^5.2.0",
