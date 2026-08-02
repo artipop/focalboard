@@ -57,6 +57,37 @@ somebody using the board: what happens when a card lands in a column, when a
 worktree appears and what becomes of it, which branch is followed, the routes
 the template ships, and what to look at when nothing happens.
 
+## What this app requires of the frontend
+
+The desktop app serves and embeds `webapp`, and knows nothing about what it is
+written in. There is no React here and none of the migration off React-only
+libraries touched this module. What the two halves *do* agree on is worth
+writing down, because it is the whole of what a port to another framework has to
+keep — `webapp/src/types/index.d.ts` declares the shape, and this is the
+contract behind it.
+
+**The build output.** `make webapp` must leave `webapp/pack/index.html` plus
+everything under `webapp/pack/static/`; `desktop-pack` copies that to
+`desktop/pack`, and `go:embed` compiles it in. `index.html` must still carry the
+Go template `{{.BaseURL}}`, and asset URLs referenced from JS and CSS must stay
+relative so they survive a non-empty base path.
+
+**Four globals, injected into the page before the app boots** (`proxy.go`):
+
+- `window.webSocketBaseURL` — the real server's origin. The webview's own origin
+  cannot carry a WebSocket upgrade, so `wsclient.ts` connects there instead.
+- `window.openInNewBrowser` — hands a link to the system browser rather than the
+  webview. Called from `utils.ts`, `csvExporter.ts`, `archiver.ts` and the
+  sidebar user menu.
+- `window.go.main.App.*` — the bound Go methods, which is how the ACP UI reaches
+  the agent, repo, proxy and flow registries.
+- `window.runtime.EventsOn` — the event bus the session console streams over.
+
+**Every one of them is feature-detected at the call site**, because the same
+bundle also runs in a browser and as a Mattermost plugin, where none of them
+exist. That guard is what keeps the desktop-only UI inert elsewhere, and it is
+the one thing a rewrite must not quietly drop.
+
 ## Prerequisites
 
 - Wails CLI:
