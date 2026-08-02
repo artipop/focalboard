@@ -159,6 +159,8 @@
   "Calculations.Options.range.label": "Диапазон",
   "Calculations.Options.sum.displayName": "Сумма",
   "Calculations.Options.sum.label": "Сумма",
+  "Calendar.nextMonth": "Следующий месяц",
+  "Calendar.previousMonth": "Предыдущий месяц",
   "CalendarCard.untitled": "Без названия",
   "CardActionsMenu.copiedLink": "Скопировано!",
   "CardActionsMenu.copyLink": "Копировать ссылку",

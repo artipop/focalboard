@@ -2,7 +2,6 @@
 // See LICENSE.txt for license information.
 import React, {type JSX, useMemo, useState, useCallback, useEffect} from 'react'
 import {useIntl} from 'react-intl'
-import {DayPicker} from 'react-day-picker'
 
 import moment from 'moment'
 
@@ -11,15 +10,14 @@ import mutator from '../../mutator'
 import Editable from '../../widgets/editable'
 import SwitchOption from '../../widgets/menu/switchOption'
 import Button from '../../widgets/buttons/button'
+import Calendar from '../../widgets/calendar'
 
 import Modal from '../../components/modal'
 import ModalWrapper from '../../components/modalWrapper'
 import {Utils} from '../../utils'
 import useMomentLocale from '../../hooks/momentLocale'
-import useDateFnsLocale from '../../hooks/dateFnsLocale'
 import {addDayToRange, isDate, parseLocalizedDate} from '../../widgets/dateUtils'
 
-import 'react-day-picker/style.css'
 import './date.scss'
 
 import {PropertyProps} from '../types'
@@ -96,7 +94,7 @@ function DateRange(props: PropertyProps): JSX.Element {
 
     const locale = intl.locale.toLowerCase()
     useMomentLocale(locale)
-    const calendarLocale = useDateFnsLocale(locale)
+    const firstDayOfWeek = moment.localeData(locale).firstDayOfWeek()
 
     const handleDayClick = (day: Date) => {
         const range: DateProperty = {}
@@ -244,24 +242,11 @@ function DateRange(props: PropertyProps): JSX.Element {
                                     />
                                 }
                             </div>
-                            <DayPicker
+                            <Calendar
                                 onDayClick={handleDayClick}
                                 defaultMonth={dateFrom || new Date()}
-                                showOutsideDays={false}
-                                locale={calendarLocale}
-                                modifiers={{
-                                    selected: dateTo ? {from: dateFrom, to: dateTo} : dateFrom,
-                                    start: dateFrom,
-                                    end: dateTo || dateFrom,
-                                }}
-
-                                // A modifier of our own gets no class unless it
-                                // is named one: version 10 only derives them for
-                                // its own flags and selection states.
-                                modifiersClassNames={{
-                                    start: 'is-start',
-                                    end: 'is-end',
-                                }}
+                                firstDayOfWeek={firstDayOfWeek}
+                                selection={{from: dateFrom, to: dateTo}}
                                 footer={
                                     <Button
                                         onClick={() => {

@@ -1,0 +1,101 @@
+.Calendar {
+    font-size: inherit;
+
+    &__nav {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 4px 0;
+    }
+
+    &__caption {
+        flex-grow: 1;
+        font-weight: 600;
+        text-align: center;
+        text-transform: capitalize;
+    }
+
+    &__grid {
+        border-collapse: collapse;
+        table-layout: fixed;
+    }
+
+    &__weekday {
+        width: 36px;
+        height: 36px;
+        color: rgba(var(--center-channel-color-rgb), 0.56);
+        font-size: 12px;
+        font-weight: 400;
+        text-align: center;
+        text-transform: capitalize;
+    }
+
+    &__cell {
+        padding: 0;
+    }
+
+    // Days are square and touch, so a range reads as one band; the rounding at
+    // its two ends is what shapes it.
+    &__day {
+        display: flex;
+        width: 36px;
+        height: 36px;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        border-radius: 50%;
+        color: inherit;
+        cursor: pointer;
+        font-size: inherit;
+
+        &:hover {
+            background: rgba(var(--button-bg-rgb), 0.08);
+            color: rgb(var(--button-bg-rgb));
+        }
+
+        &--today {
+            color: #c74655;
+        }
+
+        &--selected {
+            border-radius: 0;
+            background: rgba(var(--button-bg-rgb), 0.08);
+            color: rgb(var(--button-bg-rgb));
+
+            &:hover {
+                background: rgba(var(--button-bg-rgb), 0.08);
+            }
+        }
+
+        // The two ends carry the solid fill, and a one-day selection is both,
+        // which rounds it all the way back to a circle.
+        &--start,
+        &--end {
+            background: rgb(var(--button-bg-rgb));
+            color: rgb(var(--button-color-rgb));
+
+            &:hover {
+                background: rgb(var(--button-bg-rgb));
+                color: rgb(var(--button-color-rgb));
+            }
+        }
+
+        &--start {
+            border-top-left-radius: 50%;
+            border-bottom-left-radius: 50%;
+        }
+
+        &--end {
+            border-top-right-radius: 50%;
+            border-bottom-right-radius: 50%;
+        }
+    }
+
+    &__footer {
+        display: flex;
+        justify-content: center;
+        padding-top: 4px;
+    }
+}

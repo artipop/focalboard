@@ -156,6 +156,8 @@
   "Calculations.Options.range.label": "Range",
   "Calculations.Options.sum.displayName": "Sum",
   "Calculations.Options.sum.label": "Sum",
+  "Calendar.nextMonth": "Next month",
+  "Calendar.previousMonth": "Previous month",
   "CalendarCard.untitled": "Untitled",
   "CardActionsMenu.copiedLink": "Copied!",
   "CardActionsMenu.copyLink": "Copy link",

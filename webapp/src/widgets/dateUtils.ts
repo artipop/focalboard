@@ -2,9 +2,9 @@
 // See LICENSE.txt for license information.
 import moment from 'moment'
 
-// react-day-picker 7 shipped DateUtils and a moment adapter; version 8 dropped
-// both. The three things this codebase used from them, kept together so the
-// call sites read the same as before.
+// react-day-picker 7 shipped DateUtils and a moment adapter, and later versions
+// dropped both before the library itself was dropped. The three things this
+// codebase used from them, kept together so the call sites read the same.
 
 export function isDate(value: unknown): value is Date {
     return value instanceof Date && !isNaN(value.getTime())

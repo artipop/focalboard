@@ -1,8 +1,7 @@
-@import '../../styles/daypicker';
-
 .DateRange {
     .inputContainer {
         display: flex;
+        max-width: 252px;
 
         .Editable {
             width: 50% !important;
@@ -105,10 +104,4 @@
             margin-right: 0;
         }
     }
-
-    .inputContainer {
-        max-width: 252px;
-    }
-
-    @include focalboard-daypicker;
 }

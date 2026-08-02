@@ -59,7 +59,6 @@
 		"moment": "^2.29.1",
 		"nanoevents": "^5.1.13",
 		"react": "19.2.8",
-		"react-day-picker": "^10.0.1",
 		"react-dom": "19.2.8",
 		"react-intl": "^10.1.19",
 		"react-redux": "^9.3.0",
@@ -83,7 +82,7 @@
 			"^.+\\.[jt]sx?$": "@swc/jest"
 		},
 		"transformIgnorePatterns": [
-			"/node_modules/(?!(react-intl|@formatjs|intl-messageformat|intl-messageformat-parser|@dnd-kit|preact|@preact|react-day-picker|date-fns|@date-fns|emoji-mart)/)",
+			"/node_modules/(?!(react-intl|@formatjs|intl-messageformat|intl-messageformat-parser|@dnd-kit|preact|@preact|emoji-mart)/)",
 			"/nanoevents/"
 		],
 		"maxWorkers": "50%",

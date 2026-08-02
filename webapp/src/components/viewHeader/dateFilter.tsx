@@ -2,7 +2,6 @@
 // See LICENSE.txt for license information.
 import React, {type JSX, useState, useCallback} from 'react'
 import {useIntl} from 'react-intl'
-import {DayPicker} from 'react-day-picker'
 
 import moment from 'moment'
 
@@ -10,16 +9,15 @@ import mutator from '../../mutator'
 
 import Editable from '../../widgets/editable'
 import Button from '../../widgets/buttons/button'
+import Calendar from '../../widgets/calendar'
 import {BoardView} from '../../blocks/boardView'
 
 import Modal from '../../components/modal'
 import ModalWrapper from '../../components/modalWrapper'
 import {Utils} from '../../utils'
 import useMomentLocale from '../../hooks/momentLocale'
-import useDateFnsLocale from '../../hooks/dateFnsLocale'
 import {isDate, parseLocalizedDate} from '../../widgets/dateUtils'
 
-import 'react-day-picker/style.css'
 import './dateFilter.scss'
 
 import {FilterClause} from '../../blocks/filterClause'
@@ -91,7 +89,7 @@ function DateFilter(props: Props): JSX.Element {
 
     const locale = intl.locale.toLowerCase()
     useMomentLocale(locale)
-    const calendarLocale = useDateFnsLocale(locale)
+    const firstDayOfWeek = moment.localeData(locale).firstDayOfWeek()
 
     const handleTodayClick = (day: Date) => {
         day.setHours(12)
@@ -99,8 +97,8 @@ function DateFilter(props: Props): JSX.Element {
     }
 
     const handleDayClick = (day: Date) => {
-        // react-day-picker 7 built each day at noon to sidestep DST; version 10
-        // uses midnight, and the stored value is expected to be noon.
+        // The calendar hands over a day at midnight; the stored value is noon,
+        // which is what keeps a date from sliding across a DST boundary.
         day.setHours(12)
         saveValue(day)
     }
@@ -171,19 +169,11 @@ function DateFilter(props: Props): JSX.Element {
                                     }}
                                 />
                             </div>
-                            <DayPicker
-                                mode='single'
+                            <Calendar
                                 onDayClick={handleDayClick}
                                 defaultMonth={offsetDate || new Date()}
-                                showOutsideDays={false}
-                                locale={calendarLocale}
-                                selected={offsetDate}
-
-                                // The one selected day is both ends of a range
-                                // of one, so it is drawn filled and round like
-                                // the ends of a real range in the date property.
-                                modifiers={{start: offsetDate, end: offsetDate}}
-                                modifiersClassNames={{start: 'is-start', end: 'is-end'}}
+                                firstDayOfWeek={firstDayOfWeek}
+                                selection={{from: offsetDate}}
                                 footer={
                                     <Button
                                         onClick={() => {
