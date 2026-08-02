@@ -14,7 +14,7 @@ import {IPropertyOption} from '../../blocks/board'
 
 import KanbanColumnHeader from './kanbanColumnHeader'
 jest.mock('../../mutator')
-const mockedMutator = mocked(Mutator, true)
+const mockedMutator = mocked(Mutator)
 describe('src/components/kanban/kanbanColumnHeader', () => {
     const intl = createIntl({locale: 'en-us'})
     const board = TestBlockFactory.createBoard()

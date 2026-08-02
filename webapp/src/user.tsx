@@ -55,9 +55,9 @@ interface UserPreference {
 }
 
 export {
-    IUser,
-    UserWorkspace,
-    UserConfigPatch,
+    type IUser,
+    type UserWorkspace,
+    type UserConfigPatch,
     parseUserProps,
-    UserPreference,
+    type UserPreference,
 }

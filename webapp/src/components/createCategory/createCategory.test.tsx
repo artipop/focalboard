@@ -7,13 +7,11 @@ import {render} from '@testing-library/react'
 
 import userEvent from '@testing-library/user-event'
 
-import thunk from 'redux-thunk'
-
 import {Provider as ReduxProvider} from 'react-redux'
 
 import {mocked} from 'jest-mock'
 
-import {mockStateStore, wrapIntl} from '../../testUtils'
+import {mockStateStore, wrapIntl, mockThunk as thunk} from '../../testUtils'
 
 import {IUser} from '../../user'
 
@@ -22,7 +20,7 @@ import mutator from '../../mutator'
 import CreateCategory from './createCategory'
 
 jest.mock('../../mutator')
-const mockedMutator = mocked(mutator, true)
+const mockedMutator = mocked(mutator)
 
 describe('components/createCategory/CreateCategory', () => {
     const me: IUser = {

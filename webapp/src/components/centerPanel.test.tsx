@@ -31,9 +31,9 @@ jest.mock('../utils')
 jest.mock('../octoClient')
 jest.mock('../mutator')
 jest.mock('../telemetry/telemetryClient')
-const mockedUtils = mocked(Utils, true)
-const mockedMutator = mocked(Mutator, true)
-const mockedOctoClient = mocked(octoClient, true)
+const mockedUtils = mocked(Utils)
+const mockedMutator = mocked(Mutator)
+const mockedOctoClient = mocked(octoClient)
 mockedUtils.createGuid.mockReturnValue('test-id')
 mockedUtils.generateClassName = jest.requireActual('../utils').Utils.generateClassName
 describe('components/centerPanel', () => {

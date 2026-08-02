@@ -10,11 +10,9 @@ import {Router} from 'react-router-dom'
 import {render} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
-import thunk from 'redux-thunk'
-
 import {mocked} from 'jest-mock'
 
-import {mockMatchMedia, wrapIntl} from '../../testUtils'
+import {mockMatchMedia, wrapIntl, mockThunk as thunk} from '../../testUtils'
 
 import {TestBlockFactory} from '../../test/testBlockFactory'
 import octoClient from '../../../../webapp/src/octoClient'
@@ -22,7 +20,7 @@ import octoClient from '../../../../webapp/src/octoClient'
 import Sidebar from './sidebar'
 
 jest.mock('../../../../webapp/src/octoClient')
-const mockedOctoClient = mocked(octoClient, true)
+const mockedOctoClient = mocked(octoClient)
 
 beforeAll(() => {
     mockMatchMedia({matches: true})

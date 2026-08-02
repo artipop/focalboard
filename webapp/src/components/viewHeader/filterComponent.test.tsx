@@ -20,7 +20,7 @@ import {wrapIntl, mockStateStore} from '../../testUtils'
 import FilterComponenet from './filterComponent'
 
 jest.mock('../../mutator')
-const mockedMutator = mocked(mutator, true)
+const mockedMutator = mocked(mutator)
 
 const board = TestBlockFactory.createBoard()
 const activeView = TestBlockFactory.createBoardView(board)

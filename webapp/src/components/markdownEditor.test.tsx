@@ -107,14 +107,15 @@ describe('components/markdownEditor', () => {
 
             ))
             container = result.container
-            const previewElement = screen.getByTestId('preview-element')
-            userEvent.click(previewElement)
+        })
+        await act(async () => {
+            userEvent.click(screen.getByTestId('preview-element'))
         })
         expect(container).toMatchSnapshot()
     })
 
     test('should match snapshot with on click on preview element and then click out of it', async () => {
-        let container
+        let container: Element | undefined
         await act(async () => {
             const result = render(wrapDNDIntl(
                 <ReduxProvider store={store}>
@@ -132,9 +133,10 @@ describe('components/markdownEditor', () => {
 
             ))
             container = result.container
-            const previewElement = screen.getByTestId('preview-element')
-            userEvent.click(previewElement)
-            fireEvent.keyDown(container, {
+        })
+        await act(async () => {
+            userEvent.click(screen.getByTestId('preview-element'))
+            fireEvent.keyDown(container!, {
                 key: 'Escape',
                 code: 'Escape',
                 keyCode: 27,

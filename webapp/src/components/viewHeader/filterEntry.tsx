@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React from 'react'
+import React, {type JSX} from 'react'
 import {FormattedMessage, useIntl} from 'react-intl'
 
 import {FilterClause, areEqual as areFilterClausesEqual} from '../../blocks/filterClause'

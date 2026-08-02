@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {useState} from 'react'
+import React, {type JSX, useState} from 'react'
 import {useIntl} from 'react-intl'
 
 import MenuWrapper from '../../widgets/menuWrapper'
@@ -10,7 +10,7 @@ import Menu from '../../widgets/menu'
 import CheckIcon from '../../widgets/icons/check'
 import CompassIcon from '../../widgets/icons/compassIcon'
 
-import {Board, createBoard, BoardTypeOpen, BoardTypePrivate, MemberRole} from '../../blocks/board'
+import {Board, createBoard, BoardTypeOpen, BoardTypePrivate, MemberRole, type BoardTypes} from '../../blocks/board'
 import {useAppSelector} from '../../store/hooks'
 import {getCurrentTeam} from '../../store/teams'
 import {getCurrentBoard} from '../../store/boards'
@@ -21,7 +21,7 @@ import ConfirmationDialogBox from '../confirmationDialogBox'
 
 import mutator from '../../mutator'
 
-async function updateBoardType(board: Board, newType: string, newMinimumRole: MemberRole) {
+async function updateBoardType(board: Board, newType: BoardTypes, newMinimumRole: MemberRole) {
     if (board.type === newType && board.minimumRole === newMinimumRole) {
         return
     }

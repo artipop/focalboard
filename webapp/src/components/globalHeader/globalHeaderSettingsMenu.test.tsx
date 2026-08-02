@@ -22,8 +22,8 @@ import GlobalHeaderSettingsMenu from './globalHeaderSettingsMenu'
 
 jest.mock('../../telemetry/telemetryClient')
 jest.mock('../../octoClient')
-const mockedTelemetry = mocked(TelemetryClient, true)
-const mockedOctoClient = mocked(client, true)
+const mockedTelemetry = mocked(TelemetryClient)
+const mockedOctoClient = mocked(client)
 
 describe('components/sidebar/GlobalHeaderSettingsMenu', () => {
     const mockStore = configureStore([])

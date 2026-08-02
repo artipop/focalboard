@@ -14,5 +14,5 @@ function createH1Block(block?: Block): H1Block {
     }
 }
 
-export {H1Block, createH1Block}
+export {type H1Block, createH1Block}
 

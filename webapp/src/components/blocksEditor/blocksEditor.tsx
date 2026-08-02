@@ -1,8 +1,8 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 import React, {useState, useMemo} from 'react'
-import {DndProvider} from 'react-dnd'
-import {HTML5Backend} from 'react-dnd-html5-backend'
+
+import {SortableProvider} from '../../hooks/sortable'
 
 import Editor from './editor'
 import {BlockData} from './blocks/types'
@@ -78,7 +78,7 @@ function BlocksEditor(props: Props) {
                 }
             }}
         >
-            <DndProvider backend={HTML5Backend}>
+            <SortableProvider>
                 {Object.values(props.blocks).map((d) => (
                     <div
                         key={d.id}
@@ -115,7 +115,7 @@ function BlocksEditor(props: Props) {
                     </div>
                 ))}
                 {!editing && !afterBlock && <Editor onSave={props.onBlockCreated}/>}
-            </DndProvider>
+            </SortableProvider>
         </div>
     )
 }

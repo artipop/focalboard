@@ -32,7 +32,6 @@ exports[`components/blocksEditor/blocks/image should match Input snapshot 1`] = 
 exports[`components/blocksEditor/blocks/image should match Input snapshot with empty input 1`] = `
 <div>
   <div>
-    
     <input
       accept="image/*"
       class="Image"

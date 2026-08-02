@@ -41,10 +41,10 @@ jest.mock('../../utils')
 jest.mock('../../mutator')
 
 jest.mock('../../telemetry/telemetryClient')
-const mockedTelemetry = mocked(TelemetryClient, true)
+const mockedTelemetry = mocked(TelemetryClient)
 
 describe('components/boardTemplateSelector/boardTemplateSelector', () => {
-    const mockedMutator = mocked(Mutator, true)
+    const mockedMutator = mocked(Mutator)
     const team1: Team = {
         id: 'team-1',
         title: 'Team 1',

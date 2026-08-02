@@ -1,10 +1,8 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useMemo, useState, useCallback, useEffect} from 'react'
+import React, {type JSX, useMemo, useState, useCallback, useEffect} from 'react'
 import {useIntl} from 'react-intl'
-import {DateUtils} from 'react-day-picker'
-import MomentLocaleUtils from 'react-day-picker/moment'
-import DayPicker from 'react-day-picker/DayPicker'
+import {DayPicker} from 'react-day-picker'
 
 import moment from 'moment'
 
@@ -18,8 +16,10 @@ import Modal from '../../components/modal'
 import ModalWrapper from '../../components/modalWrapper'
 import {Utils} from '../../utils'
 import useMomentLocale from '../../hooks/momentLocale'
+import useDateFnsLocale from '../../hooks/dateFnsLocale'
+import {addDayToRange, isDate, parseLocalizedDate} from '../../widgets/dateUtils'
 
-import 'react-day-picker/lib/style.css'
+import 'react-day-picker/style.css'
 import './date.scss'
 
 import {PropertyProps} from '../types'
@@ -35,7 +35,7 @@ export function createDatePropertyFromString(initialValue: string): DateProperty
     let dateProperty: DateProperty = {}
     if (initialValue) {
         const singleDate = new Date(Number(initialValue))
-        if (singleDate && DateUtils.isDate(singleDate)) {
+        if (singleDate && isDate(singleDate)) {
             dateProperty.from = singleDate.getTime()
         } else {
             try {
@@ -63,7 +63,7 @@ function DateRange(props: PropertyProps): JSX.Element {
         }
     }, [propertyValue, setValue])
 
-    const onChange = useCallback((newValue) => {
+    const onChange = useCallback((newValue: string) => {
         if (value !== newValue) {
             setValue(newValue)
         }
@@ -96,12 +96,13 @@ function DateRange(props: PropertyProps): JSX.Element {
 
     const locale = intl.locale.toLowerCase()
     useMomentLocale(locale)
+    const calendarLocale = useDateFnsLocale(locale)
 
     const handleDayClick = (day: Date) => {
         const range: DateProperty = {}
         day.setHours(12)
         if (isRange) {
-            const newRange = DateUtils.addDayToRange(day, {from: dateFrom, to: dateTo})
+            const newRange = addDayToRange(day, {from: dateFrom, to: dateTo})
             range.from = newRange.from?.getTime()
             range.to = newRange.to?.getTime()
         } else {
@@ -197,8 +198,8 @@ function DateRange(props: PropertyProps): JSX.Element {
                                     }}
                                     onChange={setFromInput}
                                     onSave={() => {
-                                        const newDate = MomentLocaleUtils.parseDate(fromInput, 'L', intl.locale)
-                                        if (newDate && DateUtils.isDate(newDate)) {
+                                        const newDate = parseLocalizedDate(fromInput, intl.locale)
+                                        if (newDate && isDate(newDate)) {
                                             newDate.setHours(12)
                                             const range: DateProperty = {
                                                 from: newDate.getTime(),
@@ -225,8 +226,8 @@ function DateRange(props: PropertyProps): JSX.Element {
                                         }}
                                         onChange={setToInput}
                                         onSave={() => {
-                                            const newDate = MomentLocaleUtils.parseDate(toInput, 'L', intl.locale)
-                                            if (newDate && DateUtils.isDate(newDate)) {
+                                            const newDate = parseLocalizedDate(toInput, intl.locale)
+                                            if (newDate && isDate(newDate)) {
                                                 newDate.setHours(12)
                                                 const range: DateProperty = {
                                                     from: dateFrom?.getTime(),
@@ -245,15 +246,25 @@ function DateRange(props: PropertyProps): JSX.Element {
                             </div>
                             <DayPicker
                                 onDayClick={handleDayClick}
-                                initialMonth={dateFrom || new Date()}
+                                defaultMonth={dateFrom || new Date()}
                                 showOutsideDays={false}
-                                locale={locale}
-                                localeUtils={MomentLocaleUtils}
-                                todayButton={intl.formatMessage({id: 'DateRange.today', defaultMessage: 'Today'})}
-                                onTodayButtonClick={handleDayClick}
-                                month={dateFrom}
-                                selectedDays={[dateFrom, dateTo ? {from: dateFrom, to: dateTo} : {from: dateFrom, to: dateFrom}]}
-                                modifiers={dateTo ? {start: dateFrom, end: dateTo} : {start: dateFrom, end: dateFrom}}
+                                locale={calendarLocale}
+                                modifiers={{
+                                    selected: dateTo ? {from: dateFrom, to: dateTo} : dateFrom,
+                                    start: dateFrom,
+                                    end: dateTo || dateFrom,
+                                }}
+                                footer={
+                                    <Button
+                                        onClick={() => {
+                                            const today = new Date()
+                                            today.setHours(0, 0, 0, 0)
+                                            handleDayClick(today)
+                                        }}
+                                    >
+                                        {intl.formatMessage({id: 'DateRange.today', defaultMessage: 'Today'})}
+                                    </Button>
+                                }
                             />
                             <hr/>
                             <SwitchOption

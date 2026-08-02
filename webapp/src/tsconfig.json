@@ -1,16 +1,7 @@
 {
-    "extends": "../tsconfig.json",
-    "compilerOptions": {
-		"baseUrl": ".",
-		"paths": {
-			"@lexical/react/*": [
-				"../node_modules/@lexical/react/dist/*"
-			],
-			"*": [
-				"../node_modules/*",
-				"../@custom_types/*"
-			]
-		}
+	"extends": "../tsconfig.json",
+	"compilerOptions": {
+		"baseUrl": "."
 	},
 	"include": [
 		"./**/*.ts",

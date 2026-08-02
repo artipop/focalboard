@@ -39,4 +39,4 @@ function createCard(block?: Block): Card {
     }
 }
 
-export {Card, createCard}
+export {type Card, createCard}

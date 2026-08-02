@@ -23,7 +23,7 @@ import propsRegistry from '../../properties'
 import FilterValue from './filterValue'
 
 jest.mock('../../mutator')
-const mockedMutator = mocked(mutator, true)
+const mockedMutator = mocked(mutator)
 
 const board = TestBlockFactory.createBoard()
 const activeView = TestBlockFactory.createBoardView(board)

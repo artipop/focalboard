@@ -63,7 +63,6 @@ exports[`components/cardDetail/cardDetailContents should match snapshot after dr
             </div>
             <div
               class="dnd-handle"
-              draggable="true"
             >
               <svg
                 class="GripIcon Icon"
@@ -127,7 +126,6 @@ exports[`components/cardDetail/cardDetailContents should match snapshot after dr
               </div>
               <div
                 class="dnd-handle"
-                draggable="true"
               >
                 <svg
                   class="GripIcon Icon"
@@ -182,7 +180,6 @@ exports[`components/cardDetail/cardDetailContents should match snapshot after dr
               </div>
               <div
                 class="dnd-handle"
-                draggable="true"
               >
                 <svg
                   class="GripIcon Icon"
@@ -252,7 +249,6 @@ exports[`components/cardDetail/cardDetailContents should match snapshot after dr
             </div>
             <div
               class="dnd-handle"
-              draggable="true"
             >
               <svg
                 class="GripIcon Icon"
@@ -312,7 +308,6 @@ exports[`components/cardDetail/cardDetailContents should match snapshot after dr
             </div>
             <div
               class="dnd-handle"
-              draggable="true"
             >
               <svg
                 class="GripIcon Icon"
@@ -385,7 +380,6 @@ exports[`components/cardDetail/cardDetailContents should match snapshot after dr
             </div>
             <div
               class="dnd-handle"
-              draggable="true"
             >
               <svg
                 class="GripIcon Icon"
@@ -445,7 +439,6 @@ exports[`components/cardDetail/cardDetailContents should match snapshot after dr
             </div>
             <div
               class="dnd-handle"
-              draggable="true"
             >
               <svg
                 class="GripIcon Icon"
@@ -518,7 +511,6 @@ exports[`components/cardDetail/cardDetailContents should match snapshot with con
             </div>
             <div
               class="dnd-handle"
-              draggable="true"
             >
               <svg
                 class="GripIcon Icon"
@@ -591,7 +583,6 @@ exports[`components/cardDetail/cardDetailContents should match snapshot with con
             </div>
             <div
               class="dnd-handle"
-              draggable="true"
             >
               <svg
                 class="GripIcon Icon"
@@ -655,7 +646,6 @@ exports[`components/cardDetail/cardDetailContents should match snapshot with con
               </div>
               <div
                 class="dnd-handle"
-                draggable="true"
               >
                 <svg
                   class="GripIcon Icon"
@@ -710,7 +700,6 @@ exports[`components/cardDetail/cardDetailContents should match snapshot with con
               </div>
               <div
                 class="dnd-handle"
-                draggable="true"
               >
                 <svg
                   class="GripIcon Icon"

@@ -17,7 +17,7 @@ import mutator from '../../mutator'
 import Comment from './comment'
 
 jest.mock('../../mutator')
-const mockedMutator = mocked(mutator, true)
+const mockedMutator = mocked(mutator)
 
 const board = TestBlockFactory.createBoard()
 const card = TestBlockFactory.createCard(board)

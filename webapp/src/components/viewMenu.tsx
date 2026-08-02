@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 import React, {useCallback} from 'react'
-import {injectIntl, IntlShape} from 'react-intl'
+import {useIntl} from 'react-intl'
 import {generatePath, useHistory, useRouteMatch} from 'react-router-dom'
 
 import {Board, IPropertyTemplate} from '../blocks/board'
@@ -27,15 +27,15 @@ type Props = {
     board: Board
     activeView: BoardView
     views: BoardView[]
-    intl: IntlShape
     readonly: boolean
 }
 
 const ViewMenu = (props: Props) => {
+    const intl = useIntl()
     const history = useHistory()
     const match = useRouteMatch()
 
-    const showView = useCallback((viewId) => {
+    const showView = useCallback((viewId: string) => {
         let newPath = generatePath(Utils.getBoardPagePath(match.path), {...match.params, viewId: viewId || ''})
         if (props.readonly) {
             newPath += `?r=${Utils.getReadToken()}`
@@ -91,7 +91,7 @@ const ViewMenu = (props: Props) => {
     }, [props.views, showView])
 
     const handleAddViewBoard = useCallback(() => {
-        const {board, activeView, intl} = props
+        const {board, activeView} = props
         Utils.log('addview-board')
 
         TelemetryClient.trackEvent(TelemetryCategory, TelemetryActions.CreateBoardView, {board: board.id, view: activeView.id})
@@ -115,10 +115,10 @@ const ViewMenu = (props: Props) => {
             async () => {
                 showView(oldViewId)
             })
-    }, [props.activeView, props.board, props.intl, showView])
+    }, [props.activeView, props.board, intl, showView])
 
     const handleAddViewTable = useCallback(() => {
-        const {board, activeView, intl} = props
+        const {board, activeView} = props
 
         Utils.log('addview-table')
 
@@ -146,10 +146,10 @@ const ViewMenu = (props: Props) => {
             async () => {
                 showView(oldViewId)
             })
-    }, [props.activeView, props.board, props.intl, showView])
+    }, [props.activeView, props.board, intl, showView])
 
     const handleAddViewGallery = useCallback(() => {
-        const {board, activeView, intl} = props
+        const {board, activeView} = props
 
         Utils.log('addview-gallery')
 
@@ -175,10 +175,10 @@ const ViewMenu = (props: Props) => {
             async () => {
                 showView(oldViewId)
             })
-    }, [props.board, props.activeView, props.intl, showView])
+    }, [props.board, props.activeView, intl, showView])
 
     const handleAddViewCalendar = useCallback(() => {
-        const {board, activeView, intl} = props
+        const {board, activeView} = props
 
         Utils.log('addview-calendar')
 
@@ -208,9 +208,9 @@ const ViewMenu = (props: Props) => {
             async () => {
                 showView(oldViewId)
             })
-    }, [props.board, props.activeView, props.intl, showView])
+    }, [props.board, props.activeView, intl, showView])
 
-    const {views, intl} = props
+    const {views} = props
 
     const duplicateViewText = intl.formatMessage({
         id: 'View.DuplicateView',
@@ -324,4 +324,4 @@ const ViewMenu = (props: Props) => {
     )
 }
 
-export default injectIntl(React.memo(ViewMenu))
+export default React.memo(ViewMenu)

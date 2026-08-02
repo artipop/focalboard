@@ -8,14 +8,11 @@ import {Permission} from '../constants'
 import {MemberRole} from '../blocks/board'
 
 export const useHasPermissions = (teamId: string, boardId: string, permissions: Permission[]): boolean => {
-    if (!boardId || !teamId) {
-        return false
-    }
+    const identified = Boolean(boardId && teamId)
+    const member = useAppSelector((state) => (identified ? getMyBoardMembership(boardId)(state) : null))
+    const board = useAppSelector((state) => (identified ? getBoard(boardId)(state) : null))
 
-    const member = useAppSelector(getMyBoardMembership(boardId))
-    const board = useAppSelector(getBoard(boardId))
-
-    if (!board) {
+    if (!identified || !board) {
         return false
     }
 

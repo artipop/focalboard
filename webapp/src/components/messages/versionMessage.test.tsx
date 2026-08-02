@@ -21,7 +21,7 @@ import {versionProperty} from '../../store/users'
 import VersionMessage from './versionMessage'
 
 jest.mock('../../octoClient')
-const mockedOctoClient = mocked(client, true)
+const mockedOctoClient = mocked(client)
 
 describe('components/messages/VersionMessage', () => {
     beforeEach(() => {

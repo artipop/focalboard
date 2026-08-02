@@ -56,7 +56,10 @@ const BoardTemplateSelector = (props: Props) => {
 
     useHotkeys('esc', () => props.onClose?.())
 
-    const showBoard = useCallback(async (boardId) => {
+    const showBoard = useCallback(async (boardId: string | null) => {
+        if (!boardId) {
+            return
+        }
         Utils.showBoard(boardId, match, history)
         if (onClose) {
             onClose()

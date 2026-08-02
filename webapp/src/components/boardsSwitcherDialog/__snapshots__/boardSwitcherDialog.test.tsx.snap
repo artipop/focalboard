@@ -84,8 +84,6 @@ exports[`component/BoardSwitcherDialog base case 1`] = `
           <div
             class="searchResults"
           >
-            
-            
             <div
               class="noResults introScreen"
             >

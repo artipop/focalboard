@@ -10,4 +10,4 @@ interface IWorkspace {
     readonly updateAt?: number
 }
 
-export {IWorkspace}
+export {type IWorkspace}

@@ -21,7 +21,7 @@ import TextElement from './textElement'
 
 jest.mock('../../utils')
 jest.mock('../../mutator')
-const mockedUtils = mocked(Utils, true)
+const mockedUtils = mocked(Utils)
 mockedUtils.createGuid.mockReturnValue('test-id')
 const defaultBlock: TextBlock = {
     id: 'test-id',

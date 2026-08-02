@@ -19,7 +19,7 @@ import mutator from '../../mutator'
 import NewCardButtonTemplateItem from './newCardButtonTemplateItem'
 
 jest.mock('../../mutator')
-const mockedMutator = mocked(mutator, true)
+const mockedMutator = mocked(mutator)
 
 const board = TestBlockFactory.createBoard()
 const activeView = TestBlockFactory.createBoardView(board)

@@ -1,9 +1,8 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-/* eslint-disable max-lines */
-import React, {useState, useEffect, useRef} from 'react'
+
+import React, {type JSX, useState, useEffect} from 'react'
 import {FormattedMessage, IntlShape} from 'react-intl'
-import {useDrop, useDrag} from 'react-dnd'
 
 import {Constants, Permission} from '../../constants'
 import {IPropertyOption, IPropertyTemplate, Board, BoardGroup} from '../../blocks/board'
@@ -20,6 +19,7 @@ import MenuWrapper from '../../widgets/menuWrapper'
 import Editable from '../../widgets/editable'
 import Label from '../../widgets/label'
 import {useHasCurrentBoardPermissions} from '../../hooks/permissions'
+import {useSortable} from '../../hooks/sortable'
 
 import BoardPermissionGate from '../permissions/boardPermissionGate'
 
@@ -54,33 +54,18 @@ export default function KanbanColumnHeader(props: Props): JSX.Element {
     const canEditBoardProperties = useHasCurrentBoardPermissions([Permission.ManageBoardProperties])
     const canEditOption = groupByProperty?.type !== 'person' && group.option.id
 
-    const headerRef = useRef<HTMLDivElement>(null)
     const [showColumnSettings, setShowColumnSettings] = useState(false)
 
-    const [{isDragging}, drag] = useDrag(() => ({
-        type: 'column',
-        item: group.option,
-        collect: (monitor) => ({
-            isDragging: monitor.isDragging(),
-        }),
-    }))
-    const [{isOver}, drop] = useDrop(() => ({
-        accept: 'column',
-        collect: (monitor) => ({
-            isOver: monitor.isOver(),
-        }),
-        drop: (item: IPropertyOption) => {
-            props.onDropToColumn(item, undefined, group.option)
-        },
-    }), [props.onDropToColumn])
+    const [isDragging, isOver, headerRef] = useSortable(
+        'column',
+        group.option,
+        Boolean(canEditBoardProperties),
+        (src: IPropertyOption) => props.onDropToColumn(src, undefined, group.option),
+    )
 
     useEffect(() => {
         setGroupTitle(group.option.value)
     }, [group.option.value])
-
-    if (canEditBoardProperties) {
-        drop(drag(headerRef))
-    }
 
     let className = 'octo-board-header-cell KanbanColumnHeader'
     if (isOver) {

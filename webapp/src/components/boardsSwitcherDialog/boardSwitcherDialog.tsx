@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {ReactNode, useRef, createRef, useState, useEffect, MutableRefObject} from 'react'
+import React, {type JSX, ReactNode, useRef, createRef, useState, useEffect, MutableRefObject} from 'react'
 
 import './boardSwitcherDialog.scss'
 import {useIntl} from 'react-intl'

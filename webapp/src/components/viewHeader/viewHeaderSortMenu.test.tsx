@@ -18,7 +18,7 @@ import mutator from '../../mutator'
 import ViewHeaderSortMenu from './viewHeaderSortMenu'
 
 jest.mock('../../mutator')
-const mockedMutator = mocked(mutator, true)
+const mockedMutator = mocked(mutator)
 
 const board = TestBlockFactory.createBoard()
 const activeView = TestBlockFactory.createBoardView(board)

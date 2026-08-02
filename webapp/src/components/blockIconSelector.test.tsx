@@ -22,7 +22,20 @@ const card = TestBlockFactory.createCard()
 const icon = '👍'
 
 jest.mock('../mutator')
-const mockedMutator = mocked(mutator, true)
+
+// emoji-mart 5 renders inside a shadow root, which Testing Library cannot query.
+// The unit under test is what blockIconSelector does with a chosen emoji, not how
+// the picker draws itself, so the picker is reduced to a button that reports one.
+jest.mock('../widgets/emojiPicker', () => ({
+    __esModule: true,
+    default: ({onSelect}: {onSelect: (emoji: string) => void}) => (
+        <button
+            aria-label='thumbsup'
+            onClick={() => onSelect('\u{1F44D}')}
+        />
+    ),
+}))
+const mockedMutator = mocked(mutator)
 
 describe('components/blockIconSelector', () => {
     beforeEach(() => {

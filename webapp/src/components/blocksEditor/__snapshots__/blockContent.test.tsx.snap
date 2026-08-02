@@ -17,7 +17,6 @@ exports[`components/blocksEditor/blockContent should match snapshot 1`] = `
     </span>
     <span
       class="action"
-      draggable="true"
     >
       <svg
         class="GripIcon Icon"

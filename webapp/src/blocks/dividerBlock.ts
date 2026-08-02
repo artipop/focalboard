@@ -14,4 +14,4 @@ function createDividerBlock(block?: Block): DividerBlock {
     }
 }
 
-export {DividerBlock, createDividerBlock}
+export {type DividerBlock, createDividerBlock}

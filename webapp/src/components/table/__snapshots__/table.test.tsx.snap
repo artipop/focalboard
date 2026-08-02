@@ -36,7 +36,6 @@ exports[`components/table/Table extended should have Duplicate Button 1`] = `
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -71,7 +70,6 @@ exports[`components/table/Table extended should have Duplicate Button 1`] = `
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -106,7 +104,6 @@ exports[`components/table/Table extended should have Duplicate Button 1`] = `
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -133,7 +130,6 @@ exports[`components/table/Table extended should have Duplicate Button 1`] = `
       >
         <div
           class="TableRow octo-table-row"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -259,7 +255,6 @@ exports[`components/table/Table extended should have Duplicate Button 1`] = `
         </div>
         <div
           class="TableRow octo-table-row"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -493,7 +488,6 @@ exports[`components/table/Table extended should match snapshot with CreatedAt 1`
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -525,7 +519,6 @@ exports[`components/table/Table extended should match snapshot with CreatedAt 1`
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -557,7 +550,6 @@ exports[`components/table/Table extended should match snapshot with CreatedAt 1`
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -581,7 +573,6 @@ exports[`components/table/Table extended should match snapshot with CreatedAt 1`
       >
         <div
           class="TableRow octo-table-row readonly"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -680,7 +671,6 @@ exports[`components/table/Table extended should match snapshot with CreatedAt 1`
         </div>
         <div
           class="TableRow octo-table-row readonly"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -884,7 +874,6 @@ exports[`components/table/Table extended should match snapshot with CreatedBy 1`
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -919,7 +908,6 @@ exports[`components/table/Table extended should match snapshot with CreatedBy 1`
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -954,7 +942,6 @@ exports[`components/table/Table extended should match snapshot with CreatedBy 1`
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -981,7 +968,6 @@ exports[`components/table/Table extended should match snapshot with CreatedBy 1`
       >
         <div
           class="TableRow octo-table-row"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -1107,7 +1093,6 @@ exports[`components/table/Table extended should match snapshot with CreatedBy 1`
         </div>
         <div
           class="TableRow octo-table-row"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -1344,7 +1329,6 @@ exports[`components/table/Table extended should match snapshot with UpdatedAt 1`
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -1379,7 +1363,6 @@ exports[`components/table/Table extended should match snapshot with UpdatedAt 1`
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -1414,7 +1397,6 @@ exports[`components/table/Table extended should match snapshot with UpdatedAt 1`
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -1441,7 +1423,6 @@ exports[`components/table/Table extended should match snapshot with UpdatedAt 1`
       >
         <div
           class="TableRow octo-table-row"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -1567,7 +1548,6 @@ exports[`components/table/Table extended should match snapshot with UpdatedAt 1`
         </div>
         <div
           class="TableRow octo-table-row"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -1804,7 +1784,6 @@ exports[`components/table/Table extended should match snapshot with UpdatedBy 1`
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -1839,7 +1818,6 @@ exports[`components/table/Table extended should match snapshot with UpdatedBy 1`
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -1874,7 +1852,6 @@ exports[`components/table/Table extended should match snapshot with UpdatedBy 1`
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -1901,7 +1878,6 @@ exports[`components/table/Table extended should match snapshot with UpdatedBy 1`
       >
         <div
           class="TableRow octo-table-row"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -2027,7 +2003,6 @@ exports[`components/table/Table extended should match snapshot with UpdatedBy 1`
         </div>
         <div
           class="TableRow octo-table-row"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -2261,7 +2236,6 @@ exports[`components/table/Table limited card in table view 1`] = `
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -2293,7 +2267,6 @@ exports[`components/table/Table limited card in table view 1`] = `
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -2329,7 +2302,6 @@ exports[`components/table/Table limited card in table view 1`] = `
       >
         <div
           class="TableRow octo-table-row readonly"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -2410,7 +2382,6 @@ exports[`components/table/Table limited card in table view 1`] = `
         </div>
         <div
           class="TableRow octo-table-row readonly"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -2596,7 +2567,6 @@ exports[`components/table/Table should match snapshot 1`] = `
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -2628,7 +2598,6 @@ exports[`components/table/Table should match snapshot 1`] = `
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -2664,7 +2633,6 @@ exports[`components/table/Table should match snapshot 1`] = `
       >
         <div
           class="TableRow octo-table-row readonly"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -2833,7 +2801,6 @@ exports[`components/table/Table should match snapshot with GroupBy 1`] = `
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -2865,7 +2832,6 @@ exports[`components/table/Table should match snapshot with GroupBy 1`] = `
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -2904,7 +2870,6 @@ exports[`components/table/Table should match snapshot with GroupBy 1`] = `
         >
           <div
             class="octo-group-header-cell expanded"
-            draggable="true"
             style="opacity: 1;"
           >
             <div
@@ -2924,7 +2889,6 @@ exports[`components/table/Table should match snapshot with GroupBy 1`] = `
               >
                 No Property 1
               </span>
-              
             </div>
             <button
               type="button"
@@ -3025,7 +2989,6 @@ exports[`components/table/Table should match snapshot without permissions 1`] = 
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -3057,7 +3020,6 @@ exports[`components/table/Table should match snapshot without permissions 1`] = 
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -3093,7 +3055,6 @@ exports[`components/table/Table should match snapshot without permissions 1`] = 
       >
         <div
           class="TableRow octo-table-row readonly"
-          draggable="true"
           style="opacity: 1;"
         >
           <div
@@ -3262,7 +3223,6 @@ exports[`components/table/Table should match snapshot, read-only 1`] = `
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -3294,7 +3254,6 @@ exports[`components/table/Table should match snapshot, read-only 1`] = `
         </div>
         <div
           class="octo-table-cell header-cell"
-          draggable="true"
           style="overflow: unset; opacity: 1; width: 100px;"
         >
           <div
@@ -3330,7 +3289,6 @@ exports[`components/table/Table should match snapshot, read-only 1`] = `
       >
         <div
           class="TableRow octo-table-row readonly"
-          draggable="true"
           style="opacity: 1;"
         >
           <div

@@ -21,7 +21,7 @@ const board = TestBlockFactory.createBoard()
 const activeView = TestBlockFactory.createBoardView(board)
 
 jest.mock('../../mutator')
-const mockedMutator = mocked(mutator, true)
+const mockedMutator = mocked(mutator)
 describe('components/viewHeader/emptyCardButton', () => {
     const state = {
         users: {

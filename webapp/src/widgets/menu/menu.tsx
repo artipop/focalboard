@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {CSSProperties} from 'react'
+import React, {type JSX, CSSProperties} from 'react'
 
 import SeparatorOption from './separatorOption'
 import SwitchOption from './switchOption'
@@ -29,7 +29,7 @@ export default class Menu extends React.PureComponent<Props> {
     static TextInput = textInputOption
     static Label = LabelOption
 
-    menuRef: React.RefObject<HTMLDivElement>
+    menuRef: React.RefObject<HTMLDivElement | null>
 
     constructor(props: Props) {
         super(props)

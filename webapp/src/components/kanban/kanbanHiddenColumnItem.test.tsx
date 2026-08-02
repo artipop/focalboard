@@ -15,7 +15,7 @@ import {IPropertyOption} from '../../blocks/board'
 import KanbanHiddenColumnItem from './kanbanHiddenColumnItem'
 
 jest.mock('../../mutator')
-const mockedMutator = mocked(Mutator, true)
+const mockedMutator = mocked(Mutator)
 
 describe('src/components/kanban/kanbanHiddenColumnItem', () => {
     const intl = createIntl({locale: 'en-us'})

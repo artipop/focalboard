@@ -1,10 +1,8 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-/* eslint-disable max-lines */
-import React, {useCallback, useState, useMemo, useEffect} from 'react'
-import {FormattedMessage, injectIntl, IntlShape} from 'react-intl'
 
-import withScrolling, {createHorizontalStrength, createVerticalStrength} from 'react-dnd-scrolling'
+import React, {useCallback, useState, useMemo, useEffect} from 'react'
+import {FormattedMessage, useIntl} from 'react-intl'
 
 import {useAppSelector} from '../../store/hooks'
 
@@ -39,7 +37,6 @@ type Props = {
     visibleGroups: BoardGroup[]
     hiddenGroups: BoardGroup[]
     selectedCardIds: string[]
-    intl: IntlShape
     readonly: boolean
     onCardClicked: (e: React.MouseEvent, card: Card) => void
     addCard: (groupByOptionId?: string, show?: boolean) => Promise<void>
@@ -49,11 +46,8 @@ type Props = {
     showHiddenCardCountNotification: (show: boolean) => void
 }
 
-const ScrollingComponent = withScrolling('div')
-const hStrength = createHorizontalStrength(Utils.isMobile() ? 60 : 250)
-const vStrength = createVerticalStrength(Utils.isMobile() ? 60 : 250)
-
 const Kanban = (props: Props) => {
+    const intl = useIntl()
     const cardTemplates: Card[] = useAppSelector(getCurrentBoardTemplates)
     const {board, activeView, cards, groupByProperty, visibleGroups, hiddenGroups, hiddenCardsCount} = props
     const [defaultTemplateID, setDefaultTemplateID] = useState<string>()
@@ -218,11 +212,7 @@ const Kanban = (props: Props) => {
     }
 
     return (
-        <ScrollingComponent
-            className='Kanban'
-            horizontalStrength={hStrength}
-            verticalStrength={vStrength}
-        >
+        <div className='Kanban'>
             <div
                 className='octo-board-header'
                 id='mainBoardHeader'
@@ -235,7 +225,7 @@ const Kanban = (props: Props) => {
                         group={group}
                         board={board}
                         activeView={activeView}
-                        intl={props.intl}
+                        intl={intl}
                         groupByProperty={groupByProperty}
                         addCard={props.addCard}
                         readonly={props.readonly}
@@ -332,7 +322,7 @@ const Kanban = (props: Props) => {
                                 key={group.option.id}
                                 group={group}
                                 activeView={activeView}
-                                intl={props.intl}
+                                intl={intl}
                                 readonly={props.readonly}
                                 onDrop={(card: Card) => onDropToColumn(group.option, card)}
                             />
@@ -346,8 +336,8 @@ const Kanban = (props: Props) => {
                         </div>}
                     </div>}
             </div>
-        </ScrollingComponent>
+        </div>
     )
 }
 
-export default injectIntl(Kanban)
+export default Kanban

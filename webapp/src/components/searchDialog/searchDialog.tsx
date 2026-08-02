@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {ReactNode, useEffect, useMemo, useState} from 'react'
+import React, {type JSX, ReactNode, useEffect, useMemo, useState} from 'react'
 
 import './searchDialog.scss'
 import {FormattedMessage} from 'react-intl'

@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useEffect, useMemo} from 'react'
+import React, {type JSX, useEffect, useMemo} from 'react'
 import {
     Router,
     Switch,
@@ -67,14 +67,12 @@ type Props = {
 }
 
 const FocalboardRouter = (props: Props): JSX.Element => {
-    let browserHistory: History<unknown>
-    if (props.history) {
-        browserHistory = props.history
-    } else {
-        browserHistory = useMemo(() => {
-            return createBrowserHistory({basename: Utils.getFrontendBaseURL()})
-        }, [])
-    }
+    // Created every render rather than only when no history was injected: a hook
+    // behind an `if` is a hook that changes call order between renders.
+    const ownHistory = useMemo(() => {
+        return createBrowserHistory({basename: Utils.getFrontendBaseURL()})
+    }, [])
+    const browserHistory: History<unknown> = props.history || ownHistory
 
     return (
         <Router history={browserHistory}>

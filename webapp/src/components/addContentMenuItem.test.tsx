@@ -35,7 +35,7 @@ const wrap = (child: ReactNode): ReactElement => (
 )
 
 jest.mock('../mutator')
-const mockedMutator = mocked(mutator, true)
+const mockedMutator = mocked(mutator)
 
 describe('components/addContentMenuItem', () => {
     beforeEach(() => {

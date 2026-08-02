@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useEffect, useState, useMemo, useCallback} from 'react'
+import React, {type JSX, useEffect, useState, useMemo, useCallback} from 'react'
 import {batch} from 'react-redux'
 import {FormattedMessage, useIntl} from 'react-intl'
 import {useRouteMatch, useHistory} from 'react-router-dom'
@@ -98,7 +98,7 @@ const BoardPage = (props: Props): JSX.Element => {
         if (props.readonly) {
             return initialReadOnlyLoad
         }
-        return initialLoad
+        return () => initialLoad()
     }, [props.readonly])
 
     useWebsockets(teamId, (wsClient) => {
@@ -251,13 +251,11 @@ const BoardPage = (props: Props): JSX.Element => {
         }
     }, [me?.id, teamId, match.params.boardId])
 
-    if (props.readonly) {
-        useEffect(() => {
-            if (activeBoardId && activeViewId) {
-                TelemetryClient.trackEvent(TelemetryCategory, TelemetryActions.ViewSharedBoard, {board: activeBoardId, view: activeViewId})
-            }
-        }, [activeBoardId, activeViewId])
-    }
+    useEffect(() => {
+        if (props.readonly && activeBoardId && activeViewId) {
+            TelemetryClient.trackEvent(TelemetryCategory, TelemetryActions.ViewSharedBoard, {board: activeBoardId, view: activeViewId})
+        }
+    }, [props.readonly, activeBoardId, activeViewId])
 
     return (
         <>

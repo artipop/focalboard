@@ -26,7 +26,7 @@ import CardDetail from './cardDetail'
 global.fetch = FetchMock.fn
 jest.mock('../../octoClient')
 
-const mockedOctoClient = mocked(octoClient, true)
+const mockedOctoClient = mocked(octoClient)
 
 beforeEach(() => {
     FetchMock.fn.mockReset()

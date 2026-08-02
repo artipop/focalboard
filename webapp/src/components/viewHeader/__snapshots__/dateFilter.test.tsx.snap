@@ -36,15 +36,7 @@ exports[`components/viewHeader/dateFilter handles \`Today\` button click event 1
 
 exports[`components/viewHeader/dateFilter handles calendar click event 1`] = `
 <IntlProvider
-  defaultFormats={{}}
-  defaultLocale="en"
-  fallbackOnEmptyString={true}
-  formats={{}}
   locale="en"
-  messages={{}}
-  onError={[Function]}
-  onWarn={[Function]}
-  textComponent={Symbol(react.fragment)}
 >
   <DateFilter
     filter={

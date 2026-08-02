@@ -1,8 +1,8 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 import {IntlShape} from 'react-intl'
-import {DateUtils} from 'react-day-picker'
 
+import {isDate} from '../../widgets/dateUtils'
 import {Options} from '../../components/calculations/options'
 import {IPropertyTemplate} from '../../blocks/board'
 import {Card} from '../../blocks/card'
@@ -28,7 +28,7 @@ export default class DateProperty extends DatePropertyType {
         let displayValue = ''
         if (propertyValue && typeof propertyValue === 'string') {
             const singleDate = new Date(parseInt(propertyValue, 10))
-            if (singleDate && DateUtils.isDate(singleDate)) {
+            if (singleDate && isDate(singleDate)) {
                 displayValue = Utils.displayDate(new Date(parseInt(propertyValue, 10)), intl)
             } else {
                 try {

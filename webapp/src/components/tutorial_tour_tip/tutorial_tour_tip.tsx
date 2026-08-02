@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {useRef} from 'react'
+import React, {type JSX, useRef} from 'react'
 import Tippy from '@tippyjs/react'
 import ReactDOM from 'react-dom'
 import {FormattedMessage} from 'react-intl'
@@ -101,7 +101,7 @@ const TutorialTourTip = ({
         preventDefault,
     }
 
-    const triggerRef = useRef(null)
+    const triggerRef = useRef<HTMLDivElement>(null)
     const {
         show,
         tourSteps,
@@ -316,7 +316,7 @@ const TutorialTourTip = ({
                     aria={{content: 'labelledby'}}
                     allowHTML={true}
                     zIndex={9999}
-                    reference={triggerRef}
+                    reference={triggerRef as React.RefObject<Element>}
                     interactive={true}
                     appendTo={document.body}
                     className={`tutorial-tour-tip__box ${className || ''}`}

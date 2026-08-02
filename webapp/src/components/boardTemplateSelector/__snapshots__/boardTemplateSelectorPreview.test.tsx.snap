@@ -200,7 +200,6 @@ exports[`components/boardTemplateSelector/boardTemplateSelectorPreview should ma
           >
             No name
           </span>
-          
           <div
             class="KanbanCalculation"
           >

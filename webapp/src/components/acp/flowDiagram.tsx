@@ -355,7 +355,7 @@ const FlowDiagram = (props: Props) => {
         onChange(nodes, connectEdge(edges, params.source, params.target, params.sourceHandle, waitTriggers))
     }, [onChange, nodes, edges, waitTriggers])
 
-    const onNodeDragStop = useCallback((_: React.MouseEvent, node: Node) => {
+    const onNodeDragStop = useCallback((_: MouseEvent | TouchEvent, node: Node) => {
         if (!onChange) {
             return
         }

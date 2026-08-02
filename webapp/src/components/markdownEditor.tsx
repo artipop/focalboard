@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useState, Suspense} from 'react'
+import React, {type JSX, useState, Suspense} from 'react'
 
 import {Utils} from '../utils'
 import './markdownEditor.scss'

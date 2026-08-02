@@ -20,7 +20,7 @@ import TelemetryClient, {TelemetryCategory, TelemetryActions} from '../../teleme
 import SidebarSettingsMenu from './sidebarSettingsMenu'
 
 jest.mock('../../telemetry/telemetryClient')
-const mockedTelemetry = mocked(TelemetryClient, true)
+const mockedTelemetry = mocked(TelemetryClient)
 
 describe('components/sidebar/SidebarSettingsMenu', () => {
     const mockStore = configureStore([])

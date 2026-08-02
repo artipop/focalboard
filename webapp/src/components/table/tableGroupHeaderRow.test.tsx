@@ -42,7 +42,7 @@ const boardTreeGroup = {
     cards: [],
 }
 
-const Wrapper: React.FC = ({children}) => {
+const Wrapper: React.FC<React.PropsWithChildren> = ({children}) => {
     return wrapDNDIntl(
         <ColumnResizeProvider
             columnWidths={{}}

@@ -1,13 +1,13 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-/* eslint-disable max-lines */
-import React from 'react'
 
-import {useDrop} from 'react-dnd'
+import React, {type JSX} from 'react'
 
 import {Board, IPropertyOption, IPropertyTemplate, BoardGroup} from '../../blocks/board'
 import {BoardView} from '../../blocks/boardView'
 import {Card} from '../../blocks/card'
+
+import {useDropZone} from '../../hooks/sortable'
 
 import TableGroupHeaderRow from './tableGroupHeaderRow'
 import TableRows from './tableRows'
@@ -34,17 +34,7 @@ const TableGroup = (props: Props): JSX.Element => {
     const {board, activeView, group, onDropToGroup, groupByProperty} = props
     const groupId = group.option.id
 
-    const [{isOver}, drop] = useDrop(() => ({
-        accept: 'card',
-        collect: (monitor) => ({
-            isOver: monitor.isOver(),
-        }),
-        drop: (item: Card, monitor) => {
-            if (monitor.isOver({shallow: true})) {
-                onDropToGroup(item, groupId, '')
-            }
-        },
-    }), [onDropToGroup, groupId])
+    const [isOver, drop] = useDropZone<Card>('card', true, (card) => onDropToGroup(card, groupId, ''))
 
     let className = 'octo-table-group'
     if (isOver) {

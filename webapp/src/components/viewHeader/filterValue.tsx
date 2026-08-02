@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useState} from 'react'
+import React, {type JSX, useState} from 'react'
 
 import {useIntl} from 'react-intl'
 
@@ -28,7 +28,7 @@ type Props = {
     propertyType: PropertyType
 }
 
-const filterValue = (props: Props): JSX.Element|null => {
+const FilterValue = (props: Props): JSX.Element|null => {
     const {filter, template, view, propertyType} = props
     const [value, setValue] = useState(filter.values.length > 0 ? filter.values[0] : '')
     const intl = useIntl()
@@ -131,4 +131,4 @@ const filterValue = (props: Props): JSX.Element|null => {
     )
 }
 
-export default filterValue
+export default FilterValue

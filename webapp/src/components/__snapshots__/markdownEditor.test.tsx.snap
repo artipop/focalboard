@@ -30,7 +30,31 @@ exports[`components/markdownEditor should match snapshot with on click on previe
 <div>
   <div
     class="MarkdownEditor octo-editor classname-test active"
-  />
+  >
+    <div
+      class="MarkdownEditorInput"
+    >
+      <div
+        autocapitalize="off"
+        class="MarkdownEditorInput__content"
+        contenteditable="true"
+        data-lexical-editor="true"
+        role="textbox"
+        spellcheck="true"
+        style="user-select: text; white-space: pre-wrap; word-break: break-word;"
+      >
+        <p
+          dir="auto"
+        >
+          <span
+            data-lexical-text="true"
+          >
+            some initial text already set
+          </span>
+        </p>
+      </div>
+    </div>
+  </div>
 </div>
 `;
 

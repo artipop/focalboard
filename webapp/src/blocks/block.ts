@@ -117,4 +117,4 @@ function createPatchesFromBlocks(newBlock: Block, oldBlock: Block): BlockPatch[]
 }
 
 export type {ContentBlockTypes, BlockTypes, FileInfo}
-export {blockTypes, contentBlockTypes, Block, BlockPatch, createBlock, createPatchesFromBlocks}
+export {blockTypes, contentBlockTypes, type Block, type BlockPatch, createBlock, createPatchesFromBlocks}

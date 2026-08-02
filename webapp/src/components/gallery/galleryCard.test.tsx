@@ -29,9 +29,9 @@ jest.mock('../../utils')
 jest.mock('../../octoClient')
 
 describe('src/components/gallery/GalleryCard', () => {
-    const mockedMutator = mocked(mutator, true)
-    const mockedUtils = mocked(Utils, true)
-    const mockedOcto = mocked(octoClient, true)
+    const mockedMutator = mocked(mutator)
+    const mockedUtils = mocked(Utils)
+    const mockedOcto = mocked(octoClient)
     mockedOcto.getFileAsDataUrl.mockResolvedValue({url: 'test.jpg'})
 
     const board = TestBlockFactory.createBoard()

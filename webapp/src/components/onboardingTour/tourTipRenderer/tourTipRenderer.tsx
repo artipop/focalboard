@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React from 'react'
+import React, {type JSX} from 'react'
 
 import {Placement} from 'tippy.js'
 
@@ -49,9 +49,9 @@ const TourTipRenderer = (props: Props): JSX.Element | null => {
     const showTour = !disableTour && isOnboardingBoard && onboardingTourStarted && onboardingTourCategory === props.category
     let showTourTip = showTour && onboardingTourStep === props.step.toString()
 
+    const currentCard = useAppSelector((state) => (props.requireCard ? getCurrentCard(state) : null))
     if (props.requireCard) {
-        const card = useAppSelector(getCurrentCard)
-        const isOnboardingCard = card ? card.title === OnboardingCardTitle : false
+        const isOnboardingCard = currentCard ? currentCard.title === OnboardingCardTitle : false
 
         showTourTip = showTourTip && isOnboardingCard
     }

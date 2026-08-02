@@ -24,7 +24,6 @@ exports[`components/cardDetail/CommentsList comments show up 1`] = `
           </p>
         </div>
       </div>
-      
     </div>
     <div
       class="Comment comment"

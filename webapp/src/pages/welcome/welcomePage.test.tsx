@@ -16,9 +16,7 @@ import configureStore from 'redux-mock-store'
 
 import {mocked} from 'jest-mock'
 
-import thunk from 'redux-thunk'
-
-import {wrapIntl} from '../../testUtils'
+import {wrapIntl, mockThunk as thunk} from '../../testUtils'
 
 import mutator from '../../mutator'
 
@@ -32,10 +30,10 @@ const w = (window as any)
 const oldBaseURL = w.baseURL
 
 jest.mock('../../mutator')
-const mockedMutator = mocked(mutator, true)
+const mockedMutator = mocked(mutator)
 
 jest.mock('../../octoClient')
-const mockedOctoClient = mocked(octoClient, true)
+const mockedOctoClient = mocked(octoClient)
 
 beforeEach(() => {
     jest.resetAllMocks()

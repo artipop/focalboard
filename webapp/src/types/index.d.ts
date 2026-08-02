@@ -35,7 +35,7 @@ export interface IAppWindow extends Window {
                 AddProxy(entryJSON: string): Promise<string>
                 UpdateProxy(entryJSON: string): Promise<string>
                 RemoveProxy(name: string): Promise<void>
-                SyncAgentUsers(boardId: string): Promise<string>
+                SyncAgentUsers?(boardId: string): Promise<string>
                 ListDeployTargets(): Promise<string>
                 AddDeployTarget(entryJSON: string): Promise<string>
                 UpdateDeployTarget(entryJSON: string): Promise<string>

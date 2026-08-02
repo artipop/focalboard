@@ -23,8 +23,8 @@ import ViewHeaderActionsMenu from './viewHeaderActionsMenu'
 jest.mock('../../archiver')
 jest.mock('../../csvExporter')
 jest.mock('../../mutator')
-const mockedArchiver = mocked(Archiver, true)
-const mockedCsvExporter = mocked(CsvExporter, true)
+const mockedArchiver = mocked(Archiver)
+const mockedCsvExporter = mocked(CsvExporter)
 
 const board = TestBlockFactory.createBoard()
 const activeView = TestBlockFactory.createBoardView(board)

@@ -20,7 +20,7 @@ import {PropertyType} from '../../properties/types'
 import CardDetailProperties from './cardDetailProperties'
 
 jest.mock('../../mutator')
-const mockedMutator = mocked(mutator, true)
+const mockedMutator = mocked(mutator)
 
 describe('components/cardDetail/CardDetailProperties', () => {
     const board = TestBlockFactory.createBoard()

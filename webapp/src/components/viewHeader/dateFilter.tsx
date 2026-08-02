@@ -1,10 +1,8 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useState, useCallback} from 'react'
+import React, {type JSX, useState, useCallback} from 'react'
 import {useIntl} from 'react-intl'
-import {DateUtils} from 'react-day-picker'
-import MomentLocaleUtils from 'react-day-picker/moment'
-import DayPicker from 'react-day-picker/DayPicker'
+import {DayPicker} from 'react-day-picker'
 
 import moment from 'moment'
 
@@ -18,8 +16,10 @@ import Modal from '../../components/modal'
 import ModalWrapper from '../../components/modalWrapper'
 import {Utils} from '../../utils'
 import useMomentLocale from '../../hooks/momentLocale'
+import useDateFnsLocale from '../../hooks/dateFnsLocale'
+import {isDate, parseLocalizedDate} from '../../widgets/dateUtils'
 
-import 'react-day-picker/lib/style.css'
+import 'react-day-picker/style.css'
 import './dateFilter.scss'
 
 import {FilterClause} from '../../blocks/filterClause'
@@ -51,7 +51,7 @@ function DateFilter(props: Props): JSX.Element {
     const [value, setValue] = useState(dateValue)
     const intl = useIntl()
 
-    const onChange = useCallback((newValue) => {
+    const onChange = useCallback((newValue: Date | undefined) => {
         if (value !== newValue) {
             const adjustedValue = newValue ? new Date(newValue.getTime() - timeZoneOffset(newValue.getTime())) : undefined
             setValue(adjustedValue)
@@ -91,6 +91,7 @@ function DateFilter(props: Props): JSX.Element {
 
     const locale = intl.locale.toLowerCase()
     useMomentLocale(locale)
+    const calendarLocale = useDateFnsLocale(locale)
 
     const handleTodayClick = (day: Date) => {
         day.setHours(12)
@@ -98,6 +99,9 @@ function DateFilter(props: Props): JSX.Element {
     }
 
     const handleDayClick = (day: Date) => {
+        // react-day-picker 7 built each day at noon to sidestep DST; version 10
+        // uses midnight, and the stored value is expected to be noon.
+        day.setHours(12)
         saveValue(day)
     }
 
@@ -154,8 +158,8 @@ function DateFilter(props: Props): JSX.Element {
                                     }}
                                     onChange={setInput}
                                     onSave={() => {
-                                        const newDate = MomentLocaleUtils.parseDate(input, 'L', intl.locale)
-                                        if (newDate && DateUtils.isDate(newDate)) {
+                                        const newDate = parseLocalizedDate(input, intl.locale)
+                                        if (newDate && isDate(newDate)) {
                                             newDate.setHours(12)
                                             saveValue(newDate)
                                         } else {
@@ -168,15 +172,23 @@ function DateFilter(props: Props): JSX.Element {
                                 />
                             </div>
                             <DayPicker
+                                mode='single'
                                 onDayClick={handleDayClick}
-                                initialMonth={offsetDate || new Date()}
+                                defaultMonth={offsetDate || new Date()}
                                 showOutsideDays={false}
-                                locale={locale}
-                                localeUtils={MomentLocaleUtils}
-                                todayButton={intl.formatMessage({id: 'DateRange.today', defaultMessage: 'Today'})}
-                                onTodayButtonClick={handleTodayClick}
-                                month={offsetDate}
-                                selectedDays={offsetDate}
+                                locale={calendarLocale}
+                                selected={offsetDate}
+                                footer={
+                                    <Button
+                                        onClick={() => {
+                                            const today = new Date()
+                                            today.setHours(0, 0, 0, 0)
+                                            handleTodayClick(today)
+                                        }}
+                                    >
+                                        {intl.formatMessage({id: 'DateRange.today', defaultMessage: 'Today'})}
+                                    </Button>
+                                }
                             />
                             <hr/>
                             <div

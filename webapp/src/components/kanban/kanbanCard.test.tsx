@@ -23,8 +23,8 @@ import KanbanCard from './kanbanCard'
 jest.mock('../../mutator')
 jest.mock('../../utils')
 jest.mock('../../telemetry/telemetryClient')
-const mockedUtils = mocked(Utils, true)
-const mockedMutator = mocked(Mutator, true)
+const mockedUtils = mocked(Utils)
+const mockedMutator = mocked(Mutator)
 
 describe('src/components/kanban/kanbanCard', () => {
     const board = TestBlockFactory.createBoard()

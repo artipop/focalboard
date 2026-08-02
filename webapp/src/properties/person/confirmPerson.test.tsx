@@ -30,8 +30,8 @@ import ConfirmPerson from './confirmPerson'
 jest.mock('../../mutator')
 jest.mock('../../octoClient')
 
-const mockedMutator = mocked(mutator, true)
-const mockedOctoClient = mocked(client, true)
+const mockedMutator = mocked(mutator)
+const mockedOctoClient = mocked(client)
 
 const board = TestBlockFactory.createBoard()
 board.teamId = 'team-id-1'

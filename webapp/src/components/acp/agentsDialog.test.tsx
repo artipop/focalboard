@@ -12,7 +12,7 @@ import mutator from '../../mutator'
 import AgentsDialog, {isAgentsAvailable, textToServers} from './agentsDialog'
 
 jest.mock('../../mutator')
-const mockedMutator = jest.mocked(mutator, true)
+const mockedMutator = jest.mocked(mutator)
 
 const anyWindow = window as any
 

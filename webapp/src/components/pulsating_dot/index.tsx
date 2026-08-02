@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React from 'react'
+import React, {type JSX} from 'react'
 
 import './pulsating_dot.scss'
 import {Coords} from '../tutorial_tour_tip/tutorial_tour_tip_backdrop'

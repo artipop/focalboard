@@ -9,4 +9,4 @@ interface ISharing {
     updateAt?: number
 }
 
-export {ISharing}
+export {type ISharing}

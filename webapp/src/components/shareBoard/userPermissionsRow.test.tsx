@@ -3,7 +3,6 @@
 import {act, render} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import {Provider as ReduxProvider} from 'react-redux'
-import thunk from 'redux-thunk'
 
 import React from 'react'
 import {MemoryRouter} from 'react-router'
@@ -12,7 +11,7 @@ import {BoardMember} from '../../blocks/board'
 
 import {IUser} from '../../user'
 import {TestBlockFactory} from '../../test/testBlockFactory'
-import {mockStateStore, wrapDNDIntl} from '../../testUtils'
+import {mockStateStore, wrapDNDIntl, mockThunk as thunk} from '../../testUtils'
 
 import UserPermissionsRow from './userPermissionsRow'
 

@@ -20,7 +20,7 @@ import {IPropertyOption} from '../../blocks/board'
 import ViewHeaderGroupByMenu from './viewHeaderGroupByMenu'
 
 jest.mock('../../mutator')
-const mockedMutator = mocked(mutator, true)
+const mockedMutator = mocked(mutator)
 
 const board = TestBlockFactory.createBoard()
 const activeView = TestBlockFactory.createBoardView(board)

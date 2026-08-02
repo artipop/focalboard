@@ -211,5 +211,5 @@ export const {reducer} = sidebarSlice
 
 export const {updateCategories, updateBoardCategories, updateCategoryOrder, updateCategoryBoardsOrder} = sidebarSlice.actions
 
-export {Category, CategoryBoards, BoardCategoryWebsocketData, CategoryBoardsReorderData, CategoryBoardMetadata}
+export {type Category, type CategoryBoards, type BoardCategoryWebsocketData, type CategoryBoardsReorderData, type CategoryBoardMetadata}
 

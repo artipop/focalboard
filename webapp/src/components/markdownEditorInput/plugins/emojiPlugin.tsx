@@ -1,9 +1,9 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {ReactElement, useCallback, useMemo, useState} from 'react'
+import React, {ReactElement, useCallback, useEffect, useState} from 'react'
 import ReactDOM from 'react-dom'
 
-import {emojiIndex} from 'emoji-mart'
+import {SearchIndex} from 'emoji-mart'
 
 import {useLexicalComposerContext} from '@lexical/react/LexicalComposerContext'
 import {
@@ -39,15 +39,32 @@ const EmojiPlugin = (): ReactElement => {
 
     const triggerFn = useBasicTypeaheadTriggerMatch(':', {minLength: 1})
 
-    const options = useMemo(() => {
+    // emoji-mart 5 searches asynchronously and puts the glyph on the emoji's
+    // first skin rather than on the emoji itself.
+    const [options, setOptions] = useState<EmojiTypeaheadOption[]>([])
+
+    useEffect(() => {
         if (!query) {
-            return []
+            setOptions([])
+            return undefined
         }
-        const results = (emojiIndex.search(query) || []) as unknown as EmojiResult[]
-        return results.
-            slice(0, MAX_EMOJI_SUGGESTIONS).
-            filter((e) => Boolean(e.native)).
-            map((e) => new EmojiTypeaheadOption(e))
+
+        let cancelled = false
+        SearchIndex.search(query).then((results: Array<{id: string, name: string, skins?: Array<{native?: string}>}>) => {
+            if (cancelled) {
+                return
+            }
+            const found = (results || []).
+                slice(0, MAX_EMOJI_SUGGESTIONS).
+                map((e): EmojiResult => ({id: e.id, name: e.name, colons: `:${e.id}:`, native: e.skins?.[0]?.native || ''})).
+                filter((e) => Boolean(e.native)).
+                map((e) => new EmojiTypeaheadOption(e))
+            setOptions(found)
+        })
+
+        return () => {
+            cancelled = true
+        }
     }, [query])
 
     const onSelectOption = useCallback((

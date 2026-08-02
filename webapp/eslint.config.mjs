@@ -18,6 +18,7 @@ import header from 'eslint-plugin-header'
 import importPlugin from 'eslint-plugin-import'
 import noOnlyTests from 'eslint-plugin-no-only-tests'
 import react from 'eslint-plugin-react'
+import reactHooks from 'eslint-plugin-react-hooks'
 import globals from 'globals'
 
 import mattermostBase from './.eslint/mattermost-base.json' with {type: 'json'}
@@ -63,6 +64,7 @@ export default [
             'import': importPlugin,
             'no-only-tests': noOnlyTests,
             react,
+            'react-hooks': reactHooks,
         },
 
         settings: {
@@ -85,6 +87,17 @@ export default [
             // this is where the eslintrc override applied them, i.e. after the base.
             ...tsPlugin.configs['eslint-recommended'].overrides[0].rules,
             ...tsPlugin.configs.recommended.rules,
+
+            // Rules of React, which React Compiler needs held before it can be
+            // switched on: it bails out of any component that breaks them.
+            // rules-of-hooks is the one that is already clean and must stay so --
+            // a hook behind an `if` is a latent bug whatever the compiler does.
+            // The rest still report (they are what the compiler will complain
+            // about) but as warnings, because 79 findings predate this rule set
+            // and gating the build on them before anyone has read them would only
+            // teach people to silence them.
+            ...Object.fromEntries(Object.keys(reactHooks.configs['recommended-latest'].rules).
+                map((rule) => [rule, rule === 'react-hooks/rules-of-hooks' ? 'error' : 'warn'])),
 
             // Formatting rules that typescript-eslint 8 handed over to @stylistic.
             // Same options as before, new owner.
