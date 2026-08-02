@@ -2,7 +2,7 @@
 // See LICENSE.txt for license information.
 import React, {type JSX} from 'react'
 
-import {Placement} from 'tippy.js'
+import {type Placement} from '@floating-ui/dom'
 
 import {ClientConfig} from '../../../config/clientConfig'
 import {getClientConfig} from '../../../store/clientConfig'

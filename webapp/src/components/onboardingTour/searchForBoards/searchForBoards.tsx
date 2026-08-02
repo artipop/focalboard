@@ -3,7 +3,6 @@
 import React, {type JSX} from 'react'
 
 import {FormattedMessage} from 'react-intl'
-import {right} from '@popperjs/core'
 
 import {SidebarTourSteps, TOUR_SIDEBAR} from '..'
 
@@ -40,7 +39,7 @@ const SearchForBoardsTourStep = (): JSX.Element | null => {
             punchout={punchout}
             classname='SearchForBoards'
             telemetryTag='tourPoint4d'
-            placement={right}
+            placement={'right'}
             hideBackdrop={false}
             showForce={true}
         />

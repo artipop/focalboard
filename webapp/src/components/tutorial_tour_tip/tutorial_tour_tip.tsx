@@ -1,18 +1,12 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {type JSX, useRef} from 'react'
-import Tippy from '@tippyjs/react'
+import React, {type CSSProperties, type JSX, useEffect, useId, useRef, useState} from 'react'
 import ReactDOM from 'react-dom'
 import {FormattedMessage} from 'react-intl'
+import {arrow, autoUpdate, computePosition, flip, offset, shift, type Placement} from '@floating-ui/dom'
 
 import './tutorial_tour_tip.scss'
-import 'tippy.js/dist/tippy.css'
-import 'tippy.js/themes/light-border.css'
-import 'tippy.js/animations/scale-subtle.css'
-import 'tippy.js/animations/perspective-subtle.css'
-
-import {Placement} from 'tippy.js'
 
 import CloseIcon from '../../widgets/icons/close'
 import Button from '../../widgets/buttons/button'
@@ -39,6 +33,114 @@ const TourTipOverlay = ({
         </div>,
         document.body,
     ) : null)
+
+// The arrow is a 12px square turned 45 degrees, so its corner reaches about
+// 8.5px out of the box; 10px of offset keeps it clear of what it points at,
+// which is the gap tippy left as well.
+const ARROW_SIZE = 12
+const TIP_OFFSET = 10
+const VIEWPORT_PADDING = 8
+
+const oppositeSide: Record<string, 'top' | 'right' | 'bottom' | 'left'> = {
+    top: 'bottom',
+    right: 'left',
+    bottom: 'top',
+    left: 'right',
+}
+
+type TipPosition = {
+    x: number
+    y: number
+    placement: Placement
+    arrowX?: number
+    arrowY?: number
+}
+
+type TourTipBoxProps = {
+    anchor: React.RefObject<HTMLElement | null>
+    placement?: Placement
+    width: string | number
+    className?: string
+    labelledBy: string
+    children: React.ReactNode
+}
+
+// What Tippy was here for. The box is portalled to the body and placed against
+// the pulsating dot by Floating UI, which — unlike tippy.js, whose author moved
+// on to write it — has no framework in it: a port would keep everything below
+// the return statement and rewrite the rest.
+//
+// The translation goes on the positioner and the entrance animation on the box
+// inside it, so the two never fight over `transform`.
+const TourTipBox = (props: TourTipBoxProps): JSX.Element => {
+    const [positioner, setPositioner] = useState<HTMLDivElement | null>(null)
+    const [arrowElement, setArrowElement] = useState<HTMLDivElement | null>(null)
+    const [position, setPosition] = useState<TipPosition | null>(null)
+
+    const {anchor, placement} = props
+
+    useEffect(() => {
+        const reference = anchor.current
+        if (!reference || !positioner || !arrowElement) {
+            return undefined
+        }
+
+        // Keeps the box on the dot while the board behind it scrolls or resizes.
+        return autoUpdate(reference, positioner, () => {
+            computePosition(reference, positioner, {
+                placement: placement || 'top',
+                middleware: [
+                    offset(TIP_OFFSET),
+                    flip(),
+                    shift({padding: VIEWPORT_PADDING}),
+                    arrow({element: arrowElement, padding: VIEWPORT_PADDING}),
+                ],
+            }).then((computed) => {
+                setPosition({
+                    x: computed.x,
+                    y: computed.y,
+                    placement: computed.placement,
+                    arrowX: computed.middlewareData.arrow?.x,
+                    arrowY: computed.middlewareData.arrow?.y,
+                })
+            })
+        })
+    }, [anchor, positioner, arrowElement, placement])
+
+    const resolved = position?.placement || placement || 'top'
+    const arrowStyle: CSSProperties = {
+        left: position?.arrowX === undefined ? undefined : `${position.arrowX}px`,
+        top: position?.arrowY === undefined ? undefined : `${position.arrowY}px`,
+        [oppositeSide[resolved.split('-')[0]]]: `${-ARROW_SIZE / 2}px`,
+    }
+
+    return ReactDOM.createPortal(
+        <div
+            ref={setPositioner}
+
+            // Nothing is drawn until there is somewhere to draw it, so the box
+            // never appears at the top-left corner for a frame first.
+            className={`tutorial-tour-tip__positioner ${position ? 'is-positioned' : ''}`}
+            data-placement={resolved}
+            style={position ? {transform: `translate(${Math.round(position.x)}px, ${Math.round(position.y)}px)`} : undefined}
+        >
+            <div
+                className={`tutorial-tour-tip__box ${props.className || ''}`}
+                style={{maxWidth: props.width}}
+                role='dialog'
+                aria-labelledby={props.labelledBy}
+            >
+                <div
+                    ref={setArrowElement}
+                    className='tutorial-tour-tip__arrow'
+                    style={arrowStyle}
+                />
+                {props.children}
+            </div>
+        </div>,
+        document.body,
+    )
+}
 
 type Props = {
     screen: JSX.Element
@@ -102,6 +204,7 @@ const TutorialTourTip = ({
     }
 
     const triggerRef = useRef<HTMLDivElement>(null)
+    const titleId = useId()
     const {
         show,
         tourSteps,
@@ -182,7 +285,10 @@ const TutorialTourTip = ({
             }}
         >
             <div className='tutorial-tour-tip__header'>
-                <h4 className='tutorial-tour-tip__header__title'>
+                <h4
+                    id={titleId}
+                    className='tutorial-tour-tip__header__title'
+                >
                     {title}
                 </h4>
                 <IconButton
@@ -277,6 +383,7 @@ const TutorialTourTip = ({
             <div
                 ref={triggerRef}
                 onClick={handleOpen}
+                aria-expanded={show}
                 className={`tutorial-tour-tip__pulsating-dot-ctr ${className || ''}`}
             >
                 <PulsatingDot coords={pulsatingDotPosition}/>
@@ -306,22 +413,15 @@ const TutorialTourTip = ({
                 />
             </TourTipOverlay>
             {show && (
-                <Tippy
-                    showOnCreate={show}
-                    content={content}
-                    animation='scale-subtle'
-                    trigger='click'
-                    duration={[250, 150]}
-                    maxWidth={width}
-                    aria={{content: 'labelledby'}}
-                    allowHTML={true}
-                    zIndex={9999}
-                    reference={triggerRef as React.RefObject<Element>}
-                    interactive={true}
-                    appendTo={document.body}
-                    className={`tutorial-tour-tip__box ${className || ''}`}
+                <TourTipBox
+                    anchor={triggerRef}
                     placement={placement}
-                />
+                    width={width}
+                    className={className}
+                    labelledBy={titleId}
+                >
+                    {content}
+                </TourTipBox>
             )}
         </>
     )

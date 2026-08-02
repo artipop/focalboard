@@ -2,8 +2,6 @@
 // See LICENSE.txt for license information.
 import React, {type JSX} from 'react'
 
-import {bottom} from '@popperjs/core'
-
 import {FormattedMessage} from 'react-intl'
 
 import {useMeasurePunchouts} from '../../tutorial_tour_tip/hooks'
@@ -41,7 +39,7 @@ const OpenCardTourStep = (): JSX.Element | null => {
             punchout={punchout}
             classname='OpenCardTourStep'
             telemetryTag='tourPoint1'
-            placement={bottom}
+            placement={'bottom'}
             singleTip={true}
             hideNavButtons={true}
             hideBackdrop={false}

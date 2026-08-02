@@ -4,35 +4,42 @@
 .tutorial-tour-tip {
     display: flex;
 
-    &__box {
-        &.tippy-box {
-            padding: 18px 24px 24px;
-            border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
-            background: rgb(var(--center-channel-bg-rgb));
-            border-radius: 4px;
-            color: var(--center-channel-color-rgb);
-            filter: drop-shadow(0 12px 32px rgba(0, 0, 0, 0.12));
+    // Floating UI writes the placement here and the offset into the transform;
+    // everything the box itself does with `transform` would fight that, hence
+    // the two elements.
+    &__positioner {
+        @include z-index(tour-tip);
+        position: absolute;
+        top: 0;
+        left: 0;
+        visibility: hidden;
 
-            .tippy-content {
-                padding: 0;
-            }
+        &.is-positioned {
+            visibility: visible;
 
-            .tippy-arrow {
-                width: 12px;
-                height: 12px;
-                border-color: rgba(var(--center-channel-color-rgb), 0.16);
-                color: rgb(var(--center-channel-bg-rgb));
-            }
-
-            .tippy-arrow::before {
-                width: 12px;
-                height: 12px;
-                border-color: rgba(var(--center-channel-color-rgb), 0.16);
-                background: rgb(var(--center-channel-bg-rgb));
-                color: var(--center-channel-bg);
-                transform-origin: center;
+            .tutorial-tour-tip__box {
+                animation: tutorial-tour-tip-appear 250ms ease-out;
             }
         }
+    }
+
+    &__box {
+        position: relative;
+        padding: 18px 24px 24px;
+        border: 1px solid rgba(var(--center-channel-color-rgb), 0.16);
+        background: rgb(var(--center-channel-bg-rgb));
+        border-radius: 4px;
+        color: var(--center-channel-color-rgb);
+        filter: drop-shadow(0 12px 32px rgba(0, 0, 0, 0.12));
+    }
+
+    &__arrow {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        border: 0 solid rgba(var(--center-channel-color-rgb), 0.16);
+        background: rgb(var(--center-channel-bg-rgb));
+        transform-origin: center;
     }
 
     &__pulsating-dot-ctr {
@@ -320,24 +327,38 @@
     }
 }
 
-.tippy-box[data-placement^=right] > .tippy-arrow::before {
-    border-width: 1px 0 0 1px !important;
+// Only the two edges facing away from the box are drawn, so the arrow reads as
+// a tail of its border rather than as a diamond stuck to it.
+.tutorial-tour-tip__positioner[data-placement^=right] .tutorial-tour-tip__arrow {
+    border-width: 1px 0 0 1px;
     transform: rotate(-45deg);
 }
 
-.tippy-box[data-placement^=left] > .tippy-arrow::before {
-    border-width: 1px 1px 0 0 !important;
+.tutorial-tour-tip__positioner[data-placement^=left] .tutorial-tour-tip__arrow {
+    border-width: 1px 1px 0 0;
     transform: rotate(45deg);
 }
 
-.tippy-box[data-placement^=bottom] > .tippy-arrow::before {
-    border-width: 1px 0 0 1px !important;
+.tutorial-tour-tip__positioner[data-placement^=bottom] .tutorial-tour-tip__arrow {
+    border-width: 1px 0 0 1px;
     transform: rotate(45deg);
 }
 
-.tippy-box[data-placement^=top] > .tippy-arrow::before {
-    border-width: 0 0 1px 1px !important;
+.tutorial-tour-tip__positioner[data-placement^=top] .tutorial-tour-tip__arrow {
+    border-width: 0 0 1px 1px;
     transform: rotate(-45deg);
+}
+
+@keyframes tutorial-tour-tip-appear {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
 }
 
 .tip-backdrop {

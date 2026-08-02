@@ -2,8 +2,6 @@
 // See LICENSE.txt for license information.
 import React, {type JSX, useEffect} from 'react'
 
-import {right} from '@popperjs/core'
-
 import {FormattedMessage} from 'react-intl'
 
 import {useMeasurePunchouts} from '../../tutorial_tour_tip/hooks'
@@ -95,7 +93,7 @@ const SidebarCategoriesTourStep = (): JSX.Element | null => {
             punchout={punchout}
             classname='SidebarCategories'
             telemetryTag='tourPoint4a'
-            placement={right}
+            placement={'right'}
             hideBackdrop={false}
             showForce={true}
         />

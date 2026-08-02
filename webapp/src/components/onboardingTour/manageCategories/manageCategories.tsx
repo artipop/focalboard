@@ -2,8 +2,6 @@
 // See LICENSE.txt for license information.
 import React, {type JSX} from 'react'
 
-import {right} from '@popperjs/core'
-
 import {FormattedMessage} from 'react-intl'
 
 import {SidebarTourSteps, TOUR_SIDEBAR} from '..'
@@ -44,7 +42,7 @@ const ManageCategoriesTourStep = (): JSX.Element | null => {
             punchout={punchout}
             classname='ManageCatergoies'
             telemetryTag='tourPoint4b'
-            placement={right}
+            placement={'right'}
             hideBackdrop={false}
             showForce={true}
         />
