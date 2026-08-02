@@ -8,6 +8,13 @@
 // order on top of that, so the whole set is normalised out of snapshots. The
 // behaviour it provides belongs in tests that drive the keyboard, not in
 // snapshots of unrelated components.
+//
+// Hiding them does mean nothing notices if they stop being emitted, and they
+// are not decoration: role, tabindex and aria-roledescription are how a
+// keyboard reaches a card at all, which is a large part of why this app moved
+// off the HTML5 drag API. Covering them needs a browser -- measured here, a
+// dedicated test saw no attributes at all on some runs and the full set on
+// others. It belongs with the other TODO(react-19) items.
 
 const MARKER = 'aria-roledescription'
 const DND_KIT_ATTRIBUTES = [

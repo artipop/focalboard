@@ -52,6 +52,11 @@ Linux target `amd64`. The Makefile targets pass `-skipbindings`: Wails' generate
 JS bindings are unused (the webapp calls `window.go.main.App.*` via the injected
 runtime).
 
+**[How a card gets worked on](docs/flows.md)** walks through the whole thing for
+somebody using the board: what happens when a card lands in a column, when a
+worktree appears and what becomes of it, which branch is followed, the routes
+the template ships, and what to look at when nothing happens.
+
 ## Prerequisites
 
 - Wails CLI:
