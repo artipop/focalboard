@@ -31,6 +31,7 @@ function bindingsWith(sessions: any[], events: any[] = []) {
         ListAgentRepos: jest.fn().mockResolvedValue(JSON.stringify([{name: 'NotBro'}, {name: 'leadheat'}])),
         PromptSession: jest.fn().mockResolvedValue(undefined),
         AnswerPermission: jest.fn().mockResolvedValue(undefined),
+        AnswerElicitation: jest.fn().mockResolvedValue(undefined),
         AttachSession: jest.fn().mockResolvedValue(true),
         DetachSession: jest.fn(),
         CloseSession: jest.fn().mockResolvedValue(undefined),
@@ -144,6 +145,100 @@ describe('components/acp/sessionConsole', () => {
 
         // Nothing to press: there is no question here.
         expect(screen.queryByRole('button', {name: 'Allow'})).not.toBeInTheDocument()
+    })
+
+    // The agent's own question, which it can only ask because we tell it we can
+    // draw a form. The answer goes back keyed by the schema's own field names.
+    test('answers the agent\'s question as a form', async () => {
+        const bindings = bindingsWith([{id: 'sess-form', status: 'running'}])
+        anyWindow.go = {main: {App: bindings}}
+        const handlers = fakeRuntime()
+
+        render(wrapIntl(<SessionConsole cardId='card1'/>))
+        await waitFor(() => expect(bindings.AttachSession).toHaveBeenCalledWith('sess-form'))
+
+        handlers['acp:elicitation']({
+            cardId: 'card1',
+            sessionId: 'sess-form',
+            requestId: 'form-1',
+            message: 'Which database?',
+            pending: true,
+            fields: [
+                {
+                    key: 'q0',
+                    title: 'Database',
+                    type: 'select',
+                    options: [
+                        {value: 'sqlite', title: 'SQLite', description: 'one file'},
+                        {value: 'postgres', title: 'Postgres'},
+                    ],
+                },
+                {key: 'q0_other', title: 'Other', type: 'text', customFor: 'q0'},
+            ],
+        })
+
+        await waitFor(() => expect(screen.getByText('Which database?')).toBeInTheDocument())
+        expect(screen.getByText('one file')).toBeInTheDocument()
+
+        userEvent.click(screen.getByRole('radio', {name: /Postgres/}))
+        userEvent.click(screen.getByRole('button', {name: 'Answer'}))
+
+        await waitFor(() => expect(bindings.AnswerElicitation).toHaveBeenCalledWith(
+            'sess-form', 'form-1', JSON.stringify({q0: 'postgres'}),
+        ))
+    })
+
+    // Free text instead of one of the options: the field the adapter pairs with
+    // the question travels back under its own key, and the agent prefers it.
+    test('sends a typed answer alongside the question it belongs to', async () => {
+        const bindings = bindingsWith([{id: 'sess-form2', status: 'running'}])
+        anyWindow.go = {main: {App: bindings}}
+        const handlers = fakeRuntime()
+
+        render(wrapIntl(<SessionConsole cardId='card1'/>))
+        await waitFor(() => expect(bindings.AttachSession).toHaveBeenCalledWith('sess-form2'))
+
+        handlers['acp:elicitation']({
+            cardId: 'card1',
+            sessionId: 'sess-form2',
+            requestId: 'form-2',
+            message: 'Which database?',
+            pending: true,
+            fields: [
+                {key: 'q0', title: 'Database', type: 'select', options: [{value: 'sqlite', title: 'SQLite'}]},
+                {key: 'q0_other', title: 'Other', type: 'text', customFor: 'q0'},
+            ],
+        })
+
+        await waitFor(() => expect(screen.getByText('Which database?')).toBeInTheDocument())
+        userEvent.type(screen.getByRole('textbox', {name: 'Other'}), 'duckdb')
+        userEvent.click(screen.getByRole('button', {name: 'Answer'}))
+
+        await waitFor(() => expect(bindings.AnswerElicitation).toHaveBeenCalledWith(
+            'sess-form2', 'form-2', JSON.stringify({q0_other: 'duckdb'}),
+        ))
+    })
+
+    // Nobody was watching when the agent asked, so there is nothing to fill in:
+    // what is left is the record of it, not a form that answers nowhere.
+    test('shows a declined question as a record', async () => {
+        const bindings = bindingsWith([{id: 'sess-form3', status: 'running'}])
+        anyWindow.go = {main: {App: bindings}}
+        const handlers = fakeRuntime()
+
+        render(wrapIntl(<SessionConsole cardId='card1'/>))
+        await waitFor(() => expect(bindings.AttachSession).toHaveBeenCalledWith('sess-form3'))
+
+        handlers['acp:elicitation']({
+            cardId: 'card1',
+            sessionId: 'sess-form3',
+            message: 'Which database?',
+            declined: 'нет открытой консоли — некому отвечать',
+        })
+
+        await waitFor(() => expect(screen.getByText('Which database?')).toBeInTheDocument())
+        expect(screen.getByText('нет открытой консоли — некому отвечать')).toBeInTheDocument()
+        expect(screen.queryByRole('button', {name: 'Answer'})).not.toBeInTheDocument()
     })
 
     test('attaches to a session that starts while the card is already open', async () => {

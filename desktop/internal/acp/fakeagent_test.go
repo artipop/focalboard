@@ -39,6 +39,7 @@ const (
 	fakeClaudeMultiTurn      = "multiturn"
 	fakeClaudeSlowTurn       = "slowturn"
 	fakeClaudeAsksPermission = "permission"
+	fakeClaudeAsksForm       = "form"
 	fakeClaudeSlowPermission = "slowpermission"
 	fakeClaudeRecordingArgs  = "record"
 	fakeCodexEnv             = "env-codexhome"
@@ -106,6 +107,11 @@ func (f *fakeAgent) record(name, content string) {
 }
 
 func (f *fakeAgent) Initialize(ctx context.Context, params acpsdk.InitializeRequest) (acpsdk.InitializeResponse, error) {
+	// An agent decides what it may ask for from what the client says it can
+	// draw, so the capabilities are worth recording.
+	if caps, err := json.Marshal(params.ClientCapabilities); err == nil {
+		f.record("capabilities.json", string(caps))
+	}
 	return acpsdk.InitializeResponse{ProtocolVersion: acpsdk.ProtocolVersionNumber}, nil
 }
 
@@ -226,6 +232,52 @@ func (f *fakeAgent) Prompt(ctx context.Context, params acpsdk.PromptRequest) (ac
 		}
 		f.askPermission(ctx, params.SessionId)
 		return f.say(ctx, params.SessionId, "fake work done")
+
+	case fakeClaudeAsksForm:
+		// What the claude adapter sends for its own AskUserQuestion: a question
+		// as the message, the options as a `oneOf` of consts, and a free-text
+		// field marked as the custom answer for that question.
+		answer, err := f.conn.UnstableCreateElicitation(ctx, acpsdk.UnstableCreateElicitationRequest{
+			Form: &acpsdk.UnstableCreateElicitationForm{
+				Mode:    "form",
+				Message: "Which database?",
+				RequestedSchema: acpsdk.UnstableElicitationSchema{
+					Type: "object",
+					Properties: map[string]any{
+						"question_0": map[string]any{
+							"type":  "string",
+							"title": "Database",
+							"oneOf": []any{
+								map[string]any{"const": "sqlite", "title": "SQLite", "description": "one file"},
+								map[string]any{"const": "postgres", "title": "Postgres"},
+							},
+						},
+						"question_0_custom": map[string]any{
+							"type":  "string",
+							"title": "Other",
+							"_meta": map[string]any{
+								"_askUserQuestionCustomAnswer": map[string]any{"questionId": "question_0"},
+							},
+						},
+					},
+				},
+			},
+		})
+		if err != nil {
+			return f.say(ctx, params.SessionId, "elicitation failed: "+err.Error())
+		}
+		switch {
+		case answer.Accept != nil:
+			raw, _ := json.Marshal(answer.Accept.Content)
+			f.record("elicitation.json", string(raw))
+			return f.say(ctx, params.SessionId, "answered: "+string(raw))
+		case answer.Decline != nil:
+			f.record("elicitation.json", "declined")
+			return f.say(ctx, params.SessionId, "declined")
+		default:
+			f.record("elicitation.json", "cancelled")
+			return f.say(ctx, params.SessionId, "cancelled")
+		}
 
 	case fakeClaudeRecordingArgs:
 		return f.say(ctx, params.SessionId, "deployed")

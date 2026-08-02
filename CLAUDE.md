@@ -1,10 +1,17 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this
+repository.
+
+Lines are wrapped. Keep them wrapped — a paragraph on one line makes every edit a whole-line
+diff.
 
 ## Project status
 
-This repository (`mattermost/focalboard`) is **standalone Focalboard** and is no longer actively maintained by Mattermost. The Mattermost plugin lives in a separate repo (`mattermost/mattermost-plugin-boards`). Much of the code is shared/adapted with the Mattermost server via `github.com/mattermost/mattermost/server/public` imports.
+This repository (`mattermost/focalboard`) is **standalone Focalboard** and is no longer
+actively maintained by Mattermost. The Mattermost plugin lives in a separate repo
+(`mattermost/mattermost-plugin-boards`). Much of the code is shared/adapted with the Mattermost
+server via `github.com/mattermost/mattermost/server/public` imports.
 
 ## Build & run
 
@@ -12,33 +19,547 @@ A `.env` file in the repo root with `EXCLUDE_ENTERPRISE="1"` is expected for OSS
 
 - `make prebuild` — install webapp npm deps (`npm ci`). Only needed after dependency changes.
 
-The webapp toolchain is pinned: `webapp/.nvmrc` = Node 24, `engines` in `webapp/package.json` (`node >=24 <25`, `npm >=11 <12`), and `webapp/.npmrc` with `engine-strict=true` — installs on another Node fail with `EBADENGINE` rather than silently re-resolving `package-lock.json` (lockfileVersion 3). `make prebuild` and CI both use `npm ci`, which never mutates the lock; regenerate it deliberately with `npm install` on the pinned toolchain only. `webapp/.npmrc` also carries an `allow-scripts[]` allowlist, since npm 11 blocks dependency install scripts by default.
+The webapp toolchain is pinned: `webapp/.nvmrc` = Node 24, `engines` in `webapp/package.json`
+(`node >=24 <25`, `npm >=11 <12`), and `webapp/.npmrc` with `engine-strict=true` — installs on
+another Node fail with `EBADENGINE` rather than silently re-resolving `package-lock.json`
+(lockfileVersion 3). `make prebuild` and CI both use `npm ci`, which never mutates the lock;
+regenerate it deliberately with `npm install` on the pinned toolchain only. `webapp/.npmrc` also
+carries an `allow-scripts[]` allowlist, since npm 11 blocks dependency install scripts by
+default.
+
 - `make` (or `make all`) — build webapp + server. Server binary lands at `bin/focalboard-server`.
-- `make server` — build server only. `make webapp` — build+pack webapp only (`cd webapp; npm run pack`).
-- `./bin/focalboard-server` — run server (serves on `http://localhost:8000`, port set in `config.json`).
-- `make watch` — run server + webapp with hot reload via `modd` (requires `modd` installed). `make watch-single-user` for single-user mode.
-- After the server is running, `make webapp` in another terminal rebuilds the frontend; reload the browser to see changes.
-- `cd webapp; npm run dev` — Vite dev server on `http://localhost:5173` with HMR, proxying `/api`, `/plugins`, `/files`, `/login`, `/register`, `/logout` to the Focalboard server on `:8000`. Run it alongside `make watch` for the fastest browser loop. Browser-only; the desktop app does not use it.
+- `make server` — build server only. `make webapp` — build+pack webapp only
+  (`cd webapp; npm run pack`).
+- `./bin/focalboard-server` — run server (serves on `http://localhost:8000`, port set in
+  `config.json`).
+- `make watch` — run server + webapp with hot reload via `modd` (requires `modd` installed).
+  `make watch-single-user` for single-user mode.
+- After the server is running, `make webapp` in another terminal rebuilds the frontend; reload
+  the browser to see changes.
+- `cd webapp; npm run dev` — Vite dev server on `http://localhost:5173` with HMR, proxying
+  `/api`, `/plugins`, `/files`, `/login`, `/register`, `/logout` to the Focalboard server on
+  `:8000`. Run it alongside `make watch` for the fastest browser loop. Browser-only; the desktop
+  app does not use it.
 
-Desktop app builds package the server against SQLite (each needs `make prebuild` first; cross-compilation is not supported — build on the target platform):
+## Desktop app
 
-All three platforms are built from **one cross-platform Wails v2 module in `desktop/`** (its own Go module) that runs the Focalboard server **in-process** in a single binary — no spawned `focalboard-server` subprocess — which (on macOS) collapses signing/notarization to one binary. The webapp is built by `make webapp`, copied to `desktop/pack` (the `desktop-pack` target), and compiled into the binary with `go:embed` (the `frontend` build tag; `go:embed` can't reach `../webapp`, hence the copy); at startup the embedded pack is extracted to `<dataDir>/web` and served by the in-process server, so it still templates `index.html`. Builds pass `-skipbindings` (generated JS bindings are unused — the webapp calls `window.go.main.App.*` via the injected runtime). Needs the Wails CLI (`go install github.com/wailsapp/wails/v2/cmd/wails@latest`). Builds are native per platform (cgo SQLite is not cross-compiled). See `desktop/README.md` for architecture (in-process server, reverse-proxy AssetServer, and the WebKit WebSocket workaround) and per-OS prerequisites.
+Desktop builds package the server against SQLite (each needs `make prebuild` first;
+cross-compilation is not supported — build on the target platform).
 
-- **macOS — `make mac-app-wails`** (`.app`) / **`make mac-dmg-wails`** (drag-to-Applications `.dmg`): Apple Silicon (`arm64`).
-- **Windows — `make win-app-wails`**: `amd64` NSIS installer `Focalboard-amd64-installer.exe` (needs MinGW `gcc` + NSIS `makensis` on `PATH`).
-- **Linux — `make linux-app-wails`** (binary) / **`make linux-installers-wails`** (`.AppImage` + `.deb` via `nfpm`): `amd64` (needs `gcc` + `libgtk-3-dev`/`libwebkit2gtk-4.0-dev`). Installer configs live in `desktop/build/linux/` (`appimage.sh`, `nfpm.yaml`, `focalboard.desktop`).
-- **Desktop dev — `make dev-wails`**: one `wails dev -reloaddirs ../webapp/pack`. `wails.json` points `frontend:dir` at `../webapp` and declares `frontend:dev:watcher: "npm run watchdev"`, so Wails starts `vite build --watch` itself and stops it on exit. Go edits rebuild/restart the app; frontend edits rebuild `webapp/pack` and reload the window (no HMR — the page is served by the in-process Go server through `proxy.go`, exactly as in a release build, which is why the dev flow needs no pinned port or session token). There is deliberately no `frontend:dev:serverUrl`.
+All three platforms are built from **one cross-platform Wails v2 module in `desktop/`** (its own
+Go module) that runs the Focalboard server **in-process** in a single binary — no spawned
+`focalboard-server` subprocess — which (on macOS) collapses signing/notarization to one binary.
+The webapp is built by `make webapp`, copied to `desktop/pack` (the `desktop-pack` target), and
+compiled into the binary with `go:embed` (the `frontend` build tag; `go:embed` can't reach
+`../webapp`, hence the copy); at startup the embedded pack is extracted to `<dataDir>/web` and
+served by the in-process server, so it still templates `index.html`. Builds pass `-skipbindings`
+(generated JS bindings are unused — the webapp calls `window.go.main.App.*` via the injected
+runtime). Needs the Wails CLI (`go install github.com/wailsapp/wails/v2/cmd/wails@latest`).
+Builds are native per platform (cgo SQLite is not cross-compiled). See `desktop/README.md` for
+architecture (in-process server, reverse-proxy AssetServer, and the WebKit WebSocket workaround)
+and per-OS prerequisites.
 
-The desktop Wails app also embeds the **ACP agent integration**: moving a card into the **"In Progress"** column (`triggerProperty`/`triggerColumn`, `DefaultTriggerColumn`) starts a coding-agent session and posts progress/results as card comments — work starts where work normally starts, and that column ships in the stock templates. Configs still naming the abandoned "To Agent" column are rewritten on load (`LoadConfig`); a column the user chose is left alone. Sessions are also **interactive**: the card detail view carries a session console (`webapp/src/components/acp/sessionConsole.tsx`, desktop-only) that streams the agent's text/tool calls live over the Wails event bus, lets you send follow-up turns, and shows permission prompts as buttons. A card-triggered session keeps its one-shot behaviour (one turn, comment, done) unless a console is attached when the turn ends; a console opened from the card ("Open session") stays alive between turns until it is closed, everyone detaches, or `sessionIdleMinutes` elapses. Conversation continuity across turns is the agent's own: one process per session holds the conversation, and every turn is another `session/prompt` on it — verified against both vendor adapters before the bridges that used to arrange this by hand were removed. `sessionTimeoutMinutes` bounds a single turn, and the concurrency slot (`maxConcurrent`) is held only while a turn runs, so an idle console never starves other cards. Permission prompts go to the user only when a console is watching — an unattended session still decides by `autoAllowTools` policy and rejects the rest immediately, since there is nobody to ask. `autoAllowTools` therefore defaults to a list that lets an agent work on its own (`Read`, `Grep`, `Glob`, `Edit`, `Write`, `MultiEdit`, `NotebookEdit`, `TodoWrite`, `Bash`, `Skill`). An entry is either a bare tool name or a name narrowed by an argument pattern — `Bash(git log*)` — since `Bash` covers both `git status` and `rm -rf /` (`internal/acp/policy.go`). The name that policy matches against is **recovered rather than received** (`internal/acp/toolname.go`): ACP has no field for it, so a permission request is read in order of how trustworthy it is — `_meta` if the agent named the tool, else the name from the `tool_call` announced under the same id, else what the call plainly is from its ACP kind and the shape of its input (`execute` + `command` → `Bash`), else the title. That last-resort inference is what lets one policy mean the same thing to claude, whose tools are called `Read`/`Bash`, and to codex, whose are not — and `Bash(git log*)` matches whether the command arrives as a string or as the argv of the shell that runs it. A registry agent may carry its own `autoAllowTools`, and planning uses `planningTools`, which defaults to reads plus a curated set of read-only shell commands so the agent can explore without being able to change anything. Note that changing the default only affects **new** installs: `LoadConfig` unmarshals the existing `config.json` over the defaults, so a config written by an earlier version keeps its own list until edited by hand. By default every session gets its own git worktree (`worktreeMode: "always"`), on a branch named after the card — `acp/<title-slug>-<session>` (`WorktreeBranch`, folded through `dokku.AppSlug` because that branch becomes a preview hostname) — which is what gives a card something to show and to deploy; the agent is told to commit locally, and a card working in its own worktree no longer blocks another card on the same repository. `worktreeMode: "never"` puts the agent in the repository working tree instead, leaving changes uncommitted for review and rejecting a concurrent session on a busy repo. An install whose `config.json` predates this keeps whatever it has. The card detail view shows the session branch with a **Deploy** button beside it (`StartCardDeploy` → `Manager.StartDeployForCard`), publishing that branch without dragging the card into the deploy column; a deploy is a session of its own, so it neither takes over the card's console (its `acp:session` events carry `deploy: true`) nor is refused while the card's agent is running. Cards map to a repo via a named repo registry (board "…" menu → *Repositories*, desktop only) matched against a card's select/multiSelect option (the "Repositories" field, shipped in the "My Project Tasks" template), the source column name, or an explicit `repo_path` property. The dialog keeps that field in step by itself — every refresh mirrors the registry into the board's "Repositories" property, creating it when absent — and is add-only and no-op when nothing is missing, so opening it neither churns the board nor fills the undo history. Cards likewise map to a **named agent registry** (board "…" menu → *Agents*, desktop only): each entry has a `kind`, optional prompt/model/binPath and a per-process `env` map, matched (in `resolveAgent`) against an explicit `agent` card property, then the card's **assignee**, then a select option such as the "Agent" field, then the single registered agent, else the global `agentMode` fallback. **Agents are assignable like teammates**, with no separate step: the *Agents* dialog runs `Manager.SyncAgentUsers` → `boardadapter.EnsureAgentUsers` on every refresh (opening it, adding, editing or removing an entry), which gives each entry a Focalboard account named after it (`AgentUsername` folds "Codex Acct1" → `codex-acct1`; `app.RegisterUser` with a random password, e-mail under `agents.invalid`) and adds it to the members of the board the dialog was opened on, which is what puts it in that board's person picker (on any other board an agent is still findable by name in the picker's search). Provisioning is idempotent and silent unless an account is actually created; a failure is reported without hiding the registry. The accounts are a one-way projection of the registry, which stays the source of truth (it holds API keys and proxy passwords, and lives in a `0600` config file rather than the boards DB — `model.User` has nowhere to put them anyway): unregistering an agent calls `RetireAgentUser`, which drops its membership from **every** board so it stops being offered, while the account itself survives, since cards may still name it and re-registering the agent should restore the same identity. Cards already assigned to a retired agent keep the value and simply stop routing. Matching then only needs person values as usernames, which `boardadapter` gets by passing a `model.PropValueResolver` into `ParseProperties` (`PersonNames` on the event, memoized per event since `BlockChanged` runs on the notify worker). Two single-user server bugs blocked this and are fixed in `server/`: both user-resolving endpoints (`POST /users` in `api/users.go` and `POST /teams/{teamID}/users` in `api/teams.go` — the latter is what the webapp resolves board members with) returned *only* the synthetic `single-user` and dropped every other requested id, and `UserIsGuest` failed on `single-user` because it has no row in the users table. Together they left `boardUsers` empty in the desktop app, so person fields never rendered a name. Both endpoints now also tolerate an id with no account (a card outliving it) instead of failing the whole request; permission filtering is untouched, so nothing changes for the multi-user web deployment. The prompt sent to an agent is the board **system prompt** + the agent's own system prompt + the card task. **Every kind is the same code**: an ACP agent spawned over stdio and talked to in pure ACP, with no translation layer of ours in between. `claude` and `codex` reach that through the adapters their vendors publish — `@agentclientprotocol/claude-agent-acp` and `@agentclientprotocol/codex-acp` (they used to live under `@zed-industries`; those packages are deprecated and are not what we launch) — and `antigravity`, `copilot` (GitHub Copilot CLI), `junie` (JetBrains Junie CLI) and the generic `acp` kind are CLIs that speak ACP themselves (`connectACPAgent` in `session.go`). This replaced two in-process Go bridges (`claudebridge`, `codexbridge`), and with them the claim that the desktop app needs no Node.js: **both adapters are Node packages**. The claude one embeds the Claude Agent SDK, which embeds the CLI, so the `claude` binary is not needed beside it; the codex one drives the `codex` CLI it depends on, over the CLI's own JSON-RPC (before the rename it was a self-contained native binary, which is where the "no Node.js for codex" claim came from — that build is not published any more). What the change cost is `AskUserQuestion`: the adapter disables that tool outright ("not a great way to expose this over ACP"), so the console's question picker is gone and an agent that wants to ask states the question in its answer instead. What it bought is that codex sessions now ask permission at all — the old bridge had no permission channel and leaned on codex's sandbox flags. A missing adapter is reported where the agent is configured rather than on a card an hour later (`AdapterStatuses`, shown in the *Agents* dialog with an "install" button running `npm install -g`); an adapter that is not installed still runs through `npx --yes <package>` when Node.js is there. The kinds we know how to launch are a table in `config.go` (`acpNative`: binary name + the flag that selects ACP-over-stdio, `--acp` for antigravity/copilot and `--acp=true` for junie, plus how that kind is told which model to use and which session mode a card wants); `acp` instead takes an explicit `command` argv (e.g. `gemini --acp`). A model is asked for whichever way the agent understands — a `--model` flag, `ANTHROPIC_MODEL`, or, for codex, which reads no flags at all, the session config option the protocol itself defines (`selectSessionModel`, matched against what `session/new` says it offers). Codex also starts read-only, so its session is switched into `agent` (`selectSessionMode`), or the turn is spent explaining that nothing can be edited. **Everything else an agent can be told is the agent's own answer rather than a table of ours** (`internal/acp/capabilities.go`): ACP has a place for it — an agent lists its settings in the response to `session/new` (`configOptions`) and takes them back through `session/set_config_option` — so the *Agents* dialog starts the agent, opens a throwaway session, asks it what it has and draws exactly that. claude offers `fast` (Fast mode), `effort`, `mode` and `model`; codex offers `mode` and `model` and neither of the other two, so a codex entry has no Fast mode switch to set. The chosen values live on the entry as `options` (option id → value id, booleans stored as `on`/`off`), are applied by `applyAgentOptions` **after** the kind's own mode and model so a hand-picked setting wins, and are advisory: a setting the agent no longer offers is logged and skipped rather than failing the card. The answer is cached per launch configuration (binary, argv, env, proxy — `agentLaunchKey`), since asking costs an agent startup; the dialog's *Recheck* button asks again. A setting the agent stops offering is dropped from the entry the next time it is saved (`keptOptions`), so switching kinds leaves nothing behind that nothing shows. What ACP has no word for goes through a second, narrower door (`internal/acp/clihandoff.go`): the claude adapter documents `_meta.claudeCode.options` on `session/new` as a pass-through of Claude Agent SDK `Options`, so an entry's `cliArgs` are handed over as `extraArgs` and reach the real `claude` process — verified by reading its argv. That is how **Remote control** (driving an agent's sessions from claude.ai or the phone) is switched on: a checkbox in the *Agents* dialog that writes `--remote-control` into that list, shown only for kinds with such a channel (`sdkOptionsMeta`, claude alone — for every other kind the agent *is* the CLI, and `args` already reaches it). Nothing else about the CLI is listed: keeping somebody else's flags in step is not a promise worth making, and a mistake is loud anyway — an unknown argument fails `session/new` with the CLI's own message, which the probe surfaces while the agent is being edited rather than an hour later on a card. All of it is overridable via `binPath`/`command` — this is how Gemini CLI or any other ACP agent plugs in. A registry entry may also carry **MCP servers of its own** (`mcpServers`, edited in the *Agents* dialog as the same JSON every MCP client takes — `{"mcpServers": {"playwright": {"command": "npx", "args": […]}}}` — so a block pastes straight from a server's README, and so per-server `env` is expressible at all; remote `url`/`type` entries are rejected with that reason, since everything here is spawned over stdio): they are spawned alongside the ones a card configures, which is how a Node-based server such as `@playwright/mcp` is used without the app depending on Node — the user wires it per agent, we only pass it on. Their tools run unasked (`allowToolPrefix` on `mcp__<name>__`), since wiring a server to an agent is consent to use it and a card-triggered session has nobody to ask; the names `dokku` and `webtest` are reserved for the built-in ones. Playwright MCP is worth knowing about but is not what the test column drives: its `--allowed-origins` is documented as *not* a security boundary and not applied to redirects, its snapshots after an action come back as links to files (so the agent needs a file-reading tool), and it has no verdict tool — `reportTestRun` needs `result.json` to move the card. **Running several agents/accounts/network segments on one machine** needs no terminal isolation: give each registry entry its own `env` (e.g. `CODEX_HOME`/`OPENAI_API_KEY`, or `CLAUDE_CONFIG_DIR`/`ANTHROPIC_API_KEY`), injected per-process via `procgroup.Spawn`'s `extraEnv`/`dropEnv`. `command` is the launch argv for *every* kind: for `claude`/`codex` it replaces the binary the bridge builds on (`agentLaunchArgv`), so the CLI can be wrapped — `proxychains4 -q -f myproxy.conf claude` to give one agent its own network path, or any shim script — while the bridge still appends its protocol flags. Network settings live in their own **proxy registry** (`internal/acp/proxies.go`), edited in the *Agents* dialog's folded-away "Proxy configurations" section (`proxiesPanel.tsx`, embedded rather than a menu entry of its own, since an entry exists only to be referenced by an agent): a `ProxyEntry` is a name + `proxy`/`noProxy`/`caCert`, an agent references one via `proxyName`, and at session start `resolveNetwork` expands it into the standard `HTTP(S)_PROXY`/`NO_PROXY`/CA variables (`spawnEnv`), with the agent's `env` winning over them. A `socks…://` entry cannot be paired with kind `claude` (no SOCKS support), and an entry still referenced by an agent cannot be deleted. Proxy basic-auth credentials go in the entry's `username`/`password` (percent-encoded into the URL by `ProxyURL`, redacted from comments/logs by `redactProxySecret`) or inline in the URL; either way they land in the config file, which `SaveConfig` keeps `0600`. A second trigger column publishes work instead of writing it: moving a card into the **"Deploy" column** (`deployColumn`, default `"Deploy"`, on the same `triggerProperty`) starts an ordinary agent session whose task is to push the card's branch to **Dokku**, so it lands at `<repo>-<branch-slug>.<baseDomain>` — one Dokku app per branch (`<baseApp>-<slug>`), which is the only way to get a per-branch subdomain, and the app name *is* the subdomain, as it is in Dokku's own vhost convention. The repository half is derived rather than typed: only `baseDomain` is configured, and `baseApp` comes from the repository's registry name (`dokku.AppLabel`, `Target.WithBaseApp`) unless an entry overrides it, so one target serves every repository pointed at it. Both halves are length-bounded (`maxRepoLabel`, `maxSlug`, each carrying a hash when it had to be cut) because the whole app name is one DNS label and a label is 63 characters. The agent does it through **our own MCP server rather than a shell**: `internal/dokku` exposes `deploy_branch`, `deployment_status`, `app_logs`, `list_deployments` and `destroy_deployment`, and the desktop binary doubles as that server — `<binary> mcp dokku` over stdio (`desktop/mcp.go`, dispatched at the top of `main()`), so there is still one binary and no Node.js. The session hands it the target through the environment (`FOCALBOARD_DOKKU_TARGET`/`_REPO`/`_BRANCH`), never as tool arguments, so the model chooses the branch and nothing else. Every agent is told about the server the same way (`internal/acp/mcpservers.go`): in `session/new`, where the protocol has a field for it — the CLI-specific roads (a `--mcp-config` flag, a set of `-c mcp_servers.…` overrides) went with the bridges. All host work is ssh from this side — `apps:exists` → `apps:create` → `domains:set` → `git push --force ssh://…/<app> <branch>:refs/heads/master` — so nothing has to be installed on the Dokku host. Destinations live in a **deploy-target registry** (board "…" menu → *Deploy targets*, `internal/acp/deploys.go`): a `DeployEntry` is a name + `dokku.Target` and nothing else — host/user/port/key plus two overrides that are normally empty: `baseApp` (defaults to the repository's name) and `baseDomain` (defaults to the ssh host itself, since the machine dokku runs on is the machine previews are served from; set it for an ip host or a separate zone) — resolved from a card option or, as is usual, from being the single registered entry. An entry describes a *machine*: everything else a preview needs (config variables, TLS, how long a build may take) is a property of the repository being deployed, not of the host it lands on, so it is deliberately absent here until the repository registry grows somewhere to put it. The branch comes from the card's `branch` property, else the repository's checked-out branch; a deploy session always runs in the repository itself (never a worktree) and records the branch it publishes. The four read-only dokku tools are seeded into the **session's own** allow-list (`dokkuAutoAllowTools` in `mcpservers.go`) as well as sitting on the default `autoAllowTools` — a card-triggered deploy usually has no console watching, and asking nobody means rejecting; per-session seeding also reaches installs whose `config.json` predates the feature — while `destroy_deployment` deliberately is not. An ACP-native agent may also ask permission to *launch* the MCP server itself, and some (Junie) send that question with **no tool name at all** — the prompt text is the whole request, so a name-based policy has nothing to match and an unattended session would reject the server it was started with. A session we handed an MCP server to therefore answers that one prompt itself (`isMCPLaunchPrompt` + `usesOurMCP`), since consent was given when the session was configured; everything else such an agent asks still needs the prompt text itself in `autoAllowTools`, which is what the rejection log line now quotes. One wildcard DNS record on the preview domain (`*.dokku.example.com`) covers every preview of every repository, since the whole app name is a single label; that record and an ssh key in `dokku ssh-keys:add` are the prerequisites (the Let's Encrypt certificate is per app and needs no wildcard); a build longer than `sessionTimeoutMinutes` will cut the turn off, since one `deploy_branch` call blocks it. A third trigger column checks the result instead of writing or publishing it: moving a card into the **"To Test" column** (`testColumn`, default `"To Test"`, again on `triggerProperty`) starts a session that opens the card's preview **in a real browser** and tests it against the card's description — the replacement for a manual pass. The preview address comes from the card's `preview_url` property if it has one, else from the deploy registry the same way the deploy column computes it (`resolveTestRun`/`resolvePreviewURL` in `internal/acp/tests.go`), so a card that was deployed needs no extra configuration. **The browser is not ours**: a test session drives it through an MCP server the agent carries (`mcpServers` on the registry entry — `@playwright/mcp`, say), which is why a test session refuses to start when the agent has none, saying so instead of failing mid-turn. What stays ours is the **contract**: the session creates an artifacts directory, tells the agent the preview URL, where to put screenshots and where to write `result.json` (verdict `pass`/`fail`/`blocked`, summary, steps, bugs — `internal/acp/testresult.go`), and when the turn ends `reportTestRun` (`internal/acp/testreport.go`) posts it as a comment, attaches the screenshots to the card as image blocks (`BoardWriter.AttachFile` → `app.SaveFile` + a block appended to the card's `contentOrder`) and moves the card to `testPassColumn`/`testFailColumn` by name (`MoveCardByOptionName`); a `blocked` verdict, a missing report or an unset column name leaves the card where it is. A test session runs in the repository itself (never a worktree, so it can read the code it is checking) and gets its own, longer turn budget, `testTimeoutMinutes` (default 30), since clicking through a scenario outlasts a code edit. **What a column does is the column's own business** (`internal/acp/columns.go`): a `ColumnSpec` is an option of a board — bound to it by `boardId`/`optionId`, so renaming the column on the board breaks nothing — plus the action a card entering it starts (`none`/`agent`/`deploy`/`test`), the **crew** of agents who work it, the deploy target, and `maxRunning`. It is edited on the column itself (column menu → *Agents in this column…*, desktop only) and shown there as a badge, which is the only place the mechanism is visible without opening a dialog. The registry is seeded from the `triggerColumn`/`deployColumn`/`testColumn` keys the config already carries (`migratedColumns`, run by `LoadConfig` when the file has no `columns` key), so an upgrade changes nothing and those keys stop being consulted at run time: `columnFor` is the single answer to "does anything happen here", and a spec matched by name records the option ids it turned out to be, once. **A card assigned to a person is left alone**: before anything else is resolved, `startSession` asks `humanAssignee` whether somebody took the card — an assignee who is not a registered agent — and returns `AssignedToHumanError` rather than starting. It is not a failed stage: the card keeps its place on the route and waits to be moved on by hand, since the work is being done, only not by us. The veto is narrow on purpose: it stops the stage where a person and an agent would do the same job, while deploy and test still run (machine work, not the assignee's), a console the user opened still starts (that is asking for an agent outright), and an explicit `agent` property still wins (a direct instruction). Assigning the agent, or nobody, hands the card back. The **crew is a membership list, not a pin**: it says who may work this column at all, and the card chooses among them — an assignee who is on the crew gets the card, an assignee who is not is passed over (the deploy column is not worked by the developer a card is assigned to), and a column with no crew leaves the choice to the card exactly as before (`resolveSessionAgent`). Within a crew the first member with nothing running takes the card, so the choice is repeatable. When every member is busy, or `maxRunning` is reached, the card is **parked rather than failed**: `stage_queue` remembers it, the card says so once, and the place a finishing session frees is filled by `drainColumn` — deferred next to `flowAfterSession`, so it runs after the session has released the repository. The same rule holds however the card arrived, dragged or moved by a flow. Those three columns are the *stages*; what joins them is a **flow** (`internal/acp/flows.go`, `flowengine.go`): a named route in its own registry (board "…" menu → *Workflows*, desktop only), matched to a card the same way every other registry is — a card option, the card's repository, or the single registered entry. A flow is a **graph**: `FlowNode` is the column a card stands in, `FlowEdge` is `from`/`to`/`on`. A node carries no behaviour of its own unless it wants to differ: an empty `action` means "whatever the column does", `agentNames`/`deployName` override the column's crew and target for that stage alone, and `optionId` binds the stage to the column by id. So a route says where a card goes, and the column says what happens when it gets there. The set of `on` triggers is **closed and implemented in Go** (`FlowTriggers`, also served to the editor by `ListFlowTriggers`), so a graph never carries anything script-like: `success`/`failure`/`blocked` come from the stage's own action, `branch.pushed`/`branch.merged` from the local repository, and `pr.opened`/`pr.merged`/`pr.closed`/`review.approved`/`checks.passed`/`checks.failed` from the GitHub API. A stage's success/failure edges are what the editor shows as its two outputs. Everything funnels through one function, `enterNode`: it moves the card (`MoveCardByOptionName`), records the position in `flow_state`, comments *why* it moved, and starts the stage's action — so a route behaves identically whether a person drags the card or the flow advances it, and a stage that cannot even start counts as failed and takes the failure edge. A card dragged off its route cancels its session and is forgotten rather than dragged back: the human wins. A missing edge for an outcome leaves the card where it is with a comment saying so. A card shows all of this on itself: `CardFlowFor` (`internal/acp/cardflow.go`, bound as `GetCardFlow`) answers which route it is on, which stage it stands at, what that stage waits for and how long it has been standing there, which `flowStrip.tsx` draws under the card — the question "why has this not moved" is answered without reading the comments backwards. Sessions carry `FlowName`/`FlowNodeID` and report their outcome **after** `releaseSession`, so the next stage never races the finished one for the repository; a *cancelled* session yields no outcome at all. For the deploy stage the outcome is read from `deploy.json`, which the dokku MCP server now writes into the session's artifacts directory (`FOCALBOARD_DOKKU_ARTIFACTS`) — "the agent stopped talking" is not "the branch is live". The branch a route follows is asked for in order — what the card says, then the branch its own sessions have been committing to (`Store.LatestBranchForCard`), then what the route already carried, then the repository's checked-out branch. The second one is what makes worktrees and routes work together at all: with `worktreeMode: "always"` the agent commits to a branch of its own that the card never learns the name of, so without it a stage would wait for the merge of whatever happened to be checked out. The deploy stage resolves its branch the same way, so the column publishes what the agent wrote rather than somebody else's work — the same branch the Deploy button next to it publishes. Repository events come from `internal/vcs`, polled (a laptop has nowhere for a webhook to arrive) every `vcsPollSeconds` (default 60) and **only for the branches a parked card is actually waiting on** (`FlowTargets`), so an idle board makes no requests. The git watcher needs no authentication and remembers a branch's tip under `refs/focalboard/seen/<branch>`, which is what still answers "was it merged" after the branch is deleted; the GitHub watcher talks REST directly (no `gh` CLI), takes its token from `githubToken` or `GITHUB_TOKEN`, works unauthenticated on public repositories and paces itself accordingly. Repeats are suppressed by `vcs_seen` (repo+branch+kind → marker), since a watcher reports the state it sees, not a change. Backwards compatibility is deliberate: with no matching flow the standalone trigger columns behave exactly as before. A board that brings automation but lands on a machine with nothing registered opens the **setup wizard** (`webapp/src/components/acp/boardSetupWizard.tsx`) by itself: `setupNeeded` is the whole rule — desktop bindings, a board carrying `acpFlows`, an empty agent or repo registry, and no refusal remembered for that board (`UserSettings.acpSetupDismissed`). It asks for a repository and an agent, since a session starts without neither, and offers Dokku and a browser MCP server as steps that skip in one click; the last step calls `SeedBoardAutomation` so the board's own columns and routes are in the registry before the first card is moved. **A board brings its own automation** (`internal/acp/boardseed.go`): the "My Project Tasks" template writes the columns it runs and the routes across it into the board's own `properties` (`acpColumns`/`acpFlows`), bound to that board's option ids, and the first card move on a board imports them into the registry under its `boardId` — once, skipping anything already configured, so a template that changes later never rewrites what somebody has since adjusted. That is why a flow now carries a `boardId` and `resolveFlow`/`BoardFlows` only ever consider the board's own routes plus those tied to no board. The shipped routes are still written in Go (`TemplateFlows` in `internal/acp/flowtemplates.go`) — the template is generated from it and `TestTemplateBoardCarriesTheShippedAutomation` fails when the two drift apart — but they are no longer seeded into a fresh config, since the board hands them over instead: `Feature` (agent → *In Review* → merged → deploy → test, a failed check going back to the agent), `Hotfix` (agent → deploy, no review and no browser pass) and `Review only` (agent → *In Review* → merged, never deployed). They are built from the config's own column names, so renaming `triggerColumn` renames the stage with it, and a column the config leaves empty drops its stage and any transition that would then dangle. Seeding several routes is also what keeps them optional: a card takes one only by naming it (its "Workflow" option), because `resolveFlow`'s single-entry fallback needs exactly one entry to fire. The matching half lives in the **"My Project Tasks" board template**: the `Status` property ships the columns those routes name (*In Review*, *Deploy*, *To Test*, *Tested*, *Failed* beside the original ones — the first stage is `triggerColumn`, which is *In Progress*, a column every board already has) and a `Workflow` select property offers the route names — so a fresh board can be driven without configuring anything. The halves are files in two Go modules and nothing links them, so `TestTemplateFlowsMatchTheBoardTemplate` reads `server/assets/templates-boardarchive/*/board.jsonl` and fails when a stage names a column the template lacks or the template offers a route nobody answers to; editing either half means bumping `defaultTemplateVersion` and re-running `make templates-archive`. An install whose registry predates all this is not re-seeded — an explicitly emptied `"flows": []` stays empty — but the editor offers the shipped routes it is missing (`ListFlowTemplates`), opening one in the form rather than saving it behind the user's back. All of it lives in `desktop/` — `internal/acp` (board-agnostic manager/sessions/trigger/worktrees/repo-registry/agent-registry/deploy-registry/SQLite state), `internal/dokku` (Dokku client + MCP server), `internal/vcs` (git/GitHub watchers), and `internal/boardadapter` (the only package importing both the server and `internal/acp`; hooks in via `server.Params.NotifyBackends` — the only changes inside `server/` are the two single-user user-lookup fixes above). A board can also **plan a task before it exists**: the "…" menu → *Plan a task* opens a card-less session (`Manager.StartPlanningSession`) against a chosen agent and an **optional** repository (without one it runs in a scratch dir removed with the session), held to the read-only `planningTools` policy whatever `autoAllowTools` says, that neither takes the repo lock nor comments anywhere. "Create task" runs one more turn (`ComposeTask`) whose answer — first line title, rest description — is shown for editing and then written as a card in the board’s first column. The desktop-only webapp UI (repo/agent/deploy-target/workflow/column dialogs, the column badges and the card's route strip, the embedded proxies panel, the card session console, the planning dialog, bindings) lives in `webapp/src/components/acp/`, guarded so it stays inert in browser/plugin builds. The one place it draws rather than lists is `flowDiagram.tsx`, which is both the map of a board and the way a route is built. Reading, it shows where the cards actually are — `BoardFlowOverview` counts them per stage from `flow_state`, the live sessions and the queue, so the picture is the engine's own state rather than a second bookkeeping of it. Editing, the same canvas is the builder: a stage carries three outputs (success, failure, and one for the events it waits on), pulling from one of them *is* the transition — `connectEdge` needs nothing chosen afterwards except which event — stages are dragged and keep their `x`/`y` in the route, and Delete removes what is selected. Both are the route as a graph on a **React Flow** canvas (`@xyflow/react`, the only new frontend dependency; it supports React 17 and its types compile under TS 4.6): stages are laid out left to right by `depths`, a longest-path pass over the graph with the loop-closing edges left out, and each node states its size and handle positions so the arrows are drawn on the first paint instead of after a browser layout — which is also what lets jsdom render it, given the polyfills in `src/test/reactFlowEnvironment.ts`. The one place it draws rather than lists is `flowDiagram.tsx`, the route as a graph on a **React Flow** canvas (`@xyflow/react`, the only new frontend dependency; it supports React 17 and its types compile under TS 4.6): stages are laid out left to right by `depths`, a longest-path pass over the graph with the loop-closing edges left out, and each node states its size and handle positions so the arrows are drawn on the first paint instead of after a browser layout — which is also what lets jsdom render it, given the polyfills in `src/test/reactFlowEnvironment.ts`. Its strings are translated in `webapp/i18n/ru.json` alongside English. When a message does not arrive — a prompt that never reached the console, an answer that never reached the agent — set `debugLog: true` in the acp config or `FOCALBOARD_ACP_DEBUG=1` in the environment: every ACP message is appended to `<dataDir>/acp-debug.jsonl` as one JSON record per line, tagged `cli→app` / `app→cli` (the wire itself, teed line by line in `tracepipe.go`, so it now says the same thing for every kind rather than only for the one that had a bridge), `app→ui` / `ui→app` (the console), and `app` (decisions such as a permission timing out). It records conversation content, so it is off by default. `desktop/docs/flows.md` is the same machinery written for somebody using the board rather than working on it — the lifecycle of a card, when a worktree appears, which branch is followed, the shipped routes as diagrams; keep it in step when any of that changes. Tests: `cd desktop; go test ./internal/...`.
+- **macOS — `make mac-app-wails`** (`.app`) / **`make mac-dmg-wails`** (drag-to-Applications
+  `.dmg`): Apple Silicon (`arm64`).
+- **Windows — `make win-app-wails`**: `amd64` NSIS installer `Focalboard-amd64-installer.exe`
+  (needs MinGW `gcc` + NSIS `makensis` on `PATH`).
+- **Linux — `make linux-app-wails`** (binary) / **`make linux-installers-wails`** (`.AppImage` +
+  `.deb` via `nfpm`): `amd64` (needs `gcc` + `libgtk-3-dev`/`libwebkit2gtk-4.0-dev`). Installer
+  configs live in `desktop/build/linux/` (`appimage.sh`, `nfpm.yaml`, `focalboard.desktop`).
+- **Desktop dev — `make dev-wails`**: one `wails dev -reloaddirs ../webapp/pack`. `wails.json`
+  points `frontend:dir` at `../webapp` and declares `frontend:dev:watcher: "npm run watchdev"`,
+  so Wails starts `vite build --watch` itself and stops it on exit. Go edits rebuild/restart the
+  app; frontend edits rebuild `webapp/pack` and reload the window (no HMR — the page is served by
+  the in-process Go server through `proxy.go`, exactly as in a release build, which is why the
+  dev flow needs no pinned port or session token). There is deliberately no
+  `frontend:dev:serverUrl`.
+
+## ACP agent integration (desktop only)
+
+Everything below lives in `desktop/`: `internal/acp` (board-agnostic manager, sessions, trigger,
+worktrees, the registries, SQLite state), `internal/dokku` (Dokku client + MCP server),
+`internal/vcs` (git/GitHub watchers) and `internal/boardadapter` (the only package importing both
+the server and `internal/acp`; hooks in via `server.Params.NotifyBackends`). The desktop-only
+webapp UI lives in `webapp/src/components/acp/`, guarded so it stays inert in browser and plugin
+builds. Tests: `cd desktop; go test ./internal/...`.
+
+`desktop/docs/flows.md` is the same machinery written for somebody using the board rather than
+working on it — the lifecycle of a card, when a worktree appears, which branch is followed, the
+shipped routes as diagrams. Keep it in step when any of this changes.
+
+### Starting a session
+
+Moving a card into the **"In Progress"** column (`triggerProperty`/`triggerColumn`,
+`DefaultTriggerColumn`) starts a coding-agent session and posts progress and results as card
+comments — work starts where work normally starts, and that column ships in the stock templates.
+A config still naming the abandoned "To Agent" column is rewritten on load (`LoadConfig`); a
+column the user chose is left alone.
+
+Sessions are **interactive**: the card detail view carries a session console
+(`webapp/src/components/acp/sessionConsole.tsx`) that streams the agent's text and tool calls
+live over the Wails event bus, lets you send follow-up turns, and shows permission prompts as
+buttons. A card-triggered session is one-shot (one turn, comment, done) unless a console is
+attached when the turn ends; a console opened from the card ("Open session") stays alive between
+turns until it is closed, everyone detaches, or `sessionIdleMinutes` elapses. Conversation
+continuity is the agent's own: one process per session holds the conversation and every turn is
+another `session/prompt` on it. `sessionTimeoutMinutes` bounds a single turn, and the concurrency
+slot (`maxConcurrent`) is held only while a turn runs, so an idle console never starves other
+cards.
+
+### Permissions
+
+Permission prompts reach the user only when a console is watching. An unattended session decides
+by `autoAllowTools` policy and rejects everything else immediately, since there is nobody to ask
+— which is why the default list lets an agent work on its own (`Read`, `Grep`, `Glob`, `Edit`,
+`Write`, `MultiEdit`, `NotebookEdit`, `TodoWrite`, `Bash`, `Skill`). An entry is either a bare
+tool name or a name narrowed by an argument pattern — `Bash(git log*)` — since `Bash` covers both
+`git status` and `rm -rf /` (`internal/acp/policy.go`). A registry agent may carry its own
+`autoAllowTools`; planning uses `planningTools`, which defaults to reads plus a curated set of
+read-only shell commands. Changing a default only affects **new** installs: `LoadConfig`
+unmarshals the existing `config.json` over the defaults, so an older config keeps its own list
+until edited by hand.
+
+The name the policy matches against is **recovered rather than received**
+(`internal/acp/toolname.go`): ACP has no field for it, so a permission request is read in order of
+how trustworthy it is — `_meta` if the agent named the tool, else the name from the `tool_call`
+announced under the same id, else what the call plainly is from its ACP kind and the shape of its
+input (`execute` + `command` → `Bash`), else the title. That last-resort inference is what lets
+one policy mean the same thing to claude, whose tools are called `Read`/`Bash`, and to codex,
+whose are not — and `Bash(git log*)` matches whether the command arrives as a string or as the
+argv of the shell that runs it.
+
+### Worktrees and branches
+
+By default every session gets its own git worktree (`worktreeMode: "always"`), on a branch named
+after the card — `acp/<title-slug>-<session>` (`WorktreeBranch`, folded through `dokku.AppSlug`
+because that branch becomes a preview hostname). That is what gives a card something to show and
+to deploy; the agent is told to commit locally, and a card working in its own worktree no longer
+blocks another card on the same repository. `worktreeMode: "never"` puts the agent in the
+repository working tree instead, leaving changes uncommitted for review and rejecting a
+concurrent session on a busy repo. An install whose `config.json` predates this keeps whatever it
+has.
+
+The card detail view shows the session branch with a **Deploy** button beside it
+(`StartCardDeploy` → `Manager.StartDeployForCard`), publishing that branch without dragging the
+card into the deploy column. A deploy is a session of its own, so it neither takes over the card's
+console (its `acp:session` events carry `deploy: true`) nor is refused while the card's agent is
+running.
+
+### Repositories and agents
+
+Cards map to a repo via a named **repo registry** (board "…" menu → *Repositories*) matched
+against a card's select/multiSelect option (the "Repositories" field, shipped in the "My Project
+Tasks" template), the source column name, or an explicit `repo_path` property. The dialog keeps
+that field in step by itself — every refresh mirrors the registry into the board's "Repositories"
+property, creating it when absent — and is add-only and a no-op when nothing is missing, so
+opening it neither churns the board nor fills the undo history.
+
+Cards likewise map to a named **agent registry** (board "…" menu → *Agents*): each entry has a
+`kind`, optional prompt/model/binPath and a per-process `env` map, matched (in `resolveAgent`)
+against an explicit `agent` card property, then the card's **assignee**, then a select option such
+as the "Agent" field, then the single registered agent, else the global `agentMode` fallback.
+
+**Agents are assignable like teammates**, with no separate step: the *Agents* dialog runs
+`Manager.SyncAgentUsers` → `boardadapter.EnsureAgentUsers` on every refresh, which gives each
+entry a Focalboard account named after it (`AgentUsername` folds "Codex Acct1" → `codex-acct1`;
+`app.RegisterUser` with a random password, e-mail under `agents.invalid`) and adds it to the
+members of the board the dialog was opened on, which is what puts it in that board's person
+picker (on any other board an agent is still findable by name in the picker's search).
+Provisioning is idempotent and silent unless an account is actually created; a failure is
+reported without hiding the registry.
+
+The accounts are a one-way projection of the registry, which stays the source of truth — it holds
+API keys and proxy passwords and lives in a `0600` config file rather than the boards DB, where
+`model.User` has nowhere to put them. Unregistering an agent calls `RetireAgentUser`, which drops
+its membership from **every** board so it stops being offered, while the account itself survives,
+since cards may still name it and re-registering the agent should restore the same identity. Cards
+already assigned to a retired agent keep the value and simply stop routing. Matching only needs
+person values as usernames, which `boardadapter` gets by passing a `model.PropValueResolver` into
+`ParseProperties` (`PersonNames` on the event, memoized per event since `BlockChanged` runs on the
+notify worker).
+
+Two single-user bugs in `server/` blocked this and are fixed there — the only changes inside
+`server/` this integration required. Both user-resolving endpoints (`POST /users` in
+`api/users.go` and `POST /teams/{teamID}/users` in `api/teams.go`, the latter being what the
+webapp resolves board members with) returned *only* the synthetic `single-user` and dropped every
+other requested id, and `UserIsGuest` failed on `single-user` because it has no row in the users
+table. Both endpoints also tolerate an id with no account (a card outliving it) instead of failing
+the whole request; permission filtering is untouched, so nothing changes for the multi-user web
+deployment.
+
+### Agent kinds
+
+The prompt sent to an agent is the board **system prompt** + the agent's own system prompt + the
+card task.
+
+**Every kind is the same code**: an ACP agent spawned over stdio and talked to in pure ACP, with
+no translation layer of ours in between (`connectACPAgent` in `session.go`). `claude` and `codex`
+reach that through the adapters their vendors publish — `@agentclientprotocol/claude-agent-acp`
+and `@agentclientprotocol/codex-acp` — while `antigravity`, `copilot` (GitHub Copilot CLI),
+`junie` (JetBrains Junie CLI) and the generic `acp` kind are CLIs that speak ACP themselves.
+**Both vendor adapters are Node packages**, so those two kinds need Node.js: the claude one embeds
+the Claude Agent SDK, which embeds the CLI, so the `claude` binary is not needed beside it; the
+codex one drives the `codex` CLI it depends on, over that CLI's own JSON-RPC.
+
+A missing adapter is reported where the agent is configured rather than on a card an hour later
+(`AdapterStatuses`, shown in the *Agents* dialog with an "install" button running
+`npm install -g`); an adapter that is not installed still runs through `npx --yes <package>` when
+Node.js is there.
+
+The kinds we know how to launch are a table in `config.go` (`acpNative`: binary name, the flag
+that selects ACP-over-stdio — `--acp` for antigravity/copilot, `--acp=true` for junie — plus how
+that kind is told which model to use and which session mode a card wants). `acp` instead takes an
+explicit `command` argv (e.g. `gemini --acp`). A model is asked for whichever way the agent
+understands: a `--model` flag, `ANTHROPIC_MODEL`, or — for codex, which reads no flags at all —
+the session config option the protocol itself defines (`selectSessionModel`, matched against what
+`session/new` says it offers). Codex also starts read-only, so its session is switched into
+`agent` (`selectSessionMode`), or the turn is spent explaining that nothing can be edited.
+
+### An agent asking the user something
+
+An agent that needs a decision mid-task asks for it as a form — ACP's elicitation
+(`internal/acp/elicitation.go`), which the claude adapter uses both for its own
+`AskUserQuestion` tool and for any MCP server's elicitation. The tool is only offered to a client
+that says it can draw one: the adapter's rule is
+`disallowedTools = elicitationSupport.form ? [] : ["AskUserQuestion"]`, so a silent client gets an
+agent that can only state the question in its answer. `clientCapabilities` says we can, and the
+`--disallowedTools AskUserQuestion` in the spawned CLI's argv disappears accordingly.
+
+Nothing on our side knows about `AskUserQuestion`: what arrives is a JSON Schema and what goes
+back is an object keyed by the schema's own property names, which is why an MCP server's
+elicitation works the same. `elicitationForm` flattens the schema into fields the console draws
+without further interpretation — a select where the property lists its values (`oneOf`, `enum`, or
+`items.anyOf` for several answers), a text/number/boolean input otherwise — and sorts them by key,
+since a JSON object has no order and the same form should read the same twice. A free-text field
+the adapter marks with `_askUserQuestionCustomAnswer` is drawn under the question it answers
+instead of.
+
+A session with no console declines at once rather than holding the turn until the prompt times
+out, exactly as with a permission request; the card keeps the record of what was asked. The
+console renders the form (`ElicitationFormEntry` in `sessionStream.tsx`) and answers through
+`AnswerElicitation`.
+
+### Per-agent settings
+
+**What else an agent can be told is the agent's own answer rather than a table of ours**
+(`internal/acp/capabilities.go`). ACP has a place for it: an agent lists its settings in the
+response to `session/new` (`configOptions`) and takes them back through
+`session/set_config_option`. So the *Agents* dialog starts the agent, opens a throwaway session,
+asks what it has and draws exactly that — claude offers `fast` (Fast mode), `effort`, `mode` and
+`model`; codex offers `mode` and `model` and neither of the other two, so a codex entry has no
+Fast mode switch to set.
+
+The chosen values live on the entry as `options` (option id → value id, booleans stored as
+`on`/`off`), are applied by `applyAgentOptions` **after** the kind's own mode and model so a
+hand-picked setting wins, and are advisory: a setting the agent no longer offers is logged and
+skipped rather than failing the card. The answer is cached per launch configuration (binary, argv,
+env, proxy — `agentLaunchKey`), since asking costs an agent startup; the dialog's *Recheck* button
+asks again. A setting the agent stops offering is dropped from the entry the next time it is saved
+(`keptOptions`), so switching kinds leaves nothing behind that nothing shows.
+
+What ACP has no word for goes through a second, narrower door (`internal/acp/clihandoff.go`): the
+claude adapter documents `_meta.claudeCode.options` on `session/new` as a pass-through of Claude
+Agent SDK `Options`, so an entry's `cliArgs` are handed over as `extraArgs` and reach the real
+`claude` process. That is how **Remote control** (driving an agent's sessions from claude.ai or
+the phone) is switched on: a checkbox in the *Agents* dialog that writes `--remote-control` into
+that list, shown only for kinds with such a channel (`sdkOptionsMeta`, claude alone — for every
+other kind the agent *is* the CLI, and `args` already reaches it). Nothing else about the CLI is
+listed: keeping somebody else's flags in step is not a promise worth making, and a mistake is loud
+anyway — an unknown argument fails `session/new` with the CLI's own message, which the probe
+surfaces while the agent is being edited.
+
+### MCP servers, accounts and networks
+
+All of it is overridable via `binPath`/`command` — this is how Gemini CLI or any other ACP agent
+plugs in.
+
+A registry entry may carry **MCP servers of its own** (`mcpServers`, edited in the *Agents* dialog
+as the same JSON every MCP client takes — `{"mcpServers": {"playwright": {"command": "npx",
+"args": […]}}}` — so a block pastes straight from a server's README, and so per-server `env` is
+expressible at all; remote `url`/`type` entries are rejected with that reason, since everything
+here is spawned over stdio). They are spawned alongside the ones a card configures, which is how a
+Node-based server such as `@playwright/mcp` is used without the app itself depending on Node: the
+user wires it per agent, we only pass it on. Their tools run unasked (`allowToolPrefix` on
+`mcp__<name>__`), since wiring a server to an agent is consent to use it and a card-triggered
+session has nobody to ask; the name `dokku` is reserved for the built-in server
+(`builtinMCPNames`).
+
+Playwright MCP is worth knowing about but is not what the test column drives: its
+`--allowed-origins` is documented as *not* a security boundary and is not applied to redirects,
+its snapshots after an action come back as links to files (so the agent needs a file-reading
+tool), and it has no verdict tool — `reportTestRun` needs `result.json` to move the card.
+
+**Running several agents, accounts or network segments on one machine** needs no terminal
+isolation: give each registry entry its own `env` (e.g. `CODEX_HOME`/`OPENAI_API_KEY`, or
+`CLAUDE_CONFIG_DIR`/`ANTHROPIC_API_KEY`), injected per-process via `procgroup.Spawn`'s
+`extraEnv`/`dropEnv`. `command` is the launch argv for *every* kind: for `claude`/`codex` it
+replaces the adapter binary (`agentLaunch` in `session.go`), so the CLI can be wrapped —
+`proxychains4 -q -f myproxy.conf claude-agent-acp`, or any shim script — and with it set nothing
+of ours is appended.
+
+Network settings live in their own **proxy registry** (`internal/acp/proxies.go`), edited in the
+*Agents* dialog's folded-away "Proxy configurations" section (`proxiesPanel.tsx`, embedded rather
+than a menu entry of its own, since an entry exists only to be referenced by an agent): a
+`ProxyEntry` is a name + `proxy`/`noProxy`/`caCert`, an agent references one via `proxyName`, and
+at session start `resolveNetwork` expands it into the standard `HTTP(S)_PROXY`/`NO_PROXY`/CA
+variables (`spawnEnv`), with the agent's `env` winning over them. A `socks…://` entry cannot be
+paired with kind `claude` (no SOCKS support), and an entry still referenced by an agent cannot be
+deleted. Proxy basic-auth credentials go in the entry's `username`/`password` (percent-encoded
+into the URL by `ProxyURL`, redacted from comments and logs by `redactProxySecret`) or inline in
+the URL; either way they land in the config file, which `SaveConfig` keeps `0600`.
+
+### The deploy column
+
+Moving a card into the **"Deploy" column** (`deployColumn`, default `"Deploy"`, on the same
+`triggerProperty`) starts an ordinary agent session whose task is to push the card's branch to
+**Dokku**, so it lands at `<repo>-<branch-slug>.<baseDomain>` — one Dokku app per branch
+(`<baseApp>-<slug>`), which is the only way to get a per-branch subdomain, and the app name *is*
+the subdomain, as it is in Dokku's own vhost convention. The repository half is derived rather than
+typed: only `baseDomain` is configured, and `baseApp` comes from the repository's registry name
+(`dokku.AppLabel`, `Target.WithBaseApp`) unless an entry overrides it, so one target serves every
+repository pointed at it. Both halves are length-bounded (`maxRepoLabel`, `maxSlug`, each carrying
+a hash when it had to be cut) because the whole app name is one DNS label and a label is 63
+characters.
+
+The agent does it through **our own MCP server rather than a shell**: `internal/dokku` exposes
+`deploy_branch`, `deployment_status`, `app_logs`, `list_deployments` and `destroy_deployment`, and
+the desktop binary doubles as that server — `<binary> mcp dokku` over stdio (`desktop/mcp.go`,
+dispatched at the top of `main()`), so there is still one binary and no Node.js. The session hands
+it the target through the environment (`FOCALBOARD_DOKKU_TARGET`/`_REPO`/`_BRANCH`), never as tool
+arguments, so the model chooses the branch and nothing else. Every agent is told about the server
+the same way (`internal/acp/mcpservers.go`): in `session/new`, where the protocol has a field for
+it. All host work is ssh from this side — `apps:exists` → `apps:create` → `domains:set` →
+`git push --force ssh://…/<app> <branch>:refs/heads/master` — so nothing has to be installed on
+the Dokku host.
+
+Destinations live in a **deploy-target registry** (board "…" menu → *Deploy targets*,
+`internal/acp/deploys.go`): a `DeployEntry` is a name + `dokku.Target` and nothing else —
+host/user/port/key plus two overrides that are normally empty, `baseApp` (defaults to the
+repository's name) and `baseDomain` (defaults to the ssh host itself, since the machine dokku runs
+on is the machine previews are served from; set it for an ip host or a separate zone) — resolved
+from a card option or, as is usual, from being the single registered entry. An entry describes a
+*machine*: everything else a preview needs (config variables, TLS, how long a build may take) is a
+property of the repository being deployed, not of the host it lands on, so it is deliberately
+absent until the repository registry grows somewhere to put it.
+
+The branch comes from the card's `branch` property, else the repository's checked-out branch; a
+deploy session always runs in the repository itself (never a worktree) and records the branch it
+publishes. The four read-only dokku tools are seeded into the **session's own** allow-list
+(`dokkuAutoAllowTools` in `mcpservers.go`) as well as sitting on the default `autoAllowTools` — a
+card-triggered deploy usually has no console watching, and asking nobody means rejecting, and
+per-session seeding also reaches installs whose `config.json` predates the feature.
+`destroy_deployment` deliberately is not.
+
+An ACP-native agent may also ask permission to *launch* the MCP server itself, and some (Junie)
+send that question with **no tool name at all** — the prompt text is the whole request, so a
+name-based policy has nothing to match and an unattended session would reject the server it was
+started with. A session we handed an MCP server to therefore answers that one prompt itself
+(`isMCPLaunchPrompt` + `usesOurMCP`), since consent was given when the session was configured;
+everything else such an agent asks still needs the prompt text itself in `autoAllowTools`, which is
+what the rejection log line quotes.
+
+One wildcard DNS record on the preview domain (`*.dokku.example.com`) covers every preview of
+every repository, since the whole app name is a single label; that record and an ssh key in
+`dokku ssh-keys:add` are the prerequisites (the Let's Encrypt certificate is per app and needs no
+wildcard). A build longer than `sessionTimeoutMinutes` will cut the turn off, since one
+`deploy_branch` call blocks it.
+
+### The test column
+
+Moving a card into the **"To Test" column** (`testColumn`, default `"To Test"`, again on
+`triggerProperty`) starts a session that opens the card's preview **in a real browser** and tests
+it against the card's description — the replacement for a manual pass. The preview address comes
+from the card's `preview_url` property if it has one, else from the deploy registry the same way
+the deploy column computes it (`resolveTestRun`/`resolvePreviewURL` in `internal/acp/tests.go`), so
+a card that was deployed needs no extra configuration.
+
+**The browser is not ours**: a test session drives it through an MCP server the agent carries
+(`mcpServers` on the registry entry — `@playwright/mcp`, say), which is why a test session refuses
+to start when the agent has none, saying so instead of failing mid-turn. What stays ours is the
+**contract**: the session creates an artifacts directory, tells the agent the preview URL, where to
+put screenshots and where to write `result.json` (verdict `pass`/`fail`/`blocked`, summary, steps,
+bugs — `internal/acp/testresult.go`); when the turn ends `reportTestRun`
+(`internal/acp/testreport.go`) posts it as a comment, attaches the screenshots to the card as image
+blocks (`BoardWriter.AttachFile` → `app.SaveFile` + a block appended to the card's `contentOrder`)
+and moves the card to `testPassColumn`/`testFailColumn` by name (`MoveCardByOptionName`). A
+`blocked` verdict, a missing report or an unset column name leaves the card where it is. A test
+session runs in the repository itself (never a worktree, so it can read the code it is checking)
+and gets its own, longer turn budget, `testTimeoutMinutes` (default 30), since clicking through a
+scenario outlasts a code edit.
+
+### Columns
+
+**What a column does is the column's own business** (`internal/acp/columns.go`): a `ColumnSpec` is
+an option of a board — bound to it by `boardId`/`optionId`, so renaming the column on the board
+breaks nothing — plus the action a card entering it starts (`none`/`agent`/`deploy`/`test`), the
+**crew** of agents who work it, the deploy target, and `maxRunning`. It is edited on the column
+itself (column menu → *Agents in this column…*) and shown there as a badge, which is the only
+place the mechanism is visible without opening a dialog. The registry is seeded from the
+`triggerColumn`/`deployColumn`/`testColumn` keys the config already carries (`migratedColumns`, run
+by `LoadConfig` when the file has no `columns` key), so an upgrade changes nothing and those keys
+stop being consulted at run time: `columnFor` is the single answer to "does anything happen here",
+and a spec matched by name records the option ids it turned out to be, once.
+
+**A card assigned to a person is left alone**: before anything else is resolved, `startSession`
+asks `humanAssignee` whether somebody took the card — an assignee who is not a registered agent —
+and returns `AssignedToHumanError` rather than starting. It is not a failed stage: the card keeps
+its place on the route and waits to be moved on by hand, since the work is being done, only not by
+us. The veto is narrow on purpose: it stops the stage where a person and an agent would do the same
+job, while deploy and test still run (machine work, not the assignee's), a console the user opened
+still starts (that is asking for an agent outright), and an explicit `agent` property still wins (a
+direct instruction). Assigning the agent, or nobody, hands the card back.
+
+The **crew is a membership list, not a pin**: it says who may work this column at all, and the card
+chooses among them — an assignee who is on the crew gets the card, an assignee who is not is passed
+over (the deploy column is not worked by the developer a card is assigned to), and a column with no
+crew leaves the choice to the card (`resolveSessionAgent`). Within a crew the first member with
+nothing running takes the card, so the choice is repeatable. When every member is busy, or
+`maxRunning` is reached, the card is **parked rather than failed**: `stage_queue` remembers it, the
+card says so once, and the place a finishing session frees is filled by `drainColumn` — deferred
+next to `flowAfterSession`, so it runs after the session has released the repository. The same rule
+holds however the card arrived, dragged or moved by a flow.
+
+### Flows
+
+Those three columns are the *stages*; what joins them is a **flow** (`internal/acp/flows.go`,
+`flowengine.go`): a named route in its own registry (board "…" menu → *Workflows*), matched to a
+card the same way every other registry is — a card option, the card's repository, or the single
+registered entry.
+
+A flow is a **graph**: `FlowNode` is the column a card stands in, `FlowEdge` is `from`/`to`/`on`. A
+node carries no behaviour of its own unless it wants to differ: an empty `action` means "whatever
+the column does", `agentNames`/`deployName` override the column's crew and target for that stage
+alone, and `optionId` binds the stage to the column by id. So a route says where a card goes, and
+the column says what happens when it gets there.
+
+The set of `on` triggers is **closed and implemented in Go** (`FlowTriggers`, also served to the
+editor by `ListFlowTriggers`), so a graph never carries anything script-like: `success`/`failure`/
+`blocked` come from the stage's own action, `branch.pushed`/`branch.merged` from the local
+repository, and `pr.opened`/`pr.merged`/`pr.closed`/`review.approved`/`checks.passed`/
+`checks.failed` from the GitHub API. A stage's success/failure edges are what the editor shows as
+its two outputs.
+
+Everything funnels through one function, `enterNode`: it moves the card (`MoveCardByOptionName`),
+records the position in `flow_state`, comments *why* it moved, and starts the stage's action — so a
+route behaves identically whether a person drags the card or the flow advances it, and a stage that
+cannot even start counts as failed and takes the failure edge. A card dragged off its route cancels
+its session and is forgotten rather than dragged back: the human wins. A missing edge for an
+outcome leaves the card where it is with a comment saying so. A card shows all of this on itself:
+`CardFlowFor` (`internal/acp/cardflow.go`, bound as `GetCardFlow`) answers which route it is on,
+which stage it stands at, what that stage waits for and how long it has been standing there, which
+`flowStrip.tsx` draws under the card — so "why has this not moved" is answered without reading the
+comments backwards.
+
+Sessions carry `FlowName`/`FlowNodeID` and report their outcome **after** `releaseSession`, so the
+next stage never races the finished one for the repository; a *cancelled* session yields no outcome
+at all. For the deploy stage the outcome is read from `deploy.json`, which the dokku MCP server
+writes into the session's artifacts directory (`FOCALBOARD_DOKKU_ARTIFACTS`) — "the agent stopped
+talking" is not "the branch is live".
+
+The branch a route follows is asked for in order: what the card says, then the branch its own
+sessions have been committing to (`Store.LatestBranchForCard`), then what the route already
+carried, then the repository's checked-out branch. The second one is what makes worktrees and
+routes work together at all — with `worktreeMode: "always"` the agent commits to a branch of its
+own that the card never learns the name of, so without it a stage would wait for the merge of
+whatever happened to be checked out. The deploy stage resolves its branch the same way, so the
+column publishes what the agent wrote rather than somebody else's work — the same branch the Deploy
+button next to it publishes.
+
+Repository events come from `internal/vcs`, polled (a laptop has nowhere for a webhook to arrive)
+every `vcsPollSeconds` (default 60) and **only for the branches a parked card is actually waiting
+on** (`FlowTargets`), so an idle board makes no requests. The git watcher needs no authentication
+and remembers a branch's tip under `refs/focalboard/seen/<branch>`, which is what still answers
+"was it merged" after the branch is deleted; the GitHub watcher talks REST directly (no `gh` CLI),
+takes its token from `githubToken` or `GITHUB_TOKEN`, works unauthenticated on public repositories
+and paces itself accordingly. Repeats are suppressed by `vcs_seen` (repo+branch+kind → marker),
+since a watcher reports the state it sees, not a change. With no matching flow the standalone
+trigger columns behave exactly as they do without flows at all.
+
+### What a board brings with it
+
+A board that brings automation but lands on a machine with nothing registered opens the **setup
+wizard** (`webapp/src/components/acp/boardSetupWizard.tsx`) by itself: `setupNeeded` is the whole
+rule — desktop bindings, a board carrying `acpFlows`, an empty agent or repo registry, and no
+refusal remembered for that board (`UserSettings.acpSetupDismissed`). It asks for a repository and
+an agent, since a session starts without neither, and offers Dokku and a browser MCP server as
+steps that skip in one click; the last step calls `SeedBoardAutomation` so the board's own columns
+and routes are in the registry before the first card is moved.
+
+**A board brings its own automation** (`internal/acp/boardseed.go`): the "My Project Tasks"
+template writes the columns it runs and the routes across it into the board's own `properties`
+(`acpColumns`/`acpFlows`), bound to that board's option ids, and the first card move on a board
+imports them into the registry under its `boardId` — once, skipping anything already configured, so
+a template that changes later never rewrites what somebody has since adjusted. That is why a flow
+carries a `boardId` and `resolveFlow`/`BoardFlows` only ever consider the board's own routes plus
+those tied to no board.
+
+The shipped routes are written in Go (`TemplateFlows` in `internal/acp/flowtemplates.go`) — the
+template is generated from it and `TestTemplateBoardCarriesTheShippedAutomation` fails when the two
+drift apart — but they are not seeded into a fresh config, since the board hands them over instead:
+`Feature` (agent → *In Review* → merged → deploy → test, a failed check going back to the agent),
+`Hotfix` (agent → deploy, no review and no browser pass) and `Review only` (agent → *In Review* →
+merged, never deployed). They are built from the config's own column names, so renaming
+`triggerColumn` renames the stage with it, and a column the config leaves empty drops its stage and
+any transition that would then dangle. Seeding several routes is also what keeps them optional: a
+card takes one only by naming it (its "Workflow" option), because `resolveFlow`'s single-entry
+fallback needs exactly one entry to fire.
+
+The matching half lives in the **"My Project Tasks" board template**: the `Status` property ships
+the columns those routes name (*In Review*, *Deploy*, *To Test*, *Tested*, *Failed* beside the
+original ones — the first stage is `triggerColumn`, which is *In Progress*, a column every board
+already has) and a `Workflow` select property offers the route names, so a fresh board can be
+driven without configuring anything. The halves are files in two Go modules and nothing links them,
+so `TestTemplateFlowsMatchTheBoardTemplate` reads
+`server/assets/templates-boardarchive/*/board.jsonl` and fails when a stage names a column the
+template lacks or the template offers a route nobody answers to; editing either half means bumping
+`defaultTemplateVersion` and re-running `make templates-archive`. An install whose registry predates
+all this is not re-seeded — an explicitly emptied `"flows": []` stays empty — but the editor offers
+the shipped routes it is missing (`ListFlowTemplates`), opening one in the form rather than saving
+it behind the user's back.
+
+### Planning, the flow diagram, debugging
+
+A board can **plan a task before it exists**: the "…" menu → *Plan a task* opens a card-less
+session (`Manager.StartPlanningSession`) against a chosen agent and an **optional** repository
+(without one it runs in a scratch dir removed with the session), held to the read-only
+`planningTools` policy whatever `autoAllowTools` says, that neither takes the repo lock nor comments
+anywhere. "Create task" runs one more turn (`ComposeTask`) whose answer — first line title, rest
+description — is shown for editing and then written as a card in the board's first column.
+
+The one place the UI draws rather than lists is `flowDiagram.tsx`, which is both the map of a board
+and the way a route is built. Reading, it shows where the cards actually are —
+`BoardFlowOverview` counts them per stage from `flow_state`, the live sessions and the queue, so the
+picture is the engine's own state rather than a second bookkeeping of it. Editing, the same canvas
+is the builder: a stage carries three outputs (success, failure, and one for the events it waits
+on), pulling from one of them *is* the transition — `connectEdge` needs nothing chosen afterwards
+except which event — stages are dragged and keep their `x`/`y` in the route, and Delete removes what
+is selected. Both are the route as a graph on a **React Flow** canvas (`@xyflow/react`): stages are
+laid out left to right by `depths`, a longest-path pass over the graph with the loop-closing edges
+left out, and each node states its size and handle positions so the arrows are drawn on the first
+paint instead of after a browser layout — which is also what lets jsdom render it, given the
+polyfills in `src/test/reactFlowEnvironment.ts`. Its strings are translated in
+`webapp/i18n/ru.json` alongside English.
+
+When a message does not arrive — a prompt that never reached the console, an answer that never
+reached the agent — set `debugLog: true` in the acp config or `FOCALBOARD_ACP_DEBUG=1` in the
+environment: every ACP message is appended to `<dataDir>/acp-debug.jsonl` as one JSON record per
+line, tagged `cli→app` / `app→cli` (the wire itself, teed line by line in `tracepipe.go`),
+`app→ui` / `ui→app` (the console), and `app` (decisions such as a permission timing out). It
+records conversation content, so it is off by default.
 
 ## Test & lint
 
 - `make ci` — full local CI (`webapp-ci` + `server-test`). Run before committing.
-- **Server tests run against all four databases**: `make server-test` runs sqlite, mysql, mariadb, and postgres in sequence. The mysql/mariadb/postgres targets spin up Docker containers (`docker-testing/docker-compose-*.yml`). For fast local iteration use only sqlite:
+- **Server tests run against all four databases**: `make server-test` runs sqlite, mysql, mariadb,
+  and postgres in sequence. The mysql/mariadb/postgres targets spin up Docker containers
+  (`docker-testing/docker-compose-*.yml`). For fast local iteration use only sqlite:
   - `make server-test-sqlite` — full server suite on sqlite.
   - `make server-test-mini-sqlite` — just `server/integrationtests`.
-  - Single Go test: `cd server; FOCALBOARD_UNIT_TESTING=1 go test -tags 'json1 sqlite3' -run TestName ./app/...` (the `json1 sqlite3` build tags are required everywhere).
-- **Webapp**: `cd webapp; npm run test` (jest), `npm run check` (eslint + stylelint), `npm run fix` (auto-fix). Single jest test: `npm run test -- -t "test name"`. Update snapshots: `npm run updatesnapshot`.
+  - Single Go test: `cd server; FOCALBOARD_UNIT_TESTING=1 go test -tags 'json1 sqlite3' -run
+    TestName ./app/...` (the `json1 sqlite3` build tags are required everywhere).
+- **Webapp**: `cd webapp; npm run test` (jest), `npm run check` (eslint + stylelint), `npm run fix`
+  (auto-fix). Single jest test: `npm run test -- -t "test name"`. Update snapshots:
+  `npm run updatesnapshot`.
 - **Server lint**: `make server-lint` (requires `golangci-lint`).
 - **E2E**: `cd webapp; npm run cypress:ci` (builds server + runs it on :8088 + runs Cypress).
 
@@ -47,8 +568,14 @@ The desktop Wails app also embeds the **ACP agent integration**: moving a card i
 The server relies on `go:generate`. After changing the `Store` interface or DB access patterns:
 
 - `make generate` — installs `mockgen` and runs `go generate ./...`.
-- `server/services/store/store.go` drives two generators: `mockgen` produces `mockstore/mockstore.go`, and `generators/main.go` reads `// @withTransaction` annotations on interface methods to generate transaction-wrapping boilerplate. When adding a store method that mutates data, add the `// @withTransaction` comment and regenerate.
-- `make templates-archive` regenerates `server/assets/templates.boardarchive` from the board templates in `server/assets/templates-boardarchive/`. After editing a template's `board.jsonl`, also bump `defaultTemplateVersion` in `server/app/templates.go` so existing installs re-import the templates.
+- `server/services/store/store.go` drives two generators: `mockgen` produces
+  `mockstore/mockstore.go`, and `generators/main.go` reads `// @withTransaction` annotations on
+  interface methods to generate transaction-wrapping boilerplate. When adding a store method that
+  mutates data, add the `// @withTransaction` comment and regenerate.
+- `make templates-archive` regenerates `server/assets/templates.boardarchive` from the board
+  templates in `server/assets/templates-boardarchive/`. After editing a template's `board.jsonl`,
+  also bump `defaultTemplateVersion` in `server/app/templates.go` so existing installs re-import
+  the templates.
 - `make swagger` regenerates the API spec and generated clients from annotations.
 
 ## Architecture
@@ -58,28 +585,77 @@ The server relies on `go:generate`. After changing the `Store` interface or DB a
 Layered, with dependencies pointing downward:
 
 - `main/` → `server/` — process entry point and HTTP server wiring.
-- `api/` — REST handlers, one file per resource (`boards.go`, `blocks.go`, `cards.go`, …). Thin; delegates to the app layer. `context.go` holds request context/auth plumbing.
-- `app/` — business logic, one file per domain concept. This is where board/block/card/team/category/sharing rules live. Handlers here operate through the store interface, not raw SQL.
-- `services/store/` — **the data-access abstraction**. `store.go` defines the `Store` interface. Implementations:
-  - `sqlstore/` — the real backend, supporting **sqlite, mysql, mariadb, and postgres** from one codebase (SQL built with squirrel; migrations in `sqlstore/migrations/`). DB-specific quirks are branched inside these files. **On sqlite the pool is capped at one connection** (`NewStore` in `server/server/server.go`): sqlite locks the whole table for a write and a second connection fails outright with `SQLITE_LOCKED`, which `_busy_timeout` does not retry — so two writes issued together (the webapp does exactly that when a card is dropped: the card's property and the view's card order) silently lost one, and the browser, which reports nothing about a failed write, went on showing a board the server never agreed to. Every desktop install is sqlite. The cap is applied **after** the migrations, because the migration engine holds a connection while opening another and deadlocks at one. See `docs/drag-and-drop-postmortem.md`.
+- `api/` — REST handlers, one file per resource (`boards.go`, `blocks.go`, `cards.go`, …). Thin;
+  delegates to the app layer. `context.go` holds request context/auth plumbing.
+- `app/` — business logic, one file per domain concept. This is where board/block/card/team/
+  category/sharing rules live. Handlers here operate through the store interface, not raw SQL.
+- `services/store/` — **the data-access abstraction**. `store.go` defines the `Store` interface.
+  Implementations:
+  - `sqlstore/` — the real backend, supporting **sqlite, mysql, mariadb, and postgres** from one
+    codebase (SQL built with squirrel; migrations in `sqlstore/migrations/`). DB-specific quirks
+    are branched inside these files. **On sqlite the pool is capped at one connection** (`NewStore`
+    in `server/server/server.go`): sqlite locks the whole table for a write and a second connection
+    fails outright with `SQLITE_LOCKED`, which `_busy_timeout` does not retry — so two writes
+    issued together (the webapp does exactly that when a card is dropped: the card's property and
+    the view's card order) silently lost one, and the browser, which reports nothing about a failed
+    write, went on showing a board the server never agreed to. Every desktop install is sqlite. The
+    cap is applied **after** the migrations, because the migration engine holds a connection while
+    opening another and deadlocks at one. See `docs/drag-and-drop-postmortem.md`.
   - `mattermostauthlayer/` — decorator that delegates user/auth to a Mattermost server.
   - `mockstore/` — generated mocks for tests.
-- `ws/` — WebSocket layer for real-time block updates. `adapter.go`/`server.go` for standalone; `plugin_adapter*.go` for the plugin/clustered deployment.
-- `model/` — shared domain types (Block, Board, Card, Team, User, etc.) and query-options structs, used by both api and app layers.
-- `services/` — cross-cutting: `auth`, `config`, `audit`, `metrics`, `notify`, `permissions`, `scheduler`, `telemetry`, `webhook`.
+- `ws/` — WebSocket layer for real-time block updates. `adapter.go`/`server.go` for standalone;
+  `plugin_adapter*.go` for the plugin/clustered deployment.
+- `model/` — shared domain types (Block, Board, Card, Team, User, etc.) and query-options structs,
+  used by both api and app layers.
+- `services/` — cross-cutting: `auth`, `config`, `audit`, `metrics`, `notify`, `permissions`,
+  `scheduler`, `telemetry`, `webhook`.
 - `integrationtests/` — end-to-end server tests exercising the full stack against a real store.
 
-**Blocks are the core data model.** Boards contain blocks; cards, views, text, comments, and content are all block types (or board-adjacent entities). Most mutations funnel through `boards_and_blocks.go` so boards and their blocks stay consistent transactionally.
+**Blocks are the core data model.** Boards contain blocks; cards, views, text, comments, and
+content are all block types (or board-adjacent entities). Most mutations funnel through
+`boards_and_blocks.go` so boards and their blocks stay consistent transactionally.
 
 ### Webapp (`webapp/src/`, React + TypeScript + Redux)
 
-- `store/` — Redux slices (`boards.ts`, `cards.ts`, `contents.ts`, `comments.ts`, …). The single source of client state; components read via selectors/hooks (`store/hooks.ts`).
+- `store/` — Redux slices (`boards.ts`, `cards.ts`, `contents.ts`, `comments.ts`, …). The single
+  source of client state; components read via selectors/hooks (`store/hooks.ts`).
 - `octoClient.ts` — the REST client wrapping every server API call. All HTTP goes through here.
-- `wsclient.ts` — WebSocket client; applies real-time block changes into the Redux store. Honors `window.webSocketBaseURL` when set, so the Wails desktop wrapper can point the socket straight at the in-process server (its webview origin can't carry a WS upgrade); unset/inert in browser and plugin builds.
-- `mutator.ts` — **the mutation layer**. UI actions call the mutator, which performs the octoClient call *and* registers an undo/redo step with `undomanager.ts`. Prefer mutating through `mutator` rather than calling `octoClient` directly, so undo and optimistic updates stay correct.
+- `wsclient.ts` — WebSocket client; applies real-time block changes into the Redux store. Honors
+  `window.webSocketBaseURL` when set, so the Wails desktop wrapper can point the socket straight at
+  the in-process server (its webview origin can't carry a WS upgrade); unset and inert in browser
+  and plugin builds.
+- `mutator.ts` — **the mutation layer**. UI actions call the mutator, which performs the octoClient
+  call *and* registers an undo/redo step with `undomanager.ts`. Prefer mutating through `mutator`
+  rather than calling `octoClient` directly, so undo and optimistic updates stay correct.
 - `blocks/` — TypeScript models mirroring the server block types.
-- `components/`, `pages/`, `widgets/`, `properties/` — UI. `properties/` implements the per-type card property editors.
-- `hooks/sortable.tsx` — **all drag and drop**, on `@dnd-kit/react`, behind four hooks whose signatures are still react-dnd's (`useSortable`, `useSortableWithGrip`, `useDropZone`, `SortableProvider`), so call sites never changed. Cards use `useListSortable`, which is dnd-kit's own `useSortable` with `index`/`group`; the rest still use the older hand-rolled draggable+droppable pair. Three traps are load-bearing and each one silently killed dragging for a while: **never set the native `draggable` attribute** on anything draggable (dnd-kit stands aside for the browser's own drag and cancels itself), **never pass an `on*` handler to `DragDropProvider`** (it gates the start of a drag on a low-priority React render — subscribe to `manager.monitor` instead), and **`OptimisticSortingPlugin` must stay out of every `useSortable` in the app** (it reorders the DOM under React and crashes the reconciler; a bare plugin constructor registers on the manager, so leaving it out of one call site is not enough). `webapp/cypress/e2e/kanbanDrag.ts` is the guard: sixty drags, ten seconds, and it caught all of this. Read `docs/drag-and-drop-postmortem.md` before touching any of it.
-- Build: **Vite** (`webapp/vite.config.mjs`, plain `.mjs` because Vite's types need TS ≥ 5 and the project is pinned to TS 4.6). Entry is `webapp/index.html` → `src/main.tsx`; output goes to `webapp/pack/` with assets under `pack/static/`, which is exactly what the Go server expects (`index.html` templated for `{{.BaseURL}}`, `/static` served as a directory). HTML asset URLs get the `{{.BaseURL}}` prefix via `experimental.renderBuiltUrl`; URLs referenced from JS/CSS stay relative so they survive any base path. Local plugins in that config serve/copy `webapp/static` → `pack/static` and, in dev only, blank out `{{.BaseURL}}` and inject the desktop bootstrap. `webapp/editor.html` is a dev-only standalone block editor playground (`npm run deveditor`), not part of the production build.
-- react-intl messages are transformed by **`@formatjs/unplugin/vite`** (formatjs's own universal build plugin — oxc-based, no Babel) with `ast: true` and `idInterpolationPattern`, matching what `@formatjs/ts-transformer` did under webpack: an ID is only hash-generated where the source doesn't declare one, and call sites that build an ID at runtime (e.g. `sidebarSettingsMenu.tsx`'s per-theme names) are skipped. Every message in `src/` declares an explicit ID, which is what keeps them matching the keys in `webapp/i18n/*.json` — don't add `overrideIdFn`, it rewrites IDs unconditionally and would silently break every non-English locale.
+- `components/`, `pages/`, `widgets/`, `properties/` — UI. `properties/` implements the per-type
+  card property editors.
+- `hooks/sortable.tsx` — **all drag and drop**, on `@dnd-kit/react`, behind four hooks whose
+  signatures are still react-dnd's (`useSortable`, `useSortableWithGrip`, `useDropZone`,
+  `SortableProvider`), so call sites never changed. Cards use `useListSortable`, which is dnd-kit's
+  own `useSortable` with `index`/`group`; the rest still use the older hand-rolled
+  draggable+droppable pair. Three traps are load-bearing and each one silently killed dragging for
+  a while: **never set the native `draggable` attribute** on anything draggable (dnd-kit stands
+  aside for the browser's own drag and cancels itself), **never pass an `on*` handler to
+  `DragDropProvider`** (it gates the start of a drag on a low-priority React render — subscribe to
+  `manager.monitor` instead), and **`OptimisticSortingPlugin` must stay out of every `useSortable`
+  in the app** (it reorders the DOM under React and crashes the reconciler; a bare plugin
+  constructor registers on the manager, so leaving it out of one call site is not enough).
+  `webapp/cypress/e2e/kanbanDrag.ts` is the guard: sixty drags, ten seconds, and it caught all of
+  this. Read `docs/drag-and-drop-postmortem.md` before touching any of it.
+- Build: **Vite** (`webapp/vite.config.mjs`). Entry is `webapp/index.html` → `src/main.tsx`; output
+  goes to `webapp/pack/` with assets under `pack/static/`, which is exactly what the Go server
+  expects (`index.html` templated for `{{.BaseURL}}`, `/static` served as a directory). HTML asset
+  URLs get the `{{.BaseURL}}` prefix via `experimental.renderBuiltUrl`; URLs referenced from JS and
+  CSS stay relative so they survive any base path. Local plugins in that config serve/copy
+  `webapp/static` → `pack/static` and, in dev only, blank out `{{.BaseURL}}` and inject the desktop
+  bootstrap. `webapp/editor.html` is a dev-only standalone block editor playground
+  (`npm run deveditor`), not part of the production build.
+- react-intl messages are transformed by **`@formatjs/unplugin/vite`** (formatjs's own universal
+  build plugin — oxc-based, no Babel) with `ast: true` and `idInterpolationPattern`: an ID is only
+  hash-generated where the source doesn't declare one, and call sites that build an ID at runtime
+  (e.g. `sidebarSettingsMenu.tsx`'s per-theme names) are skipped. Every message in `src/` declares
+  an explicit ID, which is what keeps them matching the keys in `webapp/i18n/*.json` — don't add
+  `overrideIdFn`, it rewrites IDs unconditionally and would silently break every non-English
+  locale.
 - i18n strings extracted with `npm run i18n-extract` into `webapp/i18n/`.

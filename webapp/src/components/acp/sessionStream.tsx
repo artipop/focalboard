@@ -32,6 +32,27 @@ export type PermissionOption = {
     kind: string
 }
 
+// One field of a form the agent asked for (ACP elicitation — Claude's own
+// AskUserQuestion, or an MCP server's). The Go side flattens the schema, so
+// there is nothing left here to interpret: draw what the field says it is.
+export type ElicitationOption = {
+    value: string
+    title?: string
+    description?: string
+}
+
+export type ElicitationField = {
+    key: string
+    title?: string
+    description?: string
+    type: 'select' | 'multiSelect' | 'text' | 'number' | 'boolean'
+    options?: ElicitationOption[]
+    required?: boolean
+
+    // The free-text field that answers a select instead of choosing from it.
+    customFor?: string
+}
+
 // One rendered line of the transcript.
 export type Entry =
     | {kind: 'text', text: string, thought?: boolean}
@@ -39,6 +60,7 @@ export type Entry =
     | {kind: 'error', text: string}
     | {kind: 'tool', toolCallId: string, title?: string, status?: string}
     | {kind: 'permission', requestId?: string, tool?: string, title?: string, options?: PermissionOption[], decision?: string, byPolicy?: boolean}
+    | {kind: 'elicitation', requestId?: string, message?: string, fields?: ElicitationField[], answered?: string, declined?: string}
 
 export type SessionRecord = {
     id: string
@@ -101,6 +123,18 @@ export function entriesFromStored(events: StoredEvent[]): Entry[] {
                 options: p.pending ? p.options : undefined,
                 decision: p.decision,
                 byPolicy: p.byPolicy,
+            })
+            break
+        case 'elicitation':
+            // A form already answered (or declined) is replayed as what came of
+            // it, the way a settled permission is.
+            entries = appendEntry(entries, {
+                kind: 'elicitation',
+                requestId: p.pending ? p.requestId : undefined,
+                message: p.message,
+                fields: p.pending ? p.fields : undefined,
+                answered: p.answered,
+                declined: p.declined,
             })
             break
         default:
@@ -224,6 +258,19 @@ export function useSessionStream(match: StreamMatch, onSession?: (payload: any) 
                     })
                 })
             }),
+            runtime.EventsOn('acp:elicitation', (payload: any) => {
+                if (!mine(payload)) {
+                    return
+                }
+                setEntries((prev) => appendEntry(prev, {
+                    kind: 'elicitation',
+                    requestId: payload.pending ? payload.requestId : undefined,
+                    message: payload.message,
+                    fields: payload.pending ? payload.fields : undefined,
+                    answered: payload.answered,
+                    declined: payload.declined,
+                }))
+            }),
         ]
         return () => offs.forEach((off) => typeof off === 'function' && off())
     }, [cardId, sessionId])
@@ -246,13 +293,124 @@ const MarkdownText = React.memo((props: {text: string, thought?: boolean}) => {
 })
 MarkdownText.displayName = 'MarkdownText'
 
+// ElicitationForm is the agent's own question, drawn from the fields the Go
+// side flattened out of its schema. The answer goes back keyed by those same
+// field names, so nothing here has to know which tool asked.
+export const ElicitationFormEntry = (props: {
+    requestId: string
+    message?: string
+    fields: ElicitationField[]
+    onAnswer: (requestId: string, content: {[key: string]: unknown}) => void
+}) => {
+    const intl = useIntl()
+    const [values, setValues] = useState<{[key: string]: unknown}>({})
+    const [sent, setSent] = useState(false)
+
+    const set = (key: string, value: unknown) => setValues((prev) => ({...prev, [key]: value}))
+    const toggle = (key: string, value: string) => setValues((prev) => {
+        const chosen = Array.isArray(prev[key]) ? (prev[key] as string[]) : []
+        return {...prev, [key]: chosen.includes(value) ? chosen.filter((v) => v !== value) : [...chosen, value]}
+    })
+
+    // A free-text field belongs under the select it answers instead of.
+    const custom = (key: string) => props.fields.filter((f) => f.customFor === key)
+    const own = props.fields.filter((f) => !f.customFor)
+
+    const submit = () => {
+        const content: {[key: string]: unknown} = {}
+        for (const [key, value] of Object.entries(values)) {
+            if (value === undefined || value === '' || (Array.isArray(value) && value.length === 0)) {
+                continue
+            }
+            content[key] = value
+        }
+        setSent(true)
+        props.onAnswer(props.requestId, content)
+    }
+
+    const field = (f: ElicitationField) => {
+        if (f.type === 'select' || f.type === 'multiSelect') {
+            const chosen = values[f.key]
+            return (f.options || []).map((option) => (
+                <label
+                    className='SessionConsole__formOption'
+                    key={option.value}
+                >
+                    <input
+                        type={f.type === 'select' ? 'radio' : 'checkbox'}
+                        name={f.key}
+                        checked={f.type === 'select' ? chosen === option.value : Array.isArray(chosen) && (chosen as string[]).includes(option.value)}
+                        onChange={() => (f.type === 'select' ? set(f.key, option.value) : toggle(f.key, option.value))}
+                    />
+                    <span>
+                        <span className='SessionConsole__formOptionTitle'>{option.title || option.value}</span>
+                        {option.description && <span className='SessionConsole__formOptionHint'>{option.description}</span>}
+                    </span>
+                </label>
+            ))
+        }
+        if (f.type === 'boolean') {
+            return (
+                <label className='SessionConsole__formOption'>
+                    <input
+                        type='checkbox'
+                        checked={values[f.key] === true}
+                        onChange={(e) => set(f.key, e.target.checked)}
+                    />
+                    <span>{f.title || f.key}</span>
+                </label>
+            )
+        }
+        return (
+            <input
+                className='SessionConsole__formInput'
+                type={f.type === 'number' ? 'number' : 'text'}
+                aria-label={f.title || f.key}
+                placeholder={f.description || ''}
+                value={(values[f.key] as string) || ''}
+                onChange={(e) => set(f.key, f.type === 'number' ? Number(e.target.value) : e.target.value)}
+            />
+        )
+    }
+
+    return (
+        <div className='SessionConsole__entry SessionConsole__entry--form'>
+            {props.message && <div className='SessionConsole__formMessage'>{props.message}</div>}
+            {own.map((f) => (
+                <div
+                    className='SessionConsole__formField'
+                    key={f.key}
+                >
+                    {(f.title || f.description) &&
+                        <div className='SessionConsole__formLabel'>{f.title || f.description}</div>}
+                    {field(f)}
+                    {custom(f.key).map((other) => (
+                        <div key={other.key}>
+                            <div className='SessionConsole__formLabel'>{other.title || other.key}</div>
+                            {field({...other, customFor: undefined})}
+                        </div>
+                    ))}
+                </div>
+            ))}
+            <Button
+                emphasis='primary'
+                disabled={sent}
+                onClick={submit}
+            >
+                {intl.formatMessage({id: 'SessionConsole.form-answer', defaultMessage: 'Answer'})}
+            </Button>
+        </div>
+    )
+}
+
 type EntryProps = {
     entry: Entry
     onAnswer: (requestId: string, optionId: string) => void
+    onAnswerForm?: (requestId: string, content: {[key: string]: unknown}) => void
 }
 
 export const ConsoleEntry = React.memo((props: EntryProps) => {
-    const {entry, onAnswer} = props
+    const {entry, onAnswer, onAnswerForm} = props
     const intl = useIntl()
 
     if (entry.kind === 'prompt') {
@@ -281,6 +439,30 @@ export const ConsoleEntry = React.memo((props: EntryProps) => {
         )
     }
 
+    if (entry.kind === 'elicitation') {
+        // A form still waiting is drawn; one already answered (or declined
+        // because nobody was watching) is the record of what came of it.
+        if (entry.requestId && entry.fields?.length && onAnswerForm) {
+            return (
+                <ElicitationFormEntry
+                    requestId={entry.requestId}
+                    message={entry.message}
+                    fields={entry.fields}
+                    onAnswer={onAnswerForm}
+                />
+            )
+        }
+        return (
+            <div className='SessionConsole__entry SessionConsole__entry--form SessionConsole__entry--formSettled'>
+                {entry.message && <div className='SessionConsole__formMessage'>{entry.message}</div>}
+                <span className='SessionConsole__permissionDecision'>
+                    {entry.answered || entry.declined ||
+                        intl.formatMessage({id: 'SessionConsole.form-unanswerable', defaultMessage: 'The agent asked a question this console cannot show'})}
+                </span>
+            </div>
+        )
+    }
+
     // Permission: a question with buttons, or a record of one already settled.
     // The two must not look alike — a decision the policy made needs no answer,
     // and a box that looks like a prompt nobody can answer reads as broken.
@@ -288,26 +470,22 @@ export const ConsoleEntry = React.memo((props: EntryProps) => {
     return (
         <div className={`SessionConsole__entry SessionConsole__entry--permission${pending ? '' : ' SessionConsole__entry--permissionDecided'}`}>
             <div className='SessionConsole__permissionTitle'>{entry.title || entry.tool}</div>
-            {pending ?
-                <div className='SessionConsole__permissionOptions'>
-                    {entry.options!.map((opt) => (
-                        <Button
-                            key={opt.optionId}
-                            filled={opt.kind === 'allow_once'}
-                            onClick={() => onAnswer(entry.requestId!, opt.optionId)}
-                        >
-                            {opt.name}
-                        </Button>
-                    ))}
-                </div> :
-                <span className='SessionConsole__permissionDecision'>
-                    {entry.byPolicy ?
-                        intl.formatMessage(
-                            {id: 'SessionConsole.permission-by-policy', defaultMessage: '{decision} — automatically, by the tool policy'},
-                            {decision: entry.decision},
-                        ) :
-                        entry.decision}
-                </span>}
+            {pending ? <div className='SessionConsole__permissionOptions'>
+                {entry.options!.map((opt) => (
+                    <Button
+                        key={opt.optionId}
+                        filled={opt.kind === 'allow_once'}
+                        onClick={() => onAnswer(entry.requestId!, opt.optionId)}
+                    >
+                        {opt.name}
+                    </Button>
+                ))}
+            </div> : <span className='SessionConsole__permissionDecision'>
+                {entry.byPolicy ? intl.formatMessage(
+                    {id: 'SessionConsole.permission-by-policy', defaultMessage: '{decision} — automatically, by the tool policy'},
+                    {decision: entry.decision},
+                ) : entry.decision}
+            </span>}
         </div>
     )
 })
@@ -317,6 +495,7 @@ ConsoleEntry.displayName = 'ConsoleEntry'
 export const Transcript = (props: {
     entries: Entry[]
     onAnswer: (requestId: string, optionId: string) => void
+    onAnswerForm?: (requestId: string, content: {[key: string]: unknown}) => void
 }) => {
     const scrollRef = React.useRef<HTMLDivElement>(null)
 
@@ -339,6 +518,7 @@ export const Transcript = (props: {
                     key={i}
                     entry={entry}
                     onAnswer={props.onAnswer}
+                    onAnswerForm={props.onAnswerForm}
                 />
             ))}
         </div>
