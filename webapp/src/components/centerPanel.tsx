@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 /* eslint-disable max-lines */
-import React, {useState, useCallback, useEffect, useMemo} from 'react'
+import React, {useState, useEffect} from 'react'
 import {useIntl} from 'react-intl'
 import {useHotkeys} from 'react-hotkeys-hook'
 
@@ -180,14 +180,14 @@ const CenterPanel = (props: Props) => {
         }
     }, [selectedCardIds, props.readonly, props.cards])
 
-    const showCard = useCallback((cardId?: string) => {
+    const showCard = (cardId?: string) => {
         if (selectedCardIds.length > 0) {
             setSelectedCardIds([])
         }
         props.showCard(cardId)
-    }, [props.showCard, selectedCardIds])
+    }
 
-    const addCard = useCallback(async (groupByOptionId?: string, show = false, properties: Record<string, string> = {}): Promise<void> => {
+    const addCard = async (groupByOptionId?: string, show = false, properties: Record<string, string> = {}): Promise<void> => {
         const {activeView, board, groupByProperty} = props
 
         const card = createCard()
@@ -231,20 +231,20 @@ const CenterPanel = (props: Props) => {
             dispatch(showCardHiddenWarning(cardLimitTimestamp > 0))
             await mutator.changeViewCardOrder(board.id, activeView.id, activeView.fields.cardOrder, [...activeView.fields.cardOrder, newCard.id], 'add-card')
         })
-    }, [props.activeView, props.board.id, props.board.cardProperties, props.groupByProperty, showCard])
+    }
 
-    const addEmptyCardAndShow = useCallback(() => addCard('', true), [addCard])
+    const addEmptyCardAndShow = () => addCard('', true)
 
-    const shouldStartBoardsTour = useCallback((): boolean => {
+    const shouldStartBoardsTour = (): boolean => {
         const isOnboardingBoard = props.board.title === 'Welcome to Boards!'
         const isTourStarted = onboardingTourStarted
         const completedCardsTour = onboardingTourCategory === TOUR_CARD && onboardingTourStep === FINISHED.toString()
         const noCardOpen = !currentCard
 
         return isOnboardingBoard && isTourStarted && completedCardsTour && noCardOpen
-    }, [currentCard, onboardingTourStarted, onboardingTourCategory, onboardingTourStep, props.board.title])
+    }
 
-    const prepareBoardsTour = useCallback(async () => {
+    const prepareBoardsTour = async () => {
         if (!me?.id) {
             return
         }
@@ -260,28 +260,28 @@ const CenterPanel = (props: Props) => {
         if (patchedProps) {
             await dispatch(patchProps(patchedProps))
         }
-    }, [me?.id])
+    }
 
-    const startBoardsTour = useCallback(async () => {
+    const startBoardsTour = async () => {
         if (!shouldStartBoardsTour()) {
             return
         }
 
         await prepareBoardsTour()
-    }, [prepareBoardsTour, shouldStartBoardsTour])
+    }
 
     useEffect(() => {
         startBoardsTour()
     })
 
-    const backgroundClicked = useCallback((e: React.MouseEvent) => {
+    const backgroundClicked = (e: React.MouseEvent) => {
         if (selectedCardIds.length > 0) {
             setSelectedCardIds([])
             e.stopPropagation()
         }
-    }, [selectedCardIds])
+    }
 
-    const addCardFromTemplate = useCallback(async (cardTemplateId: string, groupByOptionId?: string) => {
+    const addCardFromTemplate = async (cardTemplateId: string, groupByOptionId?: string) => {
         const {activeView, board, groupByProperty} = props
 
         const propertiesThatMeetFilters = CardFilter.propertiesThatMeetFilterGroup(activeView.fields.filter, board.cardProperties)
@@ -312,9 +312,9 @@ const CenterPanel = (props: Props) => {
             )
             await mutator.changeViewCardOrder(props.board.id, activeView.id, activeView.fields.cardOrder, [...activeView.fields.cardOrder, newCardId], 'add-card')
         })
-    }, [props.board, props.activeView, showCard])
+    }
 
-    const addCardTemplate = useCallback(async () => {
+    const addCardTemplate = async () => {
         const {board, activeView} = props
 
         const cardTemplate = createCard()
@@ -335,13 +335,13 @@ const CenterPanel = (props: Props) => {
                 showCard(undefined)
             },
         )
-    }, [props.board, props.activeView, showCard])
+    }
 
-    const editCardTemplate = useCallback((cardTemplateId: string) => {
+    const editCardTemplate = (cardTemplateId: string) => {
         showCard(cardTemplateId)
-    }, [showCard])
+    }
 
-    const cardClicked = useCallback((e: React.MouseEvent, card: Card): void => {
+    const cardClicked = (e: React.MouseEvent, card: Card): void => {
         const {activeView, cards} = props
 
         if (e.shiftKey) {
@@ -373,11 +373,11 @@ const CenterPanel = (props: Props) => {
         }
 
         e.stopPropagation()
-    }, [selectedCardIds, props.activeView, props.cards, showCard])
+    }
 
-    const hiddenCardCountNotifyHandler = useCallback((show: boolean) => {
+    const hiddenCardCountNotifyHandler = (show: boolean) => {
         setShowHiddenCardCountNotification(show)
-    }, [showHiddenCardCountNotification])
+    }
 
     const showShareButton = !props.readonly && me?.id !== 'single-user'
     const showShareLoginButton = props.readonly && me?.id !== 'single-user'
@@ -397,7 +397,7 @@ const CenterPanel = (props: Props) => {
         return intl.formatMessage({id: 'centerPanel.unknown-user', defaultMessage: 'Unknown user'})
     }
 
-    const {visible: visibleGroups, hidden: hiddenGroups} = useMemo(() => {
+    const {visible: visibleGroups, hidden: hiddenGroups} = (() => {
         const {visible: vg, hidden: hg} = getVisibleAndHiddenGroups(cards, activeView.fields.visibleOptionIds, activeView.fields.hiddenOptionIds, groupByProperty)
         if (groupByProperty?.type === 'createdBy' || groupByProperty?.type === 'updatedBy' || groupByProperty?.type === 'person') {
             if (boardUsers) {
@@ -410,7 +410,7 @@ const CenterPanel = (props: Props) => {
             }
         }
         return {visible: vg, hidden: hg}
-    }, [cards, activeView.fields.visibleOptionIds, activeView.fields.hiddenOptionIds, groupByProperty, boardUsers])
+    })()
 
     return (
         <div

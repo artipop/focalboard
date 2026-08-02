@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useState, useCallback, useMemo} from 'react'
+import React, {useState} from 'react'
 import {useIntl} from 'react-intl'
 
 import {Board, IPropertyTemplate} from '../../blocks/board'
@@ -44,16 +44,16 @@ const KanbanCard = (props: Props) => {
     }
 
     const [showConfirmationDialogBox, setShowConfirmationDialogBox] = useState<boolean>(false)
-    const handleDeleteCard = useCallback(() => {
+    const handleDeleteCard = () => {
         if (!card) {
             Utils.assertFailure()
             return
         }
         TelemetryClient.trackEvent(TelemetryCategory, TelemetryActions.DeleteCard, {board: board.id, card: card.id})
         mutator.deleteBlock(card, 'delete card')
-    }, [card, board.id])
+    }
 
-    const confirmDialogProps: ConfirmationDialogBoxProps = useMemo(() => {
+    const confirmDialogProps: ConfirmationDialogBoxProps = (() => {
         return {
             heading: intl.formatMessage({id: 'CardDialog.delete-confirmation-dialog-heading', defaultMessage: 'Confirm card delete!'}),
             confirmButtonText: intl.formatMessage({id: 'CardDialog.delete-confirmation-dialog-button-text', defaultMessage: 'Delete'}),
@@ -62,9 +62,9 @@ const KanbanCard = (props: Props) => {
                 setShowConfirmationDialogBox(false)
             },
         }
-    }, [handleDeleteCard])
+    })()
 
-    const handleDeleteButtonOnClick = useCallback(() => {
+    const handleDeleteButtonOnClick = () => {
         // user trying to delete a card with blank name
         // but content present cannot be deleted without
         // confirmation dialog
@@ -73,13 +73,13 @@ const KanbanCard = (props: Props) => {
             return
         }
         setShowConfirmationDialogBox(true)
-    }, [handleDeleteCard, card.title, card?.fields?.contentOrder?.length])
+    }
 
-    const handleOnClick = useCallback((e: React.MouseEvent) => {
+    const handleOnClick = (e: React.MouseEvent) => {
         if (props.onClick) {
             props.onClick(e, card)
         }
-    }, [props.onClick, card])
+    }
 
     return (
         <>

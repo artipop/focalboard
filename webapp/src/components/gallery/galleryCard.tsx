@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useMemo, useState, useCallback} from 'react'
+import React, {useState} from 'react'
 import {useIntl, FormattedMessage} from 'react-intl'
 
 import {Board, IPropertyTemplate} from '../../blocks/board'
@@ -45,11 +45,11 @@ const GalleryCard = (props: Props) => {
 
     const visiblePropertyTemplates = props.visiblePropertyTemplates || []
 
-    const handleDeleteCard = useCallback(() => {
+    const handleDeleteCard = () => {
         mutator.deleteBlock(card, 'delete card')
-    }, [card, board.id])
+    }
 
-    const confirmDialogProps: ConfirmationDialogBoxProps = useMemo(() => {
+    const confirmDialogProps: ConfirmationDialogBoxProps = (() => {
         return {
             heading: intl.formatMessage({id: 'CardDialog.delete-confirmation-dialog-heading', defaultMessage: 'Confirm card delete!'}),
             confirmButtonText: intl.formatMessage({id: 'CardDialog.delete-confirmation-dialog-button-text', defaultMessage: 'Delete'}),
@@ -58,9 +58,9 @@ const GalleryCard = (props: Props) => {
                 setShowConfirmationDialogBox(false)
             },
         }
-    }, [handleDeleteCard])
+    })()
 
-    const image: ContentBlock|undefined = useMemo(() => {
+    const image: ContentBlock|undefined = (() => {
         for (let i = 0; i < contents.length; ++i) {
             if (Array.isArray(contents[i])) {
                 return (contents[i] as ContentBlock[]).find((c) => c.type === 'image')
@@ -69,7 +69,7 @@ const GalleryCard = (props: Props) => {
             }
         }
         return undefined
-    }, [contents])
+    })()
 
     let className = props.isSelected ? 'GalleryCard selected' : 'GalleryCard'
     if (isOver) {

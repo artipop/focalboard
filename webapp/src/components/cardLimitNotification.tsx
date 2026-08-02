@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useCallback, useEffect, useState} from 'react'
+import React, {useEffect, useState} from 'react'
 import {useIntl, FormattedMessage} from 'react-intl'
 
 import AlertIcon from '../widgets/icons/alert'
@@ -36,7 +36,7 @@ const CardLimitNotification = (props: Props) => {
     const snoozedCardHiddenWarningUntil = useAppSelector<number>(getCardHiddenWarningSnoozeUntil)
     const dispatch = useAppDispatch()
 
-    const onCloseHidden = useCallback(async () => {
+    const onCloseHidden = async () => {
         if (me) {
             const patch: UserConfigPatch = {
                 updatedFields: {
@@ -49,9 +49,9 @@ const CardLimitNotification = (props: Props) => {
                 dispatch(patchProps(patchedProps))
             }
         }
-    }, [me])
+    }
 
-    const onCloseWarning = useCallback(async () => {
+    const onCloseWarning = async () => {
         if (me) {
             const patch: UserConfigPatch = {
                 updatedFields: {
@@ -64,7 +64,7 @@ const CardLimitNotification = (props: Props) => {
                 dispatch(patchProps(patchedProps))
             }
         }
-    }, [me])
+    }
 
     let show = false
     let onClose = onCloseHidden
@@ -111,17 +111,17 @@ const CardLimitNotification = (props: Props) => {
         }
     }, [show])
 
-    const handleContactAdminClicked = useCallback(async () => {
+    const handleContactAdminClicked = async () => {
         TelemetryClient.trackEvent(TelemetryCategory, TelemetryActions.LimitCardCTAPerformed)
 
         await octoClient.notifyAdminUpgrade()
         setShowNotifyAdminSuccess(true)
-    }, [me?.id])
+    }
 
-    const onClick = useCallback(() => {
+    const onClick = () => {
         (window as any).openPricingModal()({trackingLocation: 'boards > card_limit_notification_upgrade_to_a_paid_plan_click'})
         TelemetryClient.trackEvent(TelemetryCategory, TelemetryActions.LimitCardLimitLinkOpen, {})
-    }, [])
+    }
 
     const hasPermissionToUpgrade = me?.roles?.split(' ').indexOf('system_admin') !== -1
 

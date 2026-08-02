@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {useCallback} from 'react'
+import React from 'react'
 import {FormattedMessage} from 'react-intl'
 import {generatePath, useRouteMatch, useHistory} from 'react-router-dom'
 
@@ -21,14 +21,14 @@ const ShareBoardLoginButton = () => {
     }
     const loginPath = '/login?' + redirectQueryParam
 
-    const onLoginClick = useCallback(() => {
+    const onLoginClick = () => {
         TelemetryClient.trackEvent(TelemetryCategory, TelemetryActions.ShareBoardLogin)
         if (Utils.isFocalboardLegacy()) {
             location.assign(loginPath)
         } else {
             history.push(loginPath)
         }
-    }, [])
+    }
 
     return (
         <div className='ShareBoardLoginButton'>

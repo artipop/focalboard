@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import {useEffect, useCallback} from 'react'
+import {useEffect} from 'react'
 import {useIntl} from 'react-intl'
 
 import {ImageBlock, createImageBlock} from '../../blocks/imageBlock'
@@ -12,7 +12,7 @@ import mutator from '../../mutator'
 
 export default function useImagePaste(boardId: string, cardId: string, contentOrder: Array<string | string[]>): void {
     const intl = useIntl()
-    const uploadItems = useCallback(async (items: FileList) => {
+    const uploadItems = async (items: FileList) => {
         let newImage: File|null = null
         const uploads: Array<Promise<string|undefined>> = []
 
@@ -58,21 +58,21 @@ export default function useImagePaste(boardId: string, cardId: string, contentOr
         }
 
         await mutator.insertBlocks(boardId, blocksToInsert, 'pasted images', afterRedo, beforeUndo)
-    }, [cardId, contentOrder, boardId])
+    }
 
-    const onDrop = useCallback((event: DragEvent): void => {
+    const onDrop = (event: DragEvent): void => {
         if (event.dataTransfer) {
             const items = event.dataTransfer.files
             uploadItems(items)
         }
-    }, [uploadItems])
+    }
 
-    const onPaste = useCallback((event: ClipboardEvent): void => {
+    const onPaste = (event: ClipboardEvent): void => {
         if (event.clipboardData) {
             const items = event.clipboardData.files
             uploadItems(items)
         }
-    }, [uploadItems])
+    }
 
     useEffect(() => {
         document.addEventListener('paste', onPaste)

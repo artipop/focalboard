@@ -1,15 +1,15 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react'
+import React, {useEffect, useRef, useState} from 'react'
 import {FormattedMessage, useIntl} from 'react-intl'
 import {generatePath, useHistory, useRouteMatch} from 'react-router-dom'
 
-import {debounce} from 'lodash'
+import debounce from 'lodash/debounce'
 
 import {useSortable} from '@dnd-kit/react/sortable'
 import {useDroppable} from '@dnd-kit/react'
 
-import {HandRightIcon} from '@mattermost/compass-icons/components'
+import HandRightIcon from '@mattermost/compass-icons/components/hand-right'
 
 import {Board} from '../../blocks/board'
 import mutator from '../../mutator'
@@ -120,15 +120,15 @@ const SidebarCategory = (props: Props) => {
         }
     }, [shouldViewManageCatergoriesTour])
 
-    const showBoard = useCallback((boardId: string) => {
+    const showBoard = (boardId: string) => {
         if (boardId === props.activeBoardID && props.onBoardTemplateSelectorClose) {
             props.onBoardTemplateSelectorClose()
         }
         Utils.showBoard(boardId, match, history)
         props.hideSidebar()
-    }, [match, history])
+    }
 
-    const showView = useCallback((viewId: string, boardId: string) => {
+    const showView = (viewId: string, boardId: string) => {
         if (viewId === props.activeViewID && props.onBoardTemplateSelectorClose) {
             props.onBoardTemplateSelectorClose()
         }
@@ -142,7 +142,7 @@ const SidebarCategory = (props: Props) => {
         const newPath = generatePath(Utils.getBoardPagePath(match.path), params)
         history.push(newPath)
         props.hideSidebar()
-    }, [match, history])
+    }
 
     const isBoardVisible = (boardID: string, existingBoardMetadata?: CategoryBoardMetadata): boolean => {
         const categoryBoardMetadata = existingBoardMetadata || sidebarBoardMetadata.find((metadata) => metadata.boardID === boardID)
@@ -190,7 +190,7 @@ const SidebarCategory = (props: Props) => {
         onClose: () => setShowDeleteCategoryDialog(false),
     }
 
-    const onDeleteBoard = useCallback(async () => {
+    const onDeleteBoard = async () => {
         if (!deleteBoard) {
             return
         }
@@ -216,17 +216,17 @@ const SidebarCategory = (props: Props) => {
                 showBoard(deleteBoard.id)
             },
         )
-    }, [showBoard, deleteBoard, props.boards])
+    }
 
-    const updateCategory = useCallback(async (value: boolean) => {
+    const updateCategory = async (value: boolean) => {
         const updatedCategory: Category = {
             ...props.categoryBoards,
             collapsed: value,
         }
         await mutator.updateCategory(updatedCategory)
-    }, [props.categoryBoards])
+    }
 
-    const debouncedUpdateCategory = useMemo(() => debounce(updateCategory, 400), [updateCategory])
+    const debouncedUpdateCategory = debounce(updateCategory, 400)
 
     const toggleCollapse = async () => {
         const newVal = !collapsed

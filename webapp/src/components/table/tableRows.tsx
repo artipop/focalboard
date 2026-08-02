@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {type JSX, useCallback} from 'react'
+import React, {type JSX} from 'react'
 
 import {Card} from '../../blocks/card'
 import {Board} from '../../blocks/board'
@@ -26,9 +26,9 @@ type Props = {
 const TableRows = (props: Props): JSX.Element => {
     const {board, cards, activeView} = props
 
-    const onClickRow = useCallback((e: React.MouseEvent<HTMLDivElement>, card: Card) => {
+    const onClickRow = (e: React.MouseEvent<HTMLDivElement>, card: Card) => {
         props.onCardClicked(e, card)
-    }, [props.onCardClicked])
+    }
 
     return (
         <>

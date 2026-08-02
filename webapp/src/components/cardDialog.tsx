@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {type JSX, useCallback, useState} from 'react'
+import React, {type JSX, useState} from 'react'
 import {FormattedMessage, useIntl} from 'react-intl'
 
 import {Board} from '../blocks/board'
@@ -199,14 +199,14 @@ const CardDialog = (props: Props): JSX.Element => {
         await mutator.insertBlock(block.boardId, block, description)
     }
 
-    const deleteBlock = useCallback(async (block: Block) => {
+    const deleteBlock = async (block: Block) => {
         if (!card) {
             return
         }
         const description = intl.formatMessage({id: 'AttachmentBlock.DeleteAction', defaultMessage: 'delete'})
         await mutator.deleteBlock(block, description)
         sendFlashMessage({content: intl.formatMessage({id: 'AttachmentBlock.delete', defaultMessage: 'Attachment Deleted Successfully.'}), severity: 'normal'})
-    }, [card?.boardId, card?.id, card?.fields.contentOrder])
+    }
 
     const attachBtn = (): React.ReactNode => {
         return (

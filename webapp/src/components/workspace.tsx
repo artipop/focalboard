@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useCallback, useEffect, useState} from 'react'
+import React, {useEffect, useState} from 'react'
 import {generatePath, useRouteMatch, useHistory} from 'react-router-dom'
 import {FormattedMessage} from 'react-intl'
 
@@ -63,7 +63,7 @@ function CenterContent(props: Props) {
         return hiddenBoardIDs.includes(board.id)
     }
 
-    const showCard = useCallback((cardId?: string) => {
+    const showCard = (cardId?: string) => {
         const params = {...match.params, cardId}
         let newPath = generatePath(Utils.getBoardPagePath(match.path), params)
         if (props.readonly) {
@@ -71,7 +71,7 @@ function CenterContent(props: Props) {
         }
         history.push(newPath)
         dispatch(setCurrentCard(cardId || ''))
-    }, [match, history])
+    }
 
     useEffect(() => {
         const onConfigChangeHandler = (_: WSClient, config: ClientConfig) => {
@@ -162,14 +162,14 @@ const Workspace = (props: Props) => {
     const viewId = useAppSelector(getCurrentViewId)
     const [boardTemplateSelectorOpen, setBoardTemplateSelectorOpen] = useState(false)
 
-    const closeBoardTemplateSelector = useCallback(() => {
+    const closeBoardTemplateSelector = () => {
         setBoardTemplateSelectorOpen(false)
-    }, [])
-    const openBoardTemplateSelector = useCallback(() => {
+    }
+    const openBoardTemplateSelector = () => {
         if (board) {
             setBoardTemplateSelectorOpen(true)
         }
-    }, [board])
+    }
     useEffect(() => {
         setBoardTemplateSelectorOpen(false)
     }, [board, viewId])

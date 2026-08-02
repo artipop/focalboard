@@ -1,11 +1,11 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {type JSX, ReactNode, useEffect, useMemo, useState} from 'react'
+import React, {type JSX, ReactNode, useEffect, useState} from 'react'
 
 import './searchDialog.scss'
 import {FormattedMessage} from 'react-intl'
 
-import {debounce} from 'lodash'
+import debounce from 'lodash/debounce'
 
 import Dialog from '../dialog'
 import {Utils} from '../../utils'
@@ -74,7 +74,7 @@ const SearchDialog = (props: Props): JSX.Element => {
         setIsSearching(false)
     }
 
-    const debouncedSearchHandler = useMemo(() => debounce(searchHandler, 200), [])
+    const debouncedSearchHandler = debounce(searchHandler, 200)
 
     const emptyResult = results.length === 0 && !isSearching && searchQuery
 

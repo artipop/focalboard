@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {type JSX, useCallback} from 'react'
+import React, {type JSX} from 'react'
 import {useIntl} from 'react-intl'
 import Select from 'react-select/async'
 import {CSSObject} from '@emotion/serialize'
@@ -111,7 +111,7 @@ const PersonSelector = (props: Props): JSX.Element => {
         users = userIDs.map((id) => boardUsersById[id])
     }
 
-    const loadOptions = useCallback(async (value: string) => {
+    const loadOptions = async (value: string) => {
         if (!allowAddUsers) {
             const returnUsers: IUser[] = []
             if (showMe && me) {
@@ -158,7 +158,7 @@ const PersonSelector = (props: Props): JSX.Element => {
             {label: intl.formatMessage({id: 'PersonProperty.board-members', defaultMessage: 'Board members'}), options: usersInsideBoard},
             {label: intl.formatMessage({id: 'PersonProperty.non-board-members', defaultMessage: 'Not board members'}), options: usersOutsideBoard},
         ]
-    }, [boardUsers, allowAddUsers, boardUsersById, me])
+    }
 
     let primaryClass = 'Person'
     if (isMulti) {

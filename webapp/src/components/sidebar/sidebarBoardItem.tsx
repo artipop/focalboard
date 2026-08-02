@@ -1,6 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {type JSX, useCallback, useRef, useState} from 'react'
+import React, {type JSX, useRef, useState} from 'react'
 import {useIntl} from 'react-intl'
 import {generatePath, useHistory, useRouteMatch} from 'react-router-dom'
 import {useSortable} from '@dnd-kit/react/sortable'
@@ -99,7 +99,7 @@ const SidebarBoardItem = (props: Props) => {
 
     const board = props.board
 
-    const handleDuplicateBoard = useCallback(async (asTemplate: boolean) => {
+    const handleDuplicateBoard = async (asTemplate: boolean) => {
         const blocksAndBoards = await mutator.duplicateBoard(
             board.id,
             undefined,
@@ -138,7 +138,7 @@ const SidebarBoardItem = (props: Props) => {
         }
 
         Utils.showBoard(boardId, match, history)
-    }, [board.id])
+    }
 
     const showTemplatePicker = () => {
         // if the same board, reuse the match params

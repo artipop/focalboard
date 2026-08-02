@@ -1,7 +1,7 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {useCallback, useState, useMemo, useEffect} from 'react'
+import React, {useState, useEffect} from 'react'
 import {FormattedMessage, useIntl} from 'react-intl'
 
 import {useAppSelector} from '../../store/hooks'
@@ -63,19 +63,19 @@ const Kanban = (props: Props) => {
     const propertyValues = groupByProperty?.options || []
     Utils.log(`${propertyValues.length} propertyValues`)
 
-    const visiblePropertyTemplates = useMemo(() => {
+    const visiblePropertyTemplates = (() => {
         return board.cardProperties.filter(
             (template: IPropertyTemplate) => activeView.fields.visiblePropertyIds.includes(template.id),
         )
-    }, [board.cardProperties, activeView.fields.visiblePropertyIds])
+    })()
     const isManualSort = activeView.fields.sortOptions.length === 0
     const visibleBadges = activeView.fields.visiblePropertyIds.includes(Constants.badgesColumnId)
 
-    const propertyNameChanged = useCallback(async (option: IPropertyOption, text: string): Promise<void> => {
+    const propertyNameChanged = async (option: IPropertyOption, text: string): Promise<void> => {
         await mutator.changePropertyOptionValue(board.id, board.cardProperties, groupByProperty!, option, text)
-    }, [board, groupByProperty])
+    }
 
-    const addGroupClicked = useCallback(async () => {
+    const addGroupClicked = async () => {
         Utils.log('onAddGroupClicked')
 
         const option: IPropertyOption = {
@@ -85,9 +85,9 @@ const Kanban = (props: Props) => {
         }
 
         await mutator.insertPropertyOption(board.id, board.cardProperties, groupByProperty!, option, 'add group')
-    }, [board, groupByProperty])
+    }
 
-    const orderAfterMoveToColumn = useCallback((cardIds: string[], columnId?: string): string[] => {
+    const orderAfterMoveToColumn = (cardIds: string[], columnId?: string): string[] => {
         let cardOrder = activeView.fields.cardOrder.slice()
         const columnGroup = visibleGroups.find((g) => g.option.id === columnId)
         const columnCards = columnGroup?.cards
@@ -100,9 +100,9 @@ const Kanban = (props: Props) => {
         const lastCardIndex = cardOrder.indexOf(lastCardId)
         cardOrder.splice(lastCardIndex + 1, 0, ...cardIds)
         return cardOrder
-    }, [activeView, visibleGroups])
+    }
 
-    const onDropToColumn = useCallback(async (option: IPropertyOption, card?: Card, dstOption?: IPropertyOption) => {
+    const onDropToColumn = async (option: IPropertyOption, card?: Card, dstOption?: IPropertyOption) => {
         const {selectedCardIds} = props
         const optionId = option ? option.id : undefined
 
@@ -154,9 +154,9 @@ const Kanban = (props: Props) => {
 
             await mutator.changeViewVisibleOptionIds(props.board.id, activeView.id, activeView.fields.visibleOptionIds, visibleOptionIdsRearranged)
         }
-    }, [cards, visibleGroups, activeView.id, activeView.fields.cardOrder, groupByProperty, props.selectedCardIds])
+    }
 
-    const onDropToCard = useCallback(async (srcCard: Card, dstCard: Card) => {
+    const onDropToCard = async (srcCard: Card, dstCard: Card) => {
         if (srcCard.id === dstCard.id || !groupByProperty) {
             return
         }
@@ -197,7 +197,7 @@ const Kanban = (props: Props) => {
             await Promise.all(awaits)
             await mutator.changeViewCardOrder(props.board.id, activeView.id, activeView.fields.cardOrder, cardOrder, description)
         })
-    }, [cards, activeView.id, activeView.fields.cardOrder, groupByProperty, props.selectedCardIds])
+    }
 
     const [showCalculationsMenu, setShowCalculationsMenu] = useState<Map<string, boolean>>(new Map<string, boolean>())
     const toggleOptions = (templateId: string, show: boolean) => {
