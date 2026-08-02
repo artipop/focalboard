@@ -115,12 +115,32 @@ func (f *fakeAgent) NewSession(ctx context.Context, params acpsdk.NewSessionRequ
 		f.record("mcp.json", string(servers))
 	}
 	f.record("env.txt", strings.Join(os.Environ(), "\n"))
+	// The modes and the model option are spelled the way the codex adapter
+	// spells them: it starts read-only, calls the working mode "agent", and
+	// takes the model as a session config option rather than a flag.
+	models := acpsdk.SessionConfigSelectOptionsUngrouped{
+		{Value: "gpt-5.4", Name: "GPT-5.4"},
+		{Value: "gpt-5.6-sol", Name: "GPT-5.6-Sol"},
+	}
 	return acpsdk.NewSessionResponse{
 		SessionId: acpsdk.SessionId("fake-session"),
 		Modes: &acpsdk.SessionModeState{
-			CurrentModeId:  "read-only",
-			AvailableModes: []acpsdk.SessionMode{{Id: "read-only", Name: "Read Only"}, {Id: "auto", Name: "Default"}},
+			CurrentModeId: "read-only",
+			AvailableModes: []acpsdk.SessionMode{
+				{Id: "read-only", Name: "Read Only"},
+				{Id: "agent", Name: "Agent"},
+				{Id: "agent-full-access", Name: "Agent (full access)"},
+			},
 		},
+		ConfigOptions: []acpsdk.SessionConfigOption{{
+			Select: &acpsdk.SessionConfigOptionSelect{
+				Id:           "model",
+				Name:         "Model",
+				Type:         "select",
+				CurrentValue: "gpt-5.6-sol",
+				Options:      acpsdk.SessionConfigSelectOptions{Ungrouped: &models},
+			},
+		}},
 	}, nil
 }
 
@@ -264,5 +284,9 @@ func (f *fakeAgent) ResumeSession(ctx context.Context, params acpsdk.ResumeSessi
 	return acpsdk.ResumeSessionResponse{}, acpsdk.NewMethodNotFound(acpsdk.AgentMethodSessionResume)
 }
 func (f *fakeAgent) SetSessionConfigOption(ctx context.Context, params acpsdk.SetSessionConfigOptionRequest) (acpsdk.SetSessionConfigOptionResponse, error) {
-	return acpsdk.SetSessionConfigOptionResponse{}, acpsdk.NewMethodNotFound(acpsdk.AgentMethodSessionSetConfigOption)
+	if params.ValueId == nil {
+		return acpsdk.SetSessionConfigOptionResponse{}, acpsdk.NewMethodNotFound(acpsdk.AgentMethodSessionSetConfigOption)
+	}
+	f.record(string(params.ValueId.ConfigId)+".txt", string(params.ValueId.Value))
+	return acpsdk.SetSessionConfigOptionResponse{}, nil
 }

@@ -72,8 +72,8 @@ func adapterStatus(kind string) AdapterStatus {
 	return st
 }
 
-// installTimeout bounds an adapter install. The codex adapter is a ~190 MB
-// native binary, so a slow link needs real time here.
+// installTimeout bounds an adapter install. Both adapters pull a CLI of their
+// own along with them, so a slow link needs real time here.
 const installTimeout = 10 * time.Minute
 
 // InstallAdapter installs the kind's adapter globally with npm. It is the

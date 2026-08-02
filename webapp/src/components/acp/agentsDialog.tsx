@@ -69,7 +69,7 @@ export type AdapterStatus = {
 // stdio; the command replaces the adapter binary, which is how a wrapper (a
 // proxy launcher, a per-account shim) gets in front of it.
 const commandPlaceholders: {[kind: string]: string} = {
-    claude: 'proxychains4 -q -f /etc/myproxy.conf claude-code-acp',
+    claude: 'proxychains4 -q -f /etc/myproxy.conf claude-agent-acp',
     codex: 'proxychains4 -q -f /etc/myproxy.conf codex-acp',
     antigravity: 'antigravity --acp',
     copilot: 'copilot --acp',

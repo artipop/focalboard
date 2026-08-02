@@ -102,13 +102,14 @@ func TestAgentLaunch(t *testing.T) {
 	}
 
 	// Each known kind is launched the way its own adapter wants: the CLIs take
-	// a flag and --model, the codex adapter takes codex's config override, and
-	// the claude adapter takes neither — its model rides in the environment.
+	// a flag and --model, while neither vendor adapter takes flags at all — the
+	// claude model rides in the environment, the codex one is asked for over the
+	// protocol once the session exists.
 	for kind, want := range map[string]string{
 		"antigravity": bin + " --acp --model m1",
 		"copilot":     bin + " --acp --model m1",
 		"junie":       bin + " --acp=true --model m1",
-		"codex":       bin + ` -c model="m1"`,
+		"codex":       bin,
 		"claude":      bin,
 	} {
 		l, err = m.agentLaunch(AgentEntry{Name: "g", Kind: kind, BinPath: bin, Model: "m1"})
@@ -141,8 +142,8 @@ func TestAgentLaunch(t *testing.T) {
 
 	// The codex adapter starts read-only, so the session has to be switched.
 	l, _ = m.agentLaunch(AgentEntry{Name: "x", Kind: "codex", BinPath: bin})
-	if l.mode != "auto" {
-		t.Errorf("codex session mode = %q, want auto", l.mode)
+	if l.mode != "agent" {
+		t.Errorf("codex session mode = %q, want agent", l.mode)
 	}
 
 	// A wrapper command stands in front of the adapter — proxychains, a shim —

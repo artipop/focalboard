@@ -7,7 +7,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -402,10 +401,12 @@ type acpAdapter struct {
 	// acpArgs put the CLI into ACP-over-stdio mode. Empty when it has no other
 	// mode to be in.
 	acpArgs []string
-	// modelArgs and modelEnv are the two ways an agent is told which model to
-	// use; a kind uses one or the other.
-	modelArgs func(model string) []string
-	modelEnv  string
+	// modelArgs, modelEnv and modelConfig are the three ways an agent is told
+	// which model to use: a launch flag, a variable, or a session config option
+	// asked for over ACP once the session exists.
+	modelArgs   func(model string) []string
+	modelEnv    string
+	modelConfig string
 	// dropEnv names variables the process must not inherit from ours.
 	dropEnv []string
 	// mode is the session mode to select after session/new, when the agent's
@@ -416,40 +417,33 @@ type acpAdapter struct {
 // dashDashModel is the spelling every ACP-native CLI uses.
 func dashDashModel(model string) []string { return []string{"--model", model} }
 
-// tomlString quotes a value for a TOML basic string, which is what the right
-// half of codex's `-c key=value` is parsed as. Go's own quoting escapes the
-// same characters TOML does, and leaves printable non-ASCII alone, which TOML
-// allows.
-func tomlString(s string) string { return strconv.Quote(s) }
-
 // acpNative is the table of agents we know how to launch. The generic acp kind
 // is deliberately absent — it carries its own Command.
 var acpNative = map[string]acpAdapter{
-	// The Claude Code adapter embeds the Claude Agent SDK, which embeds the CLI,
-	// so the claude binary is not needed alongside it. It is a Node package and
-	// there is no other build of it, which is why the desktop app now needs
-	// Node.js for this kind and only this kind.
+	// The Claude adapter embeds the Claude Agent SDK, which embeds the CLI, so
+	// the claude binary is not needed alongside it. It is a Node package and
+	// there is no other build of it, which is why the desktop app needs Node.js
+	// for this kind.
 	AgentKindClaude: {
-		bin:        "claude-code-acp",
-		npmPackage: "@zed-industries/claude-code-acp",
+		bin:        "claude-agent-acp",
+		npmPackage: "@agentclientprotocol/claude-agent-acp",
 		// The adapter takes no flags at all: it is an ACP agent and nothing else.
 		modelEnv: "ANTHROPIC_MODEL",
 		// Claude Code refuses to start inside another Claude Code session, and
 		// the desktop app may well have been launched from one.
 		dropEnv: []string{"CLAUDECODE"},
 	},
-	// The Codex adapter is a self-contained native binary (the npm package only
-	// picks the right one per platform), so this kind needs neither the codex
-	// CLI nor Node.js once it is installed.
+	// The Codex adapter drives the codex CLI it depends on, so this kind needs
+	// Node.js too.
 	AgentKindCodex: {
 		bin:        "codex-acp",
-		npmPackage: "@zed-industries/codex-acp",
-		// Its only option is codex's own config override, so that is also how
-		// the model is chosen.
-		modelArgs: func(model string) []string { return []string{"-c", "model=" + tomlString(model)} },
+		npmPackage: "@agentclientprotocol/codex-acp",
+		// It takes no flags either: the model is a session config option, asked
+		// for over the protocol once the session exists.
+		modelConfig: "model",
 		// It starts read-only, which is not what a card asked for: a session
 		// that may not edit anything would spend its turn saying so.
-		mode: "auto",
+		mode: "agent",
 	},
 	AgentKindAntigravity: {bin: "antigravity", acpArgs: []string{"--acp"}, modelArgs: dashDashModel},
 	AgentKindCopilot:     {bin: "copilot", acpArgs: []string{"--acp"}, modelArgs: dashDashModel}, // github/copilot-cli, stdio is its default transport

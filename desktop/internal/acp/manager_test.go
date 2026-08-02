@@ -407,7 +407,7 @@ func TestMissingAdapterErrorIsActionable(t *testing.T) {
 	// Nothing installed and no npx: the message names the package.
 	t.Setenv("PATH", t.TempDir())
 	_, err := m.agentLaunch(AgentEntry{Name: "c", Kind: "claude"})
-	if err == nil || !strings.Contains(err.Error(), "@zed-industries/claude-code-acp") {
+	if err == nil || !strings.Contains(err.Error(), "@agentclientprotocol/claude-agent-acp") {
 		t.Errorf("expected the npm package in the error, got %v", err)
 	}
 }

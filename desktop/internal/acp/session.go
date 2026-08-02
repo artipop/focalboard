@@ -543,7 +543,8 @@ func (m *Manager) openConnection(ctx context.Context, s *Session) (*acpsdk.Clien
 		cleanup()
 		return nil, "", nil, fmt.Errorf("session/new: %w", err)
 	}
-	m.selectSessionMode(ctx, s, conn, sess)
+	m.selectSessionMode(ctx, s, conn, sess, launch.mode)
+	m.selectSessionModel(ctx, s, conn, sess)
 	worktreePath := ""
 	if s.usedWorktree {
 		worktreePath = s.Worktree.Path
@@ -757,8 +758,7 @@ func (m *Manager) connectACPAgent(ctx context.Context, s *Session, l launch) (*a
 // advisory: an agent that offers no such mode is left in the one it chose, and
 // a refusal is logged rather than failing the session, since the mode is a
 // preference and the turn may well work without it.
-func (m *Manager) selectSessionMode(ctx context.Context, s *Session, conn *acpsdk.ClientSideConnection, sess acpsdk.NewSessionResponse) {
-	mode := acpNative[s.Agent.Kind].mode
+func (m *Manager) selectSessionMode(ctx context.Context, s *Session, conn *acpsdk.ClientSideConnection, sess acpsdk.NewSessionResponse, mode string) {
 	if mode == "" || sess.Modes == nil || string(sess.Modes.CurrentModeId) == mode {
 		return
 	}
@@ -778,6 +778,85 @@ func (m *Manager) selectSessionMode(ctx context.Context, s *Session, conn *acpsd
 	}); err != nil {
 		m.log.Warn("acp: agent refused the session mode", "session", s.ID, "mode", mode, "err", err)
 	}
+}
+
+// selectSessionModel asks for the agent's model over ACP, for the kinds that
+// have no flag or variable for it. Codex is why this exists: its adapter stopped
+// reading the model off the command line and offers it as a session config
+// option instead, which is the protocol's own answer and needs no CLI knowledge.
+//
+// Advisory like the mode: an agent that does not offer the option, or offers it
+// without the model somebody asked for, keeps the model it chose and says so in
+// the log — the turn works either way, and failing the card over it would be
+// worse than running it on the default.
+func (m *Manager) selectSessionModel(ctx context.Context, s *Session, conn *acpsdk.ClientSideConnection, sess acpsdk.NewSessionResponse) {
+	configID := acpNative[s.Agent.Kind].modelConfig
+	if configID == "" || s.Agent.Model == "" {
+		return
+	}
+	for _, opt := range sess.ConfigOptions {
+		sel := opt.Select
+		if sel == nil || string(sel.Id) != configID {
+			continue
+		}
+		value, ok := matchConfigValue(sel.Options, s.Agent.Model)
+		if !ok {
+			m.log.Warn("acp: agent offers no such model", "session", s.ID,
+				"model", s.Agent.Model, "available", configValueIDs(sel.Options))
+			return
+		}
+		if string(sel.CurrentValue) == value {
+			return
+		}
+		if _, err := conn.SetSessionConfigOption(ctx, acpsdk.SetSessionConfigOptionRequest{
+			ValueId: &acpsdk.SetSessionConfigOptionValueId{
+				SessionId: sess.SessionId,
+				ConfigId:  sel.Id,
+				Value:     acpsdk.SessionConfigValueId(value),
+			},
+		}); err != nil {
+			m.log.Warn("acp: agent refused the model", "session", s.ID, "model", value, "err", err)
+		}
+		return
+	}
+}
+
+// matchConfigValue finds the option value somebody meant: its id, or the name
+// shown for it, either way ignoring case.
+func matchConfigValue(options acpsdk.SessionConfigSelectOptions, want string) (string, bool) {
+	for _, opt := range configSelectOptions(options) {
+		if string(opt.Value) == want {
+			return string(opt.Value), true
+		}
+	}
+	for _, opt := range configSelectOptions(options) {
+		if strings.EqualFold(string(opt.Value), want) || strings.EqualFold(opt.Name, want) {
+			return string(opt.Value), true
+		}
+	}
+	return "", false
+}
+
+// configSelectOptions flattens the two shapes a select takes, grouped and not.
+func configSelectOptions(options acpsdk.SessionConfigSelectOptions) []acpsdk.SessionConfigSelectOption {
+	if options.Ungrouped != nil {
+		return *options.Ungrouped
+	}
+	var out []acpsdk.SessionConfigSelectOption
+	if options.Grouped != nil {
+		for _, group := range *options.Grouped {
+			out = append(out, group.Options...)
+		}
+	}
+	return out
+}
+
+func configValueIDs(options acpsdk.SessionConfigSelectOptions) string {
+	values := make([]string, 0, 8)
+	for _, opt := range configSelectOptions(options) {
+		values = append(values, string(opt.Value))
+	}
+	return strings.Join(values, ", ")
 }
 
 func (s *Session) markCancelled() {

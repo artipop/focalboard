@@ -92,7 +92,7 @@ describe('components/acp/agentsDialog', () => {
 
         // The launch command is offered for claude too, and quoted arguments
         // stay a single argv element.
-        userEvent.type(screen.getByPlaceholderText('proxychains4 -q -f /etc/myproxy.conf claude-code-acp'), 'proxychains4 -f "/etc/my conf.conf" claude-code-acp')
+        userEvent.type(screen.getByPlaceholderText('proxychains4 -q -f /etc/myproxy.conf claude-agent-acp'), 'proxychains4 -f "/etc/my conf.conf" claude-agent-acp')
 
         // The network settings themselves live in the proxy registry; the agent
         // only names one.
@@ -104,7 +104,7 @@ describe('components/acp/agentsDialog', () => {
         expect(payload).toMatchObject({
             name: 'proxied',
             kind: 'claude',
-            command: ['proxychains4', '-f', '/etc/my conf.conf', 'claude-code-acp'],
+            command: ['proxychains4', '-f', '/etc/my conf.conf', 'claude-agent-acp'],
             proxyName: 'office',
         })
     })
@@ -118,8 +118,8 @@ describe('components/acp/agentsDialog', () => {
             GetAgentSystemPrompt: jest.fn().mockResolvedValue(''),
             SetAgentSystemPrompt: jest.fn(),
             ListAgentAdapters: jest.fn().mockResolvedValue(JSON.stringify([
-                {kind: 'claude', package: '@zed-industries/claude-code-acp', ready: false, detail: 'не найден claude-code-acp'},
-                {kind: 'codex', package: '@zed-industries/codex-acp', ready: true, path: '/usr/local/bin/codex-acp'},
+                {kind: 'claude', package: '@agentclientprotocol/claude-agent-acp', ready: false, detail: 'не найден claude-agent-acp'},
+                {kind: 'codex', package: '@agentclientprotocol/codex-acp', ready: true, path: '/usr/local/bin/codex-acp'},
             ])),
             InstallAgentAdapter: jest.fn().mockResolvedValue('added 1 package'),
             AddAgent: jest.fn(),
@@ -139,14 +139,14 @@ describe('components/acp/agentsDialog', () => {
         userEvent.click(screen.getByRole('button', {name: 'Add agent…'}))
 
         // The default kind is claude, which this machine cannot start.
-        await waitFor(() => expect(screen.getByText('не найден claude-code-acp')).toBeInTheDocument())
+        await waitFor(() => expect(screen.getByText('не найден claude-agent-acp')).toBeInTheDocument())
 
         userEvent.click(screen.getByRole('button', {name: 'Install adapter'}))
         await waitFor(() => expect(bindings.InstallAgentAdapter).toHaveBeenCalledWith('claude'))
 
         // An installed kind says nothing at all.
         userEvent.selectOptions(screen.getAllByRole('combobox')[0], 'codex')
-        await waitFor(() => expect(screen.queryByText('не найден claude-code-acp')).not.toBeInTheDocument())
+        await waitFor(() => expect(screen.queryByText('не найден claude-agent-acp')).not.toBeInTheDocument())
     })
 
     test('offers the ACP-native kinds and saves one without a launch command', async () => {
