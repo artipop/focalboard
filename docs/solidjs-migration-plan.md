@@ -45,11 +45,39 @@ React-релиз остаётся готовым артефактом для о�
   - DnD канбана, таблицы, blocks editor и sidebar унифицировать на
     `@dnd-kit/solid`, сохранив mouse, touch, keyboard, cross-container drop и
     autoscroll.
-  - `react-select` заменить на `@thisbeyond/solid-select` с прежними CSS-классами
-    и поведением.
-  - Tippy и Emoji Mart использовать через framework-neutral API/web components.
-  - Date picker и hotkeys оформить как внутренние Solid primitives, сохранив
-    клавиатурную навигацию и accessibility.
+  - `react-select` — единственное, что осталось от этого списка, и самое
+    крупное: 8 мест, из них 5 напрямую и 3 через `PersonSelector`. В ходу
+    `CreatableSelect`, `react-select/async`, слоты `components`,
+    `formatOptionLabel` с `meta.context` и стилевой объект `getSelectBaseStyle`
+    из `theme.ts` на 11 слотов emotion. Заменять — своим headless-комбобоксом
+    (состояние, фильтрация, клавиатура) плюс floating-ui для выпадающего списка,
+    переводя места по одному.
+
+### Предподготовка: что уже снято с React (сделано до миграции)
+
+Ниже — то, что уже не нужно переписывать в Solid-ветке, потому что фреймворка в
+нём больше нет. В каждом случае ядро лежит отдельным файлом без React, а
+React-обвязка — тонкая и заменяемая:
+
+  - **Hotkeys** → `webapp/src/hotkeys.ts` (разбор и сопоставление сочетаний,
+    подписка на `keydown`) + `hooks/hotkeys.ts` на дюжину строк. Точное
+    совпадение модификаторов и «не срабатывать, пока пользователь печатает»
+    сохранены намеренно; буквы сопоставляются по `KeyboardEvent.code`, чтобы
+    `ctrl+d` работал на кириллической раскладке.
+  - **Tooltip тура** → `@floating-ui/dom` вместо заброшенного `tippy.js`
+    (`offset`/`flip`/`shift`/`arrow` + `autoUpdate`). Заодно удалены ручные
+    сдвиги коробки и стрелки в шести шагах тура — их работу делают middleware.
+  - **Date picker** → `webapp/src/calendar.ts` (сетка месяца, начало недели,
+    попадание в диапазон) + `widgets/calendar.tsx`. Вместе с
+    `react-day-picker` ушёл `date-fns`: названия дней и месяцев даёт
+    `Intl.DateTimeFormat`. Обнаружилось, что кастомные стили календаря были
+    мертвы — оба экрана стилизовали классы `react-day-picker` 7, а библиотека
+    давно на 10.
+  - **Emoji Mart** трогать не пришлось: `Picker` — custom element, `SearchIndex`
+    — обычная async-функция, React там только в сорокастрочной обёртке. Но
+    библиотека не обновлялась с апреля 2024, и её замена на
+    `emoji-picker-element` (web component) — отдельная задача, не связанная с
+    Solid.
 
 ## Реализация
 
@@ -88,7 +116,10 @@ React-релиз остаётся готовым артефактом для о�
 - Проверять server и Wails packaging, шаблонизацию `index.html`, desktop
   bootstrap injection и прямое открытие вложенного URL.
 - Добавить CI-guard, запрещающий импорты `react*`, `redux*`, `@lexical/react` и
-  наличие соответствующих runtime dependencies.
+  наличие соответствующих runtime dependencies. Тем же guard'ом ловить импорт
+  пакета, которого нет в `dependencies`: и `@popperjs/core` (под tippy), и
+  `@emotion/serialize` (под react-select) годами ездили транзитивно, и первый из
+  них сломал сборку ровно в тот момент, когда его носитель удалили.
 - Performance-gates измерять пятью запусками в закреплённой версии Chromium на
   одной fixture:
   - initial gzip JS минимум на 20% меньше React-baseline;
