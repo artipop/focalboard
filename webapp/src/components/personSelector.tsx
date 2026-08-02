@@ -37,8 +37,10 @@ type Props = {
     onChange: (items: any, action: ActionMeta<IUser>) => void
 }
 
+const baseStyles = getSelectBaseStyle()
+
 const selectStyles = {
-    ...getSelectBaseStyle(),
+    ...baseStyles,
     option: (provided: CSSObject, state: {isFocused: boolean}): CSSObject => ({
         ...provided,
         background: state.isFocused ? 'rgba(var(--center-channel-color-rgb), 0.1)' : 'rgb(var(--center-channel-bg-rgb))',
@@ -56,7 +58,7 @@ const selectStyles = {
         overflow: 'unset',
     }),
     singleValue: (provided: CSSObject): CSSObject => ({
-        ...provided,
+        ...baseStyles.singleValue(provided),
         position: 'static',
         top: 'unset',
         transform: 'unset',

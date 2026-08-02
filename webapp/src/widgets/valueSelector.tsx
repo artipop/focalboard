@@ -105,8 +105,10 @@ const ValueSelectorLabel = (props: LabelProps): JSX.Element => {
     )
 }
 
+const baseStyles = getSelectBaseStyle()
+
 const valueSelectorStyle = {
-    ...getSelectBaseStyle(),
+    ...baseStyles,
     option: (provided: CSSObject, state: {isFocused: boolean}): CSSObject => ({
         ...provided,
         background: state.isFocused ? 'rgba(var(--center-channel-color-rgb), 0.1)' : 'rgb(var(--center-channel-bg-rgb))',
@@ -124,14 +126,10 @@ const valueSelectorStyle = {
         overflow: 'unset',
     }),
     singleValue: (provided: CSSObject): CSSObject => ({
-        ...provided,
+        ...baseStyles.singleValue(provided),
         position: 'static',
         top: 'unset',
         transform: 'unset',
-    }),
-    placeholder: (provided: CSSObject): CSSObject => ({
-        ...provided,
-        color: 'rgba(var(--center-channel-color-rgb), 0.4)',
     }),
     multiValue: (provided: CSSObject): CSSObject => ({
         ...provided,
@@ -140,7 +138,7 @@ const valueSelectorStyle = {
         backgroundColor: 'transparent',
     }),
     multiValueLabel: (provided: CSSObject): CSSObject => ({
-        ...provided,
+        ...baseStyles.multiValueLabel(provided),
         display: 'flex',
         paddingLeft: 0,
         padding: 0,

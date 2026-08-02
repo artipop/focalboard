@@ -46,7 +46,7 @@ exports[`components/blocksEditor/blocksEditor should match snapshot on empty 1`]
             class="css-1neafsd"
           >
             <div
-              class="css-1jqq78o-placeholder"
+              class="css-1yro3oh-placeholder"
               id="react-select-2-placeholder"
             >
               Introduce your text or your slash command
@@ -439,7 +439,7 @@ exports[`components/blocksEditor/blocksEditor should match snapshot with blocks 
             class="css-1neafsd"
           >
             <div
-              class="css-1jqq78o-placeholder"
+              class="css-1yro3oh-placeholder"
               id="react-select-3-placeholder"
             >
               Introduce your text or your slash command
