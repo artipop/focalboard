@@ -45,13 +45,8 @@ React-релиз остаётся готовым артефактом для о�
   - DnD канбана, таблицы, blocks editor и sidebar унифицировать на
     `@dnd-kit/solid`, сохранив mouse, touch, keyboard, cross-container drop и
     autoscroll.
-  - `react-select` — единственное, что осталось от этого списка, и самое
-    крупное: 8 мест, из них 5 напрямую и 3 через `PersonSelector`. В ходу
-    `CreatableSelect`, `react-select/async`, слоты `components`,
-    `formatOptionLabel` с `meta.context` и стилевой объект `getSelectBaseStyle`
-    из `theme.ts` на 11 слотов emotion. Заменять — своим headless-комбобоксом
-    (состояние, фильтрация, клавиатура) плюс floating-ui для выпадающего списка,
-    переводя места по одному.
+Из этого списка в Solid-ветке остаются Lexical, FullCalendar и DnD. Всё
+остальное уже снято — см. ниже.
 
 ### Предподготовка: что уже снято с React (сделано до миграции)
 
@@ -73,6 +68,15 @@ React-обвязка — тонкая и заменяемая:
     `Intl.DateTimeFormat`. Обнаружилось, что кастомные стили календаря были
     мертвы — оба экрана стилизовали классы `react-day-picker` 7, а библиотека
     давно на 10.
+  - **Select** → `webapp/src/combobox.ts` (строки списка, фильтрация, куда ведёт
+    клавиша) + `widgets/combobox.tsx` с выпадающим списком на floating-ui.
+    Восемь мест переведены по одному: слэш-команды редактора, выбор роли, меню
+    вычислений, три места через `PersonSelector`, поиск при шаринге доски и
+    свойства select/multiSelect. Виджет намеренно продолжает выдавать имена
+    классов из `classNamePrefix` react-select, поэтому 28 правил в шести
+    таблицах стилей переписывать не пришлось; `getSelectBaseStyle()` из
+    `theme.ts` с одиннадцатью слотами emotion стал обычным SCSS. Вместе с
+    библиотекой ушёл `@emotion/serialize`.
   - **Emoji Mart** трогать не пришлось: `Picker` — custom element, `SearchIndex`
     — обычная async-функция, React там только в сорокастрочной обёртке. Но
     библиотека не обновлялась с апреля 2024, и её замена на
