@@ -35,7 +35,6 @@ function bindingsWith(sessions: any[], events: any[] = []) {
         DetachSession: jest.fn(),
         CloseSession: jest.fn().mockResolvedValue(undefined),
         CancelSession: jest.fn().mockResolvedValue(true),
-        AnswerQuestion: jest.fn().mockResolvedValue(undefined),
         StartCardDeploy: jest.fn().mockResolvedValue('sess-deploy'),
     }
 }
@@ -120,6 +119,33 @@ describe('components/acp/sessionConsole', () => {
         await waitFor(() => expect(bindings.AnswerPermission).toHaveBeenCalledWith('sess-3', 'req-1', 'allow'))
     })
 
+    // A call the policy allowed by itself is a note, not a question. Rendering
+    // it like a prompt — same frame, a bare word where the buttons go — reads as
+    // a broken dialog, which is exactly how it was reported.
+    test('shows a policy decision as a record rather than as a prompt', async () => {
+        const bindings = bindingsWith([{id: 'sess-4', status: 'running'}])
+        anyWindow.go = {main: {App: bindings}}
+        const handlers = fakeRuntime()
+
+        render(wrapIntl(<SessionConsole cardId='card1'/>))
+        await waitFor(() => expect(bindings.AttachSession).toHaveBeenCalledWith('sess-4'))
+
+        handlers['acp:permission']({
+            cardId: 'card1',
+            sessionId: 'sess-4',
+            tool: 'Write',
+            title: 'Write hello.txt',
+            decision: 'allow',
+            byPolicy: true,
+        })
+
+        await waitFor(() => expect(screen.getByText('Write hello.txt')).toBeInTheDocument())
+        expect(screen.getByText('allow — automatically, by the tool policy')).toBeInTheDocument()
+
+        // Nothing to press: there is no question here.
+        expect(screen.queryByRole('button', {name: 'Allow'})).not.toBeInTheDocument()
+    })
+
     test('attaches to a session that starts while the card is already open', async () => {
         // No session yet when the console mounts: the card was opened first and
         // the agent was triggered afterwards. Without attaching here the backend
@@ -171,45 +197,6 @@ describe('components/acp/sessionConsole', () => {
             error: 'session/prompt: agent exited',
         })
         await waitFor(() => expect(screen.getByText('session/prompt: agent exited')).toBeInTheDocument())
-    })
-
-    test('answers the agent own questions through the picker', async () => {
-        const bindings = bindingsWith([{id: 'sess-q', status: 'running'}])
-        anyWindow.go = {main: {App: bindings}}
-        const handlers = fakeRuntime()
-
-        render(wrapIntl(<SessionConsole cardId='card1'/>))
-        await waitFor(() => expect(bindings.AttachSession).toHaveBeenCalledWith('sess-q'))
-
-        handlers['acp:question']({
-            cardId: 'card1',
-            sessionId: 'sess-q',
-            requestId: 'q-1',
-            questions: [{
-                question: 'Какая цель рефакторинга?',
-                header: 'Цель',
-                multiSelect: false,
-                options: [
-                    {label: 'Читаемость', description: 'структура'},
-                    {label: 'Скорость', description: 'перф'},
-                ],
-            }],
-        })
-
-        await waitFor(() => expect(screen.getByText('Какая цель рефакторинга?')).toBeInTheDocument())
-        expect(screen.getByText('структура')).toBeInTheDocument()
-
-        // Nothing is sent until something is picked.
-        expect(screen.getByRole('button', {name: 'Ответить'})).toBeDisabled()
-
-        userEvent.click(screen.getByText('Читаемость'))
-        userEvent.click(screen.getByRole('button', {name: 'Ответить'}))
-
-        await waitFor(() => expect(bindings.AnswerQuestion).toHaveBeenCalled())
-        const [sessionId, requestId, text] = bindings.AnswerQuestion.mock.calls[0]
-        expect(sessionId).toBe('sess-q')
-        expect(requestId).toBe('q-1')
-        expect(text).toContain('Цель: Читаемость')
     })
 
     test('offers a repository when the card does not name one', async () => {

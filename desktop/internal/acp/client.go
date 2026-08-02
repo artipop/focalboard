@@ -28,6 +28,12 @@ type sessionClient struct {
 	chunkBuf     strings.Builder
 	chunkThought bool
 	chunkTimer   *time.Timer
+
+	// toolNames remembers what each tool call was called, because the agent
+	// announces a call and asks permission for it in two separate messages, and
+	// only the first one is required to carry a name.
+	toolMu    sync.Mutex
+	toolNames map[string]string // toolCallId → tool name
 }
 
 // emitChunk queues streamed text for the UI, flushing on a short timer or as
@@ -80,7 +86,7 @@ var _ acpsdk.Client = (*sessionClient)(nil)
 // goroutine, so the agent's session/update stream keeps flowing while the
 // prompt is on screen.
 func (c *sessionClient) RequestPermission(ctx context.Context, params acpsdk.RequestPermissionRequest) (acpsdk.RequestPermissionResponse, error) {
-	toolName := permissionToolName(params)
+	toolName := c.permissionToolName(params)
 	title := ""
 	if params.ToolCall.Title != nil {
 		title = *params.ToolCall.Title
@@ -213,11 +219,21 @@ func selectOption(params acpsdk.RequestPermissionRequest, kind acpsdk.Permission
 }
 
 // permissionToolName extracts the tool name the bridge put into the meta.
-func permissionToolName(params acpsdk.RequestPermissionRequest) string {
-	if params.ToolCall.Meta != nil {
-		if name, ok := params.ToolCall.Meta["toolName"].(string); ok && name != "" {
-			return name
-		}
+func (c *sessionClient) permissionToolName(params acpsdk.RequestPermissionRequest) string {
+	if name := metaToolName(params.ToolCall.Meta); name != "" {
+		return normalizeToolName(name)
+	}
+	// The call was announced before permission was asked for it, and that
+	// announcement is where an adapter puts the name.
+	if name := c.recalledToolName(string(params.ToolCall.ToolCallId)); name != "" {
+		return name
+	}
+	kind := ""
+	if params.ToolCall.Kind != nil {
+		kind = string(*params.ToolCall.Kind)
+	}
+	if name := inferToolName(kind, params.ToolCall.RawInput); name != "" {
+		return name
 	}
 	if params.ToolCall.Title != nil {
 		if name, _, found := strings.Cut(*params.ToolCall.Title, ":"); found {
@@ -226,6 +242,48 @@ func permissionToolName(params acpsdk.RequestPermissionRequest) string {
 		return *params.ToolCall.Title
 	}
 	return ""
+}
+
+// noteToolCall files whatever the announcement of a call tells us about which
+// tool it is: the name the agent gave it, else what its kind and input say.
+func (c *sessionClient) noteToolCall(id string, meta map[string]any, kind string, input any) {
+	name := normalizeToolName(metaToolName(meta))
+	if name == "" {
+		name = inferToolName(kind, input)
+	}
+	c.rememberToolName(id, name)
+}
+
+// rememberToolName files a named tool call under its id, so the permission
+// request that follows can be matched to it.
+func (c *sessionClient) rememberToolName(id, name string) {
+	if id == "" || name == "" {
+		return
+	}
+	c.toolMu.Lock()
+	defer c.toolMu.Unlock()
+	if c.toolNames == nil {
+		c.toolNames = make(map[string]string)
+	}
+	// A turn's worth of tool calls is small; a session's is not, and nothing
+	// tells us a call is finished with. Forgetting the oldest keeps a long
+	// console session from growing this without bound.
+	if len(c.toolNames) >= maxRememberedTools {
+		for k := range c.toolNames {
+			delete(c.toolNames, k)
+			break
+		}
+	}
+	c.toolNames[id] = name
+}
+
+// maxRememberedTools bounds the id → name map.
+const maxRememberedTools = 512
+
+func (c *sessionClient) recalledToolName(id string) string {
+	c.toolMu.Lock()
+	defer c.toolMu.Unlock()
+	return c.toolNames[id]
 }
 
 // isMCPLaunchPrompt spots an agent asking whether it may start an MCP server.
@@ -264,6 +322,8 @@ func (c *sessionClient) SessionUpdate(ctx context.Context, params acpsdk.Session
 		}
 	case u.ToolCall != nil:
 		c.flush() // keep the console in the order the agent produced it
+		c.noteToolCall(string(u.ToolCall.ToolCallId), u.ToolCall.Meta,
+			string(u.ToolCall.Kind), u.ToolCall.RawInput)
 		c.s.appendEvent(c.m, "tool_call", map[string]any{
 			"toolCallId": string(u.ToolCall.ToolCallId),
 			"title":      u.ToolCall.Title,
@@ -276,6 +336,14 @@ func (c *sessionClient) SessionUpdate(ctx context.Context, params acpsdk.Session
 			"status":     string(u.ToolCall.Status),
 		})
 	case u.ToolCallUpdate != nil:
+		// An update may be the first message that names the call: an adapter
+		// that fills the input in stages sends the name with every one of them.
+		kind := ""
+		if u.ToolCallUpdate.Kind != nil {
+			kind = string(*u.ToolCallUpdate.Kind)
+		}
+		c.noteToolCall(string(u.ToolCallUpdate.ToolCallId), u.ToolCallUpdate.Meta,
+			kind, u.ToolCallUpdate.RawInput)
 		status := ""
 		if u.ToolCallUpdate.Status != nil {
 			status = string(*u.ToolCallUpdate.Status)
@@ -330,11 +398,42 @@ func (c *sessionClient) jail(path string) (string, error) {
 	if root == "" {
 		return "", fmt.Errorf("session has no worktree")
 	}
-	if clean != root && !strings.HasPrefix(clean, root+string(filepath.Separator)) {
-		c.m.log.Warn("acp: fs access outside worktree denied", "session", c.s.ID, "path", clean)
-		return "", fmt.Errorf("path %s is outside the session worktree", clean)
+	// The agent may well spell the worktree differently than we do and still
+	// mean it: on macOS the temp and home trees are reached through symlinks
+	// (/var → /private/var), and an agent that resolved the path before asking
+	// would be refused its own working directory. Comparing against the
+	// resolved root as well is what makes both spellings the same place.
+	for _, candidate := range []string{clean, resolvedPath(clean)} {
+		for _, r := range []string{root, resolvedPath(root)} {
+			if underRoot(candidate, r) {
+				return clean, nil
+			}
+		}
 	}
-	return clean, nil
+	c.m.log.Warn("acp: fs access outside worktree denied", "session", c.s.ID, "path", clean)
+	return "", fmt.Errorf("path %s is outside the session worktree", clean)
+}
+
+// underRoot reports whether path is root or something inside it.
+func underRoot(path, root string) bool {
+	if root == "" {
+		return false
+	}
+	return path == root || strings.HasPrefix(path, root+string(filepath.Separator))
+}
+
+// resolvedPath follows symlinks, falling back to the path as given — a path
+// that cannot be resolved is not a reason to refuse everything. A file being
+// created does not exist yet, so its directory is resolved instead.
+func resolvedPath(path string) string {
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		return resolved
+	}
+	dir, base := filepath.Split(path)
+	if resolved, err := filepath.EvalSymlinks(filepath.Clean(dir)); err == nil {
+		return filepath.Join(resolved, base)
+	}
+	return path
 }
 
 // Terminal capability is not advertised.

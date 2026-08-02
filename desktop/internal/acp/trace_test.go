@@ -88,10 +88,10 @@ func TestTraceRecordsBothDirections(t *testing.T) {
 	// Streamed text is flushed on a short timer, so the trace is polled rather
 	// than read once — otherwise the test races the flush.
 	for _, want := range []struct{ dir, kind string }{
-		{TraceToCLI, "user"},           // what we sent the agent
-		{TraceFromCLI, "result"},       // what it sent back
-		{TraceToUI, EventChunk},        // what the console was told
-		{TraceFromUI, "PromptSession"}, // what the console asked of us
+		{TraceToCLI, "session/prompt"},   // what we sent the agent
+		{TraceFromCLI, "session/update"}, // what it sent back
+		{TraceToUI, EventChunk},          // what the console was told
+		{TraceFromUI, "PromptSession"},   // what the console asked of us
 	} {
 		w := want
 		waitFor(t, 5*time.Second, "trace record "+w.dir+" "+w.kind, func() bool {
@@ -114,37 +114,36 @@ func TestTraceRecordsBothDirections(t *testing.T) {
 	}
 }
 
-// A question that nobody answers is exactly the case the trace exists for.
-func TestTraceRecordsAnUnansweredQuestion(t *testing.T) {
-	m, _, _, _, _ := testManagerWithEmitter(t, fakeClaudeAsksQuestion, func(c *Config) {
+// A permission nobody answers is exactly the case the trace exists for.
+func TestTraceRecordsAnUnansweredPermission(t *testing.T) {
+	m, _, _, _, _ := testManagerWithEmitter(t, fakeClaudeSlowPermission, func(c *Config) {
 		c.DebugLog = true
 		c.PermissionTimeoutMinutes = 0 // times out at once
 	})
 	path := m.tr.Path()
 
 	s := liveSession(t, m, "cardTraceQ")
-	waitFor(t, 15*time.Second, "the turn to finish", func() bool {
-		return s.Status() == StatusIdle || s.Status().Terminal()
+	waitFor(t, 15*time.Second, "the prompt to time out", func() bool {
+		return hasTrace(traceLines(t, path), TraceApp, "permission_timeout")
 	})
 
 	recs := traceLines(t, path)
-	if !hasTrace(recs, TraceToUI, EventQuestion) {
-		t.Error("the question should be recorded on its way to the console")
+	if !hasTrace(recs, TraceToUI, EventPermission) {
+		t.Error("the prompt should be recorded on its way to the console")
 	}
-	if !hasTrace(recs, TraceApp, "question_timeout") {
-		t.Error("the timeout should be recorded, since that is what explains the agent guessing")
-	}
-	// And the denial carrying the explanation back to the agent.
-	var sawDeny bool
+	// The wire itself is traced now, for every kind, so the refusal we sent
+	// back to the agent has to be in there too.
+	var sawResponse bool
 	for _, r := range recs {
 		if r["dir"] != TraceToCLI {
 			continue
 		}
-		if b, _ := json.Marshal(r["payload"]); strings.Contains(string(b), "deny") {
-			sawDeny = true
+		if b, _ := json.Marshal(r["payload"]); strings.Contains(string(b), "outcome") {
+			sawResponse = true
 		}
 	}
-	if !sawDeny {
+	if !sawResponse {
 		t.Error("the answer sent back to the agent should be recorded")
 	}
+	_ = s
 }

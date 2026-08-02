@@ -120,21 +120,6 @@ func (e *fakeEmitter) pendingPermissionID() string {
 	return ""
 }
 
-// pendingQuestionID returns the request id of a question awaiting an answer.
-func (e *fakeEmitter) pendingQuestionID() string {
-	e.mu.Lock()
-	defer e.mu.Unlock()
-	for i, name := range e.events {
-		if name != EventQuestion {
-			continue
-		}
-		if id, ok := e.payloads[i]["requestId"].(string); ok {
-			return id
-		}
-	}
-	return ""
-}
-
 // fakeReader serves one card to the "open a console" path.
 type fakeReader struct{ ev CardMoved }
 
@@ -149,43 +134,21 @@ type fakeEvents struct{ ch chan CardMoved }
 
 func (f *fakeEvents) Subscribe(ctx context.Context) (<-chan CardMoved, error) { return f.ch, nil }
 
-// writeFakeClaude installs a shell script speaking just enough of the
-// stream-json protocol for the bridge: reads the user message, streams one
-// text delta, asks one permission, finishes with a result.
-func writeFakeClaude(t *testing.T, script string) string {
+func testManager(t *testing.T, scenario string, mutate func(*Config)) (*Manager, *fakeWriter, *fakeEvents, string) {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "fake-claude")
-	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	return path
-}
-
-const fakeClaudeHappy = `#!/bin/sh
-read line
-printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-1"}'
-printf '%s\n' '{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"fake work done"}}}'
-printf '%s\n' '{"type":"result","is_error":false,"result":"fake work done"}'
-`
-
-const fakeClaudeHang = `#!/bin/sh
-read line
-printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-2"}'
-sleep 300
-`
-
-func testManager(t *testing.T, claudeScript string, mutate func(*Config)) (*Manager, *fakeWriter, *fakeEvents, string) {
-	t.Helper()
-	m, w, ev, repo, _ := testManagerWithEmitter(t, claudeScript, mutate)
+	m, w, ev, repo, _ := testManagerWithEmitter(t, scenario, mutate)
 	return m, w, ev, repo
 }
 
-func testManagerWithEmitter(t *testing.T, claudeScript string, mutate func(*Config)) (*Manager, *fakeWriter, *fakeEvents, string, *fakeEmitter) {
+func testManagerWithEmitter(t *testing.T, scenario string, mutate func(*Config)) (*Manager, *fakeWriter, *fakeEvents, string, *fakeEmitter) {
 	t.Helper()
 	repo := initTestRepo(t)
 	dir := t.TempDir()
 	cfg := DefaultConfig(dir)
-	cfg.ClaudePath = writeFakeClaude(t, claudeScript)
+	// Every kind is an ACP process now, so the fallback path is the one that
+	// spells the agent out: the fake agent is the whole command.
+	cfg.AgentMode = agentModeCommand
+	cfg.AgentCommand = []string{writeFakeAgent(t, scenario)}
 	cfg.RepoWhitelist = []string{filepath.Dir(repo)}
 	cfg.WorktreeDir = filepath.Join(dir, "wt")
 	if mutate != nil {
@@ -401,7 +364,8 @@ func TestRecoveryMarksStaleFailed(t *testing.T) {
 	repo := initTestRepo(t)
 	dir := t.TempDir()
 	cfg := DefaultConfig(dir)
-	cfg.ClaudePath = writeFakeClaude(t, fakeClaudeHappy)
+	cfg.AgentMode = agentModeCommand
+	cfg.AgentCommand = []string{writeFakeAgent(t, fakeClaudeHappy)}
 	cfg.RepoWhitelist = []string{filepath.Dir(repo)}
 
 	dbPath := filepath.Join(dir, "acp.db")
@@ -432,36 +396,21 @@ func TestRecoveryMarksStaleFailed(t *testing.T) {
 	}
 }
 
-func TestFindClaudeErrorIsClear(t *testing.T) {
+// A missing adapter has to be said in the words that fix it — the package to
+// install — because it is the first thing a machine without one runs into.
+func TestMissingAdapterErrorIsActionable(t *testing.T) {
 	cfg := DefaultConfig(t.TempDir())
-	cfg.ClaudePath = "/definitely/not/here"
 	m := NewManager(cfg, "", nil, newFakeWriter(), &fakeEmitter{}, nil)
-	if _, err := m.findClaude(); err == nil || !strings.Contains(err.Error(), "claudePath") {
-		t.Errorf("expected clear claudePath error, got %v", err)
+	if _, err := m.agentLaunch(AgentEntry{Name: "c", Kind: "claude", BinPath: "/definitely/not/here"}); err == nil {
+		t.Fatal("a binPath that does not exist should error")
+	}
+	// Nothing installed and no npx: the message names the package.
+	t.Setenv("PATH", t.TempDir())
+	_, err := m.agentLaunch(AgentEntry{Name: "c", Kind: "claude"})
+	if err == nil || !strings.Contains(err.Error(), "@agentclientprotocol/claude-agent-acp") {
+		t.Errorf("expected the npm package in the error, got %v", err)
 	}
 }
-
-// fakeClaudeMultiTurn stays alive across turns the way the real CLI does,
-// answering every user message it reads with one text delta and a result.
-const fakeClaudeMultiTurn = `#!/bin/sh
-turn=0
-while read line; do
-  turn=$((turn+1))
-  printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-multi"}'
-  printf '{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"turn %s done"}}}\n' "$turn"
-  printf '{"type":"result","is_error":false,"result":"turn %s done"}\n' "$turn"
-done
-`
-
-// fakeClaudeAsksPermission requests a tool that is not on autoAllowTools, then waits
-// for the control_response before finishing the turn.
-const fakeClaudeAsksPermission = `#!/bin/sh
-read line
-printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-perm"}'
-printf '%s\n' '{"type":"control_request","request_id":"r1","request":{"subtype":"can_use_tool","tool_name":"WebFetch","tool_use_id":"tu1","description":"fetch https://example.com","input":{}}}'
-read response
-printf '%s\n' '{"type":"result","is_error":false,"result":"finished"}'
-`
 
 func liveSession(t *testing.T, m *Manager, cardID string) *Session {
 	t.Helper()
@@ -584,17 +533,6 @@ func TestIdleConsoleFreesConcurrencySlot(t *testing.T) {
 	}
 }
 
-// fakeClaudeSlowPermission waits before asking, leaving a window for a console
-// to attach to an already-running session.
-const fakeClaudeSlowPermission = `#!/bin/sh
-read line
-printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-slow"}'
-sleep 1
-printf '%s\n' '{"type":"control_request","request_id":"r1","request":{"subtype":"can_use_tool","tool_name":"WebFetch","tool_use_id":"tu1","description":"fetch https://example.com","input":{}}}'
-read response
-printf '%s\n' '{"type":"result","is_error":false,"result":"finished"}'
-`
-
 // A card-triggered session starts unattended, so opening its card mid-run must
 // be enough to get the permission prompt instead of a policy rejection.
 func TestConsoleAttachedAfterTriggerGetsPrompt(t *testing.T) {
@@ -626,16 +564,6 @@ func TestConsoleAttachedAfterTriggerGetsPrompt(t *testing.T) {
 	// Attaching also turned it into a console session: it waits rather than ending.
 	waitStatus(t, s, StatusIdle)
 }
-
-// fakeClaudeSlowTurn keeps one turn running long enough to close the card
-// while the agent is still working.
-const fakeClaudeSlowTurn = `#!/bin/sh
-while read line; do
-  printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-slow-turn"}'
-  sleep 1
-  printf '%s\n' '{"type":"result","is_error":false,"result":"done"}'
-done
-`
 
 // Closing the card mid-turn detaches a console that cannot end the session yet,
 // because it is not idle. The session must still not park afterwards: it would
@@ -686,22 +614,14 @@ func TestPromptDoesNotLeakConsoleCount(t *testing.T) {
 	waitStatus(t, s, StatusDone)
 }
 
-// fakeClaudeEcho answers every turn with a canned two-line "task", which is the
-// shape ComposeTask promises its caller.
-const fakeClaudeEcho = `#!/bin/sh
-while read line; do
-  printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-plan"}'
-  printf '%s\n' '{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Кэшировать список досок\nДобавить кеш в store и инвалидировать его на запись."}}}'
-  printf '%s\n' '{"type":"result","is_error":false,"result":"ok"}'
-done
-`
-
 // planningManager wires a manager whose registries hold one repo and one agent,
 // which is what a planning session resolves against.
 func planningManager(t *testing.T, script string) (*Manager, string) {
 	t.Helper()
 	m, _, _, repo, _ := testManagerWithEmitter(t, script, func(c *Config) {
-		c.Agents = []AgentEntry{{Name: "planner", Kind: AgentKindClaude}}
+		// The fake agent is the whole command, so the registry entry names it
+		// the way a user names an arbitrary ACP agent.
+		c.Agents = []AgentEntry{{Name: "planner", Kind: AgentKindACP, Command: c.AgentCommand}}
 	})
 	// The repo is created by the helper, so its path is only known now.
 	m.cfgMu.Lock()
@@ -826,62 +746,6 @@ func TestPlanningSessionRejectsUnknownRepository(t *testing.T) {
 
 	if _, err := m.StartPlanningSession("nope", "planner"); err == nil {
 		t.Fatal("expected an error for a repository that is not registered")
-	}
-}
-
-// fakeClaudeAsksQuestion drives the AskUserQuestion path: the CLI announces the
-// tool as a can_use_tool control request, then reports whether the answer came
-// back to it — which is the whole point, since the answers travel in the deny
-// message of that same control response.
-const fakeClaudeAsksQuestion = `#!/bin/sh
-read line
-printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-ask"}'
-printf '%s\n' '{"type":"control_request","request_id":"q1","request":{"subtype":"can_use_tool","tool_name":"AskUserQuestion","tool_use_id":"tu1","input":{"questions":[{"question":"Что рефакторим?","header":"Цель","multiSelect":false,"options":[{"label":"Читаемость","description":"структура"},{"label":"Скорость","description":"перф"}]}]}}}'
-read response
-case "$response" in
-  *behavior*deny*Читаемость*) seen=ANSWER_REACHED_AGENT ;;
-  *) seen=NO_ANSWER ;;
-esac
-printf '{"type":"stream_event","event":{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"%s"}}}\n' "$seen"
-printf '%s\n' '{"type":"result","is_error":false,"result":"done"}'
-`
-
-// The agent's questions must reach the console and the answers must come back
-// to the model — the tool's own picker cannot render in stream-json mode.
-func TestQuestionReachesConsoleAndAnswersComeBack(t *testing.T) {
-	m, _, _, _, emitter := testManagerWithEmitter(t, fakeClaudeAsksQuestion, nil)
-
-	s := liveSession(t, m, "cardAsk")
-
-	waitStatus(t, s, StatusWaitingPermission)
-	var requestID string
-	waitFor(t, 5*time.Second, "question on the console", func() bool {
-		requestID = emitter.pendingQuestionID()
-		return requestID != ""
-	})
-
-	if err := m.AnswerQuestion(s.ID, requestID, "Цель: Читаемость"); err != nil {
-		t.Fatalf("answer question: %v", err)
-	}
-	waitStatus(t, s, StatusIdle)
-
-	// The fake reports back whether the answer actually arrived at the CLI.
-	if got := lastAgentText(t, m, s); !strings.Contains(got, "ANSWER_REACHED_AGENT") {
-		t.Errorf("the answer should have reached the agent, got %q", got)
-	}
-}
-
-// An unattended session must not sit on a question: nobody can answer it.
-func TestQuestionWithoutConsoleIsRefusedAtOnce(t *testing.T) {
-	m, _, events, repo, emitter := testManagerWithEmitter(t, fakeClaudeAsksQuestion, nil)
-
-	events.ch <- moveEvent("cardAskAuto", repo, "opt-backlog", "opt-agent")
-	waitFor(t, 15*time.Second, "session to finish", func() bool {
-		sessions, _, err := m.store.SessionsForCard("cardAskAuto")
-		return err == nil && len(sessions) == 1 && sessions[0].Status.Terminal()
-	})
-	if id := emitter.pendingQuestionID(); id != "" {
-		t.Errorf("an unattended session should not have asked, got request %s", id)
 	}
 }
 

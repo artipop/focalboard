@@ -27,8 +27,8 @@ type RepoEntry struct {
 type AgentEntry struct {
 	Name    string            `json:"name"`              // registry key; matches the card "Agent" option
 	Kind    string            `json:"kind"`              // "claude" | "codex" | "antigravity" | "copilot" | "junie" | "acp"
-	BinPath string            `json:"binPath,omitempty"` // overrides binary discovery
-	Model   string            `json:"model,omitempty"`   // --model passed to the CLI
+	BinPath string            `json:"binPath,omitempty"` // overrides adapter discovery
+	Model   string            `json:"model,omitempty"`   // the model the adapter is asked for
 	Prompt  string            `json:"prompt,omitempty"`  // per-agent system prompt prepended to the task
 	Env     map[string]string `json:"env,omitempty"`     // per-process env (CODEX_HOME, OPENAI_API_KEY, …)
 	Args    []string          `json:"args,omitempty"`    // extra CLI args (sandbox/approval, etc.)
@@ -39,12 +39,12 @@ type AgentEntry struct {
 	// including argument patterns such as "Bash(git *)".
 	AutoAllowTools []string `json:"autoAllowTools,omitempty"`
 
-	// Command is the launch argv. For the ACP-native kinds it is the whole
-	// agent command (required for "acp"). For claude/codex it replaces the
-	// binary the bridge builds its invocation on: the last element is the CLI
-	// and anything before it is a wrapper — `proxychains4 -f myproxy.conf claude`,
-	// a per-account shim script — while the bridge still appends its own
-	// protocol flags. Takes precedence over BinPath.
+	// Command is the launch argv, and it is the whole agent command (required
+	// for "acp"): what it replaces is the adapter binary we would have looked
+	// up, so a wrapper gets in front of it — `proxychains4 -f myproxy.conf
+	// codex-acp`, a per-account shim script. Takes precedence over BinPath, and
+	// with it set nothing of ours is appended, so the flags the kind would have
+	// carried (the ACP switch, the model) have to be spelled out.
 	Command []string `json:"command,omitempty"`
 
 	// MCPServers are the agent's own MCP servers, spawned alongside the one a
@@ -364,8 +364,9 @@ func spawnEnv(a AgentEntry, net NetworkSettings) (env []string, drop []string) {
 	return env, drop
 }
 
-// Agent kinds. claude/codex run through in-process bridges; the rest are
-// ACP-native CLIs spawned over stdio (no bridge).
+// Agent kinds. Every one of them is an ACP agent spawned over stdio and talked
+// to in pure ACP — claude and codex through the adapters their vendors ship,
+// the rest through CLIs that speak ACP themselves.
 const (
 	AgentKindClaude      = "claude"
 	AgentKindCodex       = "codex"
@@ -382,21 +383,81 @@ var AgentKinds = []string{
 	AgentKindACP,
 }
 
-// acpNative describes an ACP-native CLI we know how to launch ourselves: the
-// binary to look for and the flag that puts it into ACP-over-stdio mode. All of
-// them also take `--model <name>`. The generic acp kind is deliberately absent —
-// it carries its own Command.
-var acpNative = map[string]struct{ bin, acpFlag string }{
-	AgentKindAntigravity: {"antigravity", "--acp"},
-	AgentKindCopilot:     {"copilot", "--acp"},    // github/copilot-cli, stdio is its default transport
-	AgentKindJunie:       {"junie", "--acp=true"}, // JetBrains Junie CLI takes a boolean value
+// acpAdapter is everything that differs between one ACP agent and another: the
+// binary to look for, the package that provides it when it is missing, the
+// flags that select ACP-over-stdio, how a model is asked for, what the process
+// must not inherit, and the mode to switch it into once connected.
+//
+// Everything else — the connection, MCP servers, permissions, cancellation,
+// turn budgets — is the same code for every kind, which is the point of the
+// table: adding an agent is a row, not a branch.
+type acpAdapter struct {
+	// bin is the executable, looked up on PATH and in the usual install spots.
+	bin string
+	// npmPackage provides bin when it is not installed. The two vendor adapters
+	// are published there and nowhere else, so it doubles as the install
+	// instruction we show and the argument to npx when we fall back to it.
+	npmPackage string
+	// acpArgs put the CLI into ACP-over-stdio mode. Empty when it has no other
+	// mode to be in.
+	acpArgs []string
+	// modelArgs, modelEnv and modelConfig are the three ways an agent is told
+	// which model to use: a launch flag, a variable, or a session config option
+	// asked for over ACP once the session exists.
+	modelArgs   func(model string) []string
+	modelEnv    string
+	modelConfig string
+	// dropEnv names variables the process must not inherit from ours.
+	dropEnv []string
+	// mode is the session mode to select after session/new, when the agent's
+	// default is not what a card wants.
+	mode string
 }
 
-// IsExternalACP reports whether the kind is an ACP-native external agent
-// (spawned over stdio and talked to in pure ACP, no bridge translation).
-func IsExternalACP(kind string) bool {
+// dashDashModel is the spelling every ACP-native CLI uses.
+func dashDashModel(model string) []string { return []string{"--model", model} }
+
+// acpNative is the table of agents we know how to launch. The generic acp kind
+// is deliberately absent — it carries its own Command.
+var acpNative = map[string]acpAdapter{
+	// The Claude adapter embeds the Claude Agent SDK, which embeds the CLI, so
+	// the claude binary is not needed alongside it. It is a Node package and
+	// there is no other build of it, which is why the desktop app needs Node.js
+	// for this kind.
+	AgentKindClaude: {
+		bin:        "claude-agent-acp",
+		npmPackage: "@agentclientprotocol/claude-agent-acp",
+		// The adapter takes no flags at all: it is an ACP agent and nothing else.
+		modelEnv: "ANTHROPIC_MODEL",
+		// Claude Code refuses to start inside another Claude Code session, and
+		// the desktop app may well have been launched from one.
+		dropEnv: []string{"CLAUDECODE"},
+	},
+	// The Codex adapter drives the codex CLI it depends on, so this kind needs
+	// Node.js too.
+	AgentKindCodex: {
+		bin:        "codex-acp",
+		npmPackage: "@agentclientprotocol/codex-acp",
+		// It takes no flags either: the model is a session config option, asked
+		// for over the protocol once the session exists.
+		modelConfig: "model",
+		// It starts read-only, which is not what a card asked for: a session
+		// that may not edit anything would spend its turn saying so.
+		mode: "agent",
+	},
+	AgentKindAntigravity: {bin: "antigravity", acpArgs: []string{"--acp"}, modelArgs: dashDashModel},
+	AgentKindCopilot:     {bin: "copilot", acpArgs: []string{"--acp"}, modelArgs: dashDashModel}, // github/copilot-cli, stdio is its default transport
+	AgentKindJunie:       {bin: "junie", acpArgs: []string{"--acp=true"}, modelArgs: dashDashModel},
+}
+
+// agentModeCommand is the AgentMode that names no kind: the agent is whatever
+// AgentCommand spells out.
+const agentModeCommand = "acp-command"
+
+// knownAdapter reports whether the kind is one we know how to launch ourselves.
+func knownAdapter(kind string) bool {
 	_, ok := acpNative[kind]
-	return ok || kind == AgentKindACP
+	return ok
 }
 
 // Config controls the agent integration. It is stored as JSON in the app data
@@ -405,11 +466,10 @@ func IsExternalACP(kind string) bool {
 type Config struct {
 	Enabled bool `json:"enabled"`
 
-	// AgentMode selects how sessions run: "claude" (built-in bridge spawning
-	// the claude binary) or "acp-command" (arbitrary external ACP agent).
+	// AgentMode is the kind a card falls back to when the agent registry is
+	// empty: one of the kinds above, or "acp-command" for the argv in
+	// AgentCommand.
 	AgentMode string `json:"agentMode"`
-	// ClaudePath overrides claude binary discovery for agentMode "claude".
-	ClaudePath string `json:"claudePath,omitempty"`
 	// AgentCommand is the argv of an external ACP agent for agentMode "acp-command".
 	AgentCommand []string `json:"agentCommand,omitempty"`
 

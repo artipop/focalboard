@@ -98,6 +98,29 @@ func (a *App) RemoveAgentRepo(name string) error {
 	return a.mgr.RemoveRepo(name)
 }
 
+// ListAgentAdapters reports, per agent kind, whether it can be started on this
+// machine — the adapter is installed, npx would fetch it, or Node.js is missing
+// — so the dialog can say it instead of a card failing later.
+func (a *App) ListAgentAdapters() (string, error) {
+	if a.mgr == nil {
+		return "[]", nil
+	}
+	out, err := json.Marshal(a.mgr.AdapterStatuses())
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// InstallAgentAdapter installs a kind's adapter with npm and returns npm's own
+// output, so a failure is readable.
+func (a *App) InstallAgentAdapter(kind string) (string, error) {
+	if a.mgr == nil {
+		return "", errACPDisabled
+	}
+	return a.mgr.InstallAdapter(kind)
+}
+
 // ListAgents returns the agent registry as JSON: [{"name","kind",…}, …].
 func (a *App) ListAgents() (string, error) {
 	if a.mgr == nil {
@@ -543,15 +566,6 @@ func (a *App) AnswerPermission(sessionID, requestID, optionID string) error {
 		return errACPDisabled
 	}
 	return a.mgr.AnswerPermission(sessionID, requestID, optionID)
-}
-
-// AnswerQuestion delivers the user's answers to the agent's questions. text is
-// what the model will read, composed by the console from the picker.
-func (a *App) AnswerQuestion(sessionID, requestID, text string) error {
-	if a.mgr == nil {
-		return errACPDisabled
-	}
-	return a.mgr.AnswerQuestion(sessionID, requestID, text)
 }
 
 // AttachSession marks the console as watching a session, keeping it alive

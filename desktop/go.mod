@@ -5,7 +5,6 @@ go 1.25.0
 replace github.com/mattermost/focalboard/server => ../server
 
 require (
-	github.com/beyond5959/acp-adapter v0.3.8
 	github.com/coder/acp-go-sdk v0.13.5
 	github.com/google/uuid v1.6.0
 	github.com/mattermost/focalboard/server v0.0.0-20230104182634-f909c2552e37

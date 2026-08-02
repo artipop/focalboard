@@ -12,7 +12,7 @@ import Button from '../../widgets/buttons/button'
 import Dialog from '../dialog'
 
 import {agentBindings} from './agentReposDialog'
-import {AGENT_KINDS, textToServers} from './agentsDialog'
+import {AGENT_KINDS, textToServers, AdapterStatus} from './agentsDialog'
 
 import './boardSetupWizard.scss'
 
@@ -114,6 +114,7 @@ const BoardSetupWizard = (props: Props) => {
 
     // Step 4: what tests with.
     const [serversText, setServersText] = useState(BROWSER_SERVER)
+    const [adapters, setAdapters] = useState<AdapterStatus[]>([])
 
     const refresh = useCallback(async () => {
         try {
@@ -121,14 +122,22 @@ const BoardSetupWizard = (props: Props) => {
             if (loaded) {
                 setRegistry(loaded)
             }
+
+            // A fresh machine is exactly where the agent's adapter is missing,
+            // so the step that asks for an agent is where that has to be said.
+            if (bindings?.ListAgentAdapters) {
+                setAdapters(JSON.parse(await bindings.ListAgentAdapters()) || [])
+            }
         } catch (e) {
             setError(String(e))
         }
-    }, [])
+    }, [bindings])
 
     useEffect(() => {
         refresh()
     }, [refresh])
+
+    const adapterStatus = adapters.find((a) => a.kind === agentKind)
 
     // Every step does its work through the same registry calls the dialogs use,
     // and shows what Go says when it refuses.
@@ -242,7 +251,7 @@ const BoardSetupWizard = (props: Props) => {
         case STEP_AGENT:
             return (
                 <div className='BoardSetupWizard__step'>
-                    <p>{intl.formatMessage({id: 'BoardSetup.agent-why', defaultMessage: 'The agent that picks a card up. Its binary has to be installed and logged in already; here it is only given a name.'})}</p>
+                    <p>{intl.formatMessage({id: 'BoardSetup.agent-why', defaultMessage: 'The agent that picks a card up. It has to be logged in already; here it is only given a name.'})}</p>
                     {hasAgent &&
                         <div className='BoardSetupWizard__known'>
                             {intl.formatMessage({id: 'BoardSetup.agent-known', defaultMessage: 'Already registered: {names}'}, {names: registry.agents.map((a) => a.name).join(', ')})}
@@ -268,6 +277,8 @@ const BoardSetupWizard = (props: Props) => {
                             ))}
                         </select>
                     </label>
+                    {adapterStatus && !adapterStatus.ready &&
+                        <div className='BoardSetupWizard__warning'>{adapterStatus.detail}</div>}
                 </div>
             )
         case STEP_DEPLOY:

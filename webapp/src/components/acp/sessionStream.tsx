@@ -9,6 +9,7 @@
 // The Wails runtime methods are PascalCase, not constructors.
 /* eslint-disable new-cap */
 import React, {useEffect, useRef, useState} from 'react'
+import {useIntl} from 'react-intl'
 
 import {Utils} from '../../utils'
 import Button from '../../widgets/buttons/button'
@@ -25,14 +26,6 @@ export function isLive(status?: SessionStatus): boolean {
     return Boolean(status && liveStatuses.includes(status))
 }
 
-// One question the agent is asking, mirroring claude's AskUserQuestion input.
-export type Question = {
-    question: string
-    header?: string
-    multiSelect?: boolean
-    options?: Array<{label: string, description?: string}>
-}
-
 export type PermissionOption = {
     optionId: string
     name: string
@@ -45,8 +38,7 @@ export type Entry =
     | {kind: 'prompt', text: string}
     | {kind: 'error', text: string}
     | {kind: 'tool', toolCallId: string, title?: string, status?: string}
-    | {kind: 'permission', requestId?: string, tool?: string, title?: string, options?: PermissionOption[], decision?: string}
-    | {kind: 'question', requestId?: string, questions: Question[], answer?: string}
+    | {kind: 'permission', requestId?: string, tool?: string, title?: string, options?: PermissionOption[], decision?: string, byPolicy?: boolean}
 
 export type SessionRecord = {
     id: string
@@ -93,15 +85,6 @@ export function entriesFromStored(events: StoredEvent[]): Entry[] {
         case 'error':
             entries = appendEntry(entries, {kind: 'error', text: p.text || ''})
             break
-        case 'question':
-            entries = appendEntry(entries, {kind: 'question', requestId: p.requestId, questions: p.questions || []})
-            break
-        case 'answer':
-            // Replay shows the question already answered, not still open.
-            entries = entries.map((e) => (
-                e.kind === 'question' && e.requestId === p.requestId ?
-                    {...e, requestId: undefined, answer: p.text} : e))
-            break
         case 'tool_call':
             entries = appendEntry(entries, {kind: 'tool', toolCallId: p.toolCallId, title: p.title, status: p.status})
             break
@@ -117,6 +100,7 @@ export function entriesFromStored(events: StoredEvent[]): Entry[] {
                 title: p.title,
                 options: p.pending ? p.options : undefined,
                 decision: p.decision,
+                byPolicy: p.byPolicy,
             })
             break
         default:
@@ -204,22 +188,6 @@ export function useSessionStream(match: StreamMatch, onSession?: (payload: any) 
                     setEntries((prev) => appendEntry(prev, {kind: 'prompt', text: payload.text}))
                 }
             }),
-            runtime.EventsOn('acp:question', (payload: any) => {
-                if (mine(payload)) {
-                    setEntries((prev) => appendEntry(prev, {
-                        kind: 'question',
-                        requestId: payload.requestId,
-                        questions: payload.questions || [],
-                    }))
-                }
-            }),
-            runtime.EventsOn('acp:answer', (payload: any) => {
-                if (mine(payload)) {
-                    setEntries((prev) => prev.map((e) => (
-                        e.kind === 'question' && e.requestId === payload.requestId ?
-                            {...e, requestId: undefined, answer: payload.text} : e)))
-                }
-            }),
             runtime.EventsOn('acp:tool', (payload: any) => {
                 if (mine(payload)) {
                     setEntries((prev) => appendEntry(prev, {
@@ -241,7 +209,7 @@ export function useSessionStream(match: StreamMatch, onSession?: (payload: any) 
                         const pending = idx >= 0 ? prev[idx] : undefined
                         if (pending?.kind === 'permission') {
                             const next = [...prev]
-                            next[idx] = {...pending, requestId: undefined, options: undefined, decision: payload.decision}
+                            next[idx] = {...pending, requestId: undefined, options: undefined, decision: payload.decision, byPolicy: payload.byPolicy}
                             return next
                         }
                     }
@@ -252,6 +220,7 @@ export function useSessionStream(match: StreamMatch, onSession?: (payload: any) 
                         title: payload.title,
                         options: payload.options,
                         decision: payload.decision,
+                        byPolicy: payload.byPolicy,
                     })
                 })
             }),
@@ -280,22 +249,14 @@ MarkdownText.displayName = 'MarkdownText'
 type EntryProps = {
     entry: Entry
     onAnswer: (requestId: string, optionId: string) => void
-    onAnswerQuestion?: (requestId: string, text: string) => void
 }
 
 export const ConsoleEntry = React.memo((props: EntryProps) => {
     const {entry, onAnswer} = props
+    const intl = useIntl()
 
     if (entry.kind === 'prompt') {
         return <div className='SessionConsole__entry SessionConsole__entry--prompt'>{entry.text}</div>
-    }
-    if (entry.kind === 'question') {
-        return (
-            <QuestionEntry
-                entry={entry}
-                onSubmit={props.onAnswerQuestion}
-            />
-        )
     }
     if (entry.kind === 'error') {
         return <div className='SessionConsole__entry SessionConsole__entry--failed'>{entry.text}</div>
@@ -320,13 +281,16 @@ export const ConsoleEntry = React.memo((props: EntryProps) => {
         )
     }
 
-    // Permission: still pending (buttons) or already decided (a record).
+    // Permission: a question with buttons, or a record of one already settled.
+    // The two must not look alike — a decision the policy made needs no answer,
+    // and a box that looks like a prompt nobody can answer reads as broken.
+    const pending = Boolean(entry.requestId && entry.options)
     return (
-        <div className='SessionConsole__entry SessionConsole__entry--permission'>
+        <div className={`SessionConsole__entry SessionConsole__entry--permission${pending ? '' : ' SessionConsole__entry--permissionDecided'}`}>
             <div className='SessionConsole__permissionTitle'>{entry.title || entry.tool}</div>
-            {entry.requestId && entry.options ?
+            {pending ?
                 <div className='SessionConsole__permissionOptions'>
-                    {entry.options.map((opt) => (
+                    {entry.options!.map((opt) => (
                         <Button
                             key={opt.optionId}
                             filled={opt.kind === 'allow_once'}
@@ -336,110 +300,23 @@ export const ConsoleEntry = React.memo((props: EntryProps) => {
                         </Button>
                     ))}
                 </div> :
-                <span className='SessionConsole__permissionDecision'>{entry.decision}</span>}
+                <span className='SessionConsole__permissionDecision'>
+                    {entry.byPolicy ?
+                        intl.formatMessage(
+                            {id: 'SessionConsole.permission-by-policy', defaultMessage: '{decision} — automatically, by the tool policy'},
+                            {decision: entry.decision},
+                        ) :
+                        entry.decision}
+                </span>}
         </div>
     )
 })
 ConsoleEntry.displayName = 'ConsoleEntry'
 
-// QuestionEntry renders the agent's own questions as a picker. Answers are
-// composed into the text the model reads — the transport back to it is a single
-// string, so the shape has to be readable rather than structured.
-const QuestionEntry = (props: {
-    entry: Extract<Entry, {kind: 'question'}>
-    onSubmit?: (requestId: string, text: string) => void
-}) => {
-    const {entry, onSubmit} = props
-    const [picked, setPicked] = useState<{[index: number]: string[]}>({})
-    const [notes, setNotes] = useState<{[index: number]: string}>({})
-
-    const toggle = (qi: number, label: string, multi: boolean) => {
-        setPicked((prev) => {
-            const current = prev[qi] || []
-            if (!multi) {
-                return {...prev, [qi]: current.includes(label) ? [] : [label]}
-            }
-            return {
-                ...prev,
-                [qi]: current.includes(label) ? current.filter((l) => l !== label) : [...current, label],
-            }
-        })
-    }
-
-    const answered = entry.questions.every((_, qi) => (picked[qi]?.length || notes[qi]?.trim()))
-
-    const submit = () => {
-        if (!entry.requestId || !onSubmit) {
-            return
-        }
-        const lines = entry.questions.map((q, qi) => {
-            const parts = [...(picked[qi] || [])]
-            if (notes[qi]?.trim()) {
-                parts.push(notes[qi].trim())
-            }
-            return `${qi + 1}. ${q.header || q.question}: ${parts.join('; ') || '—'}`
-        })
-        onSubmit(entry.requestId, `Ответы пользователя:\n${lines.join('\n')}`)
-    }
-
-    if (!entry.requestId) {
-        return (
-            <div className='SessionConsole__entry SessionConsole__entry--question is-answered'>
-                {entry.questions.map((q, qi) => (
-                    <div
-                        key={qi}
-                        className='SessionConsole__questionText'
-                    >{q.question}</div>
-                ))}
-                {entry.answer && <div className='SessionConsole__questionAnswer'>{entry.answer}</div>}
-            </div>
-        )
-    }
-
-    return (
-        <div className='SessionConsole__entry SessionConsole__entry--question'>
-            {entry.questions.map((q, qi) => (
-                <div
-                    key={qi}
-                    className='SessionConsole__question'
-                >
-                    <div className='SessionConsole__questionText'>{q.question}</div>
-                    <div className='SessionConsole__questionOptions'>
-                        {(q.options || []).map((opt) => (
-                            <button
-                                key={opt.label}
-                                type='button'
-                                className={`SessionConsole__option${(picked[qi] || []).includes(opt.label) ? ' is-picked' : ''}`}
-                                onClick={() => toggle(qi, opt.label, Boolean(q.multiSelect))}
-                            >
-                                <span className='SessionConsole__optionLabel'>{opt.label}</span>
-                                {opt.description && <span className='SessionConsole__optionDescription'>{opt.description}</span>}
-                            </button>
-                        ))}
-                    </div>
-                    <input
-                        type='text'
-                        className='SessionConsole__questionNote'
-                        value={notes[qi] || ''}
-                        placeholder='Свой ответ'
-                        onChange={(e) => setNotes((prev) => ({...prev, [qi]: e.target.value}))}
-                    />
-                </div>
-            ))}
-            <Button
-                filled={true}
-                onClick={submit}
-                disabled={!answered}
-            >{'Ответить'}</Button>
-        </div>
-    )
-}
-
 // Transcript renders the whole conversation and follows the stream.
 export const Transcript = (props: {
     entries: Entry[]
     onAnswer: (requestId: string, optionId: string) => void
-    onAnswerQuestion?: (requestId: string, text: string) => void
 }) => {
     const scrollRef = React.useRef<HTMLDivElement>(null)
 
@@ -462,7 +339,6 @@ export const Transcript = (props: {
                     key={i}
                     entry={entry}
                     onAnswer={props.onAnswer}
-                    onAnswerQuestion={props.onAnswerQuestion}
                 />
             ))}
         </div>
