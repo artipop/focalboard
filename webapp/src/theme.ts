@@ -272,10 +272,19 @@ export function getSelectBaseStyle() {
         }),
         input: (provided: CSSObject): CSSObject => ({
             ...provided,
+            color: 'rgb(var(--center-channel-color-rgb))',
             paddingBottom: 0,
             paddingTop: 0,
             marginBottom: 0,
             marginTop: 0,
+        }),
+        placeholder: (provided: CSSObject): CSSObject => ({
+            ...provided,
+            color: 'rgba(var(--center-channel-color-rgb), 0.4)',
+        }),
+        multiValueLabel: (provided: CSSObject): CSSObject => ({
+            ...provided,
+            color: 'rgb(var(--center-channel-color-rgb))',
         }),
         menuList: (provided: CSSObject): CSSObject => ({
             ...provided,
