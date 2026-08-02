@@ -3,7 +3,7 @@
 
 // The Wails-generated Go bindings are PascalCase methods, not constructors.
 /* eslint-disable new-cap */
-import React, {useCallback, useEffect, useState} from 'react'
+import React, {useCallback, useEffect, useRef, useState} from 'react'
 import {useIntl} from 'react-intl'
 
 import {Board, IPropertyTemplate, IPropertyOption} from '../../blocks/board'
@@ -53,7 +53,33 @@ type AgentEntry = {
     command?: string[]
     mcpServers?: AgentMCPServers
     proxyName?: string
+
+    // The agent's own settings: an ACP config option id mapped to the value
+    // asked for ({"fast": "on"}). Which ones exist is the agent's answer, not
+    // a list of ours — see AgentOption below.
+    options?: {[id: string]: string}
 }
+
+// One setting the agent itself declares (Fast mode, effort, permission mode),
+// as the manager reports it after asking the agent. An agent that has none is
+// offered none: there is nothing to choose from.
+export type AgentOption = {
+    id: string
+    name: string
+    description?: string
+    type: 'select' | 'boolean'
+    category?: string
+    current: string
+    values?: Array<{value: string, name?: string, description?: string}>
+}
+
+// The Model field above is the same setting as the agent's "model" option, so
+// the options list leaves it to the field rather than asking twice.
+const MODEL_OPTION_ID = 'model'
+
+// A boolean option is drawn as the same dropdown as a select, so "leave it as
+// the agent has it" stays expressible alongside on and off.
+const booleanValues = [{value: 'on'}, {value: 'off'}]
 
 // Whether a kind can be started on this machine, as the manager reports it.
 export type AdapterStatus = {
@@ -180,6 +206,42 @@ function joinArgv(argv?: string[]): string {
     return (argv || []).map((a) => (whitespace.test(a) ? `"${a}"` : a)).join(' ')
 }
 
+// optionValues are the values a setting can be given. A boolean is offered as
+// on/off, which is also how it is stored, so the whole panel is one control.
+export function optionValues(option: AgentOption): Array<{value: string, name?: string}> {
+    if (option.type === 'boolean') {
+        return booleanValues
+    }
+    return option.values || []
+}
+
+// optionValueLabel names the value the agent already holds, for the "leave it
+// alone" entry. A boolean arrives as true/false and reads as on/off.
+export function optionValueLabel(option: AgentOption, value: string): string {
+    if (option.type === 'boolean') {
+        return value === 'true' ? 'on' : 'off'
+    }
+    const known = (option.values || []).find((v) => v.value === value)
+    return known?.name || value
+}
+
+// keptOptions drops the settings this agent does not offer: switching an entry
+// from an agent that has Fast mode to one that has not would otherwise leave a
+// value in the config that nothing shows and nothing applies.
+export function keptOptions(
+    chosen: {[id: string]: string} | undefined,
+    offered: AgentOption[],
+): {[id: string]: string} {
+    const kept: {[id: string]: string} = {}
+    for (const option of offered) {
+        const value = chosen?.[option.id]
+        if (value) {
+            kept[option.id] = value
+        }
+    }
+    return kept
+}
+
 const emptyForm: AgentEntry = {name: '', kind: 'claude'}
 
 type Props = {
@@ -204,6 +266,13 @@ const AgentsDialog = (props: Props) => {
     const [adapters, setAdapters] = useState<AdapterStatus[]>([])
     const [installing, setInstalling] = useState('')
     const [error, setError] = useState('')
+
+    // What the agent being edited says it can be configured with. Empty until
+    // it has been asked, and empty for good if it declares nothing.
+    const [agentOptions, setAgentOptions] = useState<AgentOption[]>([])
+    const [probing, setProbing] = useState(false)
+    const [probed, setProbed] = useState(false)
+    const [probeError, setProbeError] = useState('')
 
     const refresh = useCallback(async () => {
         if (!bindings?.ListAgents) {
@@ -283,6 +352,74 @@ const AgentsDialog = (props: Props) => {
         }
     }, [bindings, form?.kind, adapter?.package, intl, refresh])
 
+    // Which settings an agent has is the agent's own answer: it is started the
+    // way a session would start it and asked, over ACP, what it can be
+    // configured with. So Fast mode appears for an agent that has Fast mode and
+    // for no other, and an agent that grows a setting shows it here without
+    // anything being taught about it.
+    //
+    // probeToken drops an answer that arrives after the form moved on to
+    // another agent, which is easy to do while a probe takes a second or two.
+    const probeToken = useRef(0)
+    const forgetOptions = useCallback(() => {
+        probeToken.current++
+        setAgentOptions([])
+        setProbed(false)
+        setProbeError('')
+        setProbing(false)
+    }, [])
+
+    const probeAgent = useCallback(async (entry: AgentEntry, recheck: boolean) => {
+        if (!bindings?.AgentOptions) {
+            return
+        }
+
+        // Nothing has been said yet about what to start.
+        if (entry.kind === 'acp' && (entry.command || []).length === 0) {
+            forgetOptions()
+            return
+        }
+        const token = ++probeToken.current
+        setProbing(true)
+        setProbeError('')
+        try {
+            const reported = JSON.parse(await bindings.AgentOptions(JSON.stringify(entry), recheck)) || []
+            if (token !== probeToken.current) {
+                return
+            }
+            setAgentOptions(reported)
+            setProbed(true)
+        } catch (e) {
+            if (token !== probeToken.current) {
+                return
+            }
+
+            // Not an error of the form: the agent could not be asked (no
+            // adapter, no account), and everything else here still saves.
+            setAgentOptions([])
+            setProbed(false)
+            setProbeError(String(e))
+        } finally {
+            if (token === probeToken.current) {
+                setProbing(false)
+            }
+        }
+    }, [bindings, forgetOptions])
+
+    // The entry as the form currently describes it, which is what the probe
+    // starts and what "Save" writes.
+    const formEntry = useCallback((): AgentEntry => ({
+        ...(form || emptyForm),
+        name: (form?.name || '').trim(),
+        env: textToEnv(envText),
+        args: splitArgv(argsText),
+        command: splitArgv(commandText),
+    }), [form, envText, argsText, commandText])
+
+    // The agent is asked when the form opens and when the kind changes — the
+    // moments its answer can differ. The launch details (binary, command,
+    // environment) are re-read on "Recheck" alone, so typing a path does not
+    // start an agent on every keystroke.
     const startAdd = useCallback(() => {
         setForm({...emptyForm})
         setEnvText('')
@@ -291,7 +428,9 @@ const AgentsDialog = (props: Props) => {
         setCommandText('')
         setEditingName(null)
         setError('')
-    }, [])
+        forgetOptions()
+        probeAgent({...emptyForm}, false)
+    }, [forgetOptions, probeAgent])
 
     const startEdit = useCallback((agent: AgentEntry) => {
         setForm({...agent})
@@ -301,7 +440,21 @@ const AgentsDialog = (props: Props) => {
         setCommandText(joinArgv(agent.command))
         setEditingName(agent.name)
         setError('')
-    }, [])
+        forgetOptions()
+        probeAgent(agent, false)
+    }, [forgetOptions, probeAgent])
+
+    // Another kind is another agent, with settings of its own.
+    const changeKind = useCallback((kind: string) => {
+        setForm((f) => (f ? {...f, kind} : f))
+        forgetOptions()
+        probeAgent({...formEntry(), kind}, false)
+    }, [forgetOptions, probeAgent, formEntry])
+
+    const closeForm = useCallback(() => {
+        setForm(null)
+        forgetOptions()
+    }, [forgetOptions])
 
     const saveForm = useCallback(async () => {
         if (!bindings || !form) {
@@ -316,11 +469,13 @@ const AgentsDialog = (props: Props) => {
             return
         }
         const entry: AgentEntry = {
-            ...form,
-            name: form.name.trim(),
-            env: textToEnv(envText),
-            args: splitArgv(argsText),
-            command: splitArgv(commandText),
+            ...formEntry(),
+
+            // Settings the agent no longer offers are dropped rather than kept
+            // as a line in the config nobody can see or unset — switching the
+            // kind is how they get there. Only a probe that answered may do
+            // this: an agent that could not be asked keeps what it has.
+            options: probed ? keptOptions(form.options, agentOptions) : form.options,
             mcpServers,
         }
         try {
@@ -329,12 +484,12 @@ const AgentsDialog = (props: Props) => {
             } else {
                 await bindings.AddAgent!(JSON.stringify(entry))
             }
-            setForm(null)
+            closeForm()
             await refresh()
         } catch (e) {
             setError(String(e))
         }
-    }, [bindings, form, intl, envText, serversText, argsText, commandText, editingName, refresh])
+    }, [bindings, form, intl, formEntry, serversText, editingName, refresh, probed, agentOptions, closeForm])
 
     const removeAgent = useCallback(async (name: string) => {
         if (!bindings?.RemoveAgent) {
@@ -410,6 +565,10 @@ const AgentsDialog = (props: Props) => {
 
     const updateForm = (patch: Partial<AgentEntry>) => setForm((f) => (f ? {...f, ...patch} : f))
 
+    // The model is asked for by the field above, so it is not asked for twice.
+    const tunableOptions = agentOptions.filter((o) => o.id !== MODEL_OPTION_ID)
+    const modelOption = agentOptions.find((o) => o.id === MODEL_OPTION_ID)
+
     return (
         <Dialog
             className='AgentsDialog'
@@ -454,7 +613,7 @@ const AgentsDialog = (props: Props) => {
                             {intl.formatMessage({id: 'Agents.kind', defaultMessage: 'Kind'})}
                             <select
                                 value={form.kind}
-                                onChange={(e) => updateForm({kind: e.target.value})}
+                                onChange={(e) => changeKind(e.target.value)}
                             >
                                 {AGENT_KINDS.map((kind) => (
                                     <option
@@ -481,10 +640,23 @@ const AgentsDialog = (props: Props) => {
                         )}
                         <label>
                             {intl.formatMessage({id: 'Agents.model', defaultMessage: 'Model (optional)'})}
+                            {/* Free text still, because an agent may take a
+                                model it does not list; the list is what this
+                                one said it has. */}
                             <input
                                 value={form.model || ''}
+                                list={modelOption ? 'AgentsDialog__models' : undefined}
                                 onChange={(e) => updateForm({model: e.target.value})}
                             />
+                            {modelOption &&
+                                <datalist id='AgentsDialog__models'>
+                                    {(modelOption.values || []).map((value) => (
+                                        <option
+                                            key={value.value}
+                                            value={value.value}
+                                        >{value.name}</option>
+                                    ))}
+                                </datalist>}
                         </label>
                         <label>
                             {intl.formatMessage({id: 'Agents.binPath', defaultMessage: 'Binary path (optional)'})}
@@ -501,6 +673,66 @@ const AgentsDialog = (props: Props) => {
                                 onChange={(e) => setCommandText(e.target.value)}
                             />
                         </label>
+
+                        {/* What this agent can be told beyond the task, asked
+                            of the agent itself. Nothing is drawn for an agent
+                            that declares nothing — there is no choice to make. */}
+                        <div className='AgentsDialog__options'>
+                            <div className='AgentsDialog__optionsHeader'>
+                                <span>{intl.formatMessage({id: 'Agents.options', defaultMessage: 'Agent settings'})}</span>
+                                {bindings?.AgentOptions &&
+                                    <Button
+                                        onClick={() => probeAgent(formEntry(), true)}
+                                        disabled={probing}
+                                    >
+                                        {probing ?
+                                            intl.formatMessage({id: 'Agents.options-probing', defaultMessage: 'Asking the agent…'}) :
+                                            intl.formatMessage({id: 'Agents.options-recheck', defaultMessage: 'Recheck'})}
+                                    </Button>}
+                            </div>
+                            {tunableOptions.map((option) => (
+                                <div
+                                    className='AgentsDialog__option'
+                                    key={option.id}
+                                >
+                                    <label>
+                                        {option.name || option.id}
+                                        <select
+                                            value={form.options?.[option.id] || ''}
+                                            onChange={(e) => updateForm({options: {...form.options, [option.id]: e.target.value}})}
+                                        >
+                                            <option value=''>
+                                                {intl.formatMessage(
+                                                    {id: 'Agents.option-default', defaultMessage: 'As the agent has it ({current})'},
+                                                    {current: optionValueLabel(option, option.current)},
+                                                )}
+                                            </option>
+                                            {optionValues(option).map((value) => (
+                                                <option
+                                                    key={value.value}
+                                                    value={value.value}
+                                                >{value.name || value.value}</option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                    {option.description &&
+                                        <div className='AgentsDialog__hint'>{option.description}</div>}
+                                </div>
+                            ))}
+                            {probing && tunableOptions.length === 0 &&
+                                <div className='AgentsDialog__hint'>
+                                    {intl.formatMessage({id: 'Agents.options-asking', defaultMessage: 'Starting the agent to ask what it supports…'})}
+                                </div>}
+                            {probed && !probing && tunableOptions.length === 0 &&
+                                <div className='AgentsDialog__hint'>
+                                    {intl.formatMessage({id: 'Agents.options-none', defaultMessage: 'This agent has no settings of its own.'})}
+                                </div>}
+                            {probeError && !probing &&
+                                <div className='AgentsDialog__hint'>
+                                    {intl.formatMessage({id: 'Agents.options-failed', defaultMessage: 'Could not ask the agent what it supports: {error}'}, {error: probeError})}
+                                </div>}
+                        </div>
+
                         <label>
                             {intl.formatMessage({id: 'Agents.prompt', defaultMessage: 'Agent system prompt'})}
                             <textarea
@@ -568,7 +800,7 @@ const AgentsDialog = (props: Props) => {
                             >
                                 {intl.formatMessage({id: 'Agents.save', defaultMessage: 'Save'})}
                             </Button>
-                            <Button onClick={() => setForm(null)}>
+                            <Button onClick={closeForm}>
                                 {intl.formatMessage({id: 'Agents.cancel', defaultMessage: 'Cancel'})}
                             </Button>
                         </div>

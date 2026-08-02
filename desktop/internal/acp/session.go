@@ -545,6 +545,9 @@ func (m *Manager) openConnection(ctx context.Context, s *Session) (*acpsdk.Clien
 	}
 	m.selectSessionMode(ctx, s, conn, sess, launch.mode)
 	m.selectSessionModel(ctx, s, conn, sess)
+	// Last, so what the user chose on the agent outranks what the kind's table
+	// would have set.
+	m.applyAgentOptions(ctx, s, conn, sess)
 	worktreePath := ""
 	if s.usedWorktree {
 		worktreePath = s.Worktree.Path

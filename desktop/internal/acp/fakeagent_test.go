@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -122,6 +123,14 @@ func (f *fakeAgent) NewSession(ctx context.Context, params acpsdk.NewSessionRequ
 		{Value: "gpt-5.4", Name: "GPT-5.4"},
 		{Value: "gpt-5.6-sol", Name: "GPT-5.6-Sol"},
 	}
+	// Alongside them, the two shapes a per-agent setting takes: a select the
+	// way claude offers its effort level, and a boolean toggle the way an agent
+	// that has Fast mode offers it. An agent that has neither simply lists
+	// neither, which is what the dialog then shows.
+	effort := acpsdk.SessionConfigSelectOptionsUngrouped{
+		{Value: "default", Name: "Default"},
+		{Value: "high", Name: "High"},
+	}
 	return acpsdk.NewSessionResponse{
 		SessionId: acpsdk.SessionId("fake-session"),
 		Modes: &acpsdk.SessionModeState{
@@ -139,6 +148,21 @@ func (f *fakeAgent) NewSession(ctx context.Context, params acpsdk.NewSessionRequ
 				Type:         "select",
 				CurrentValue: "gpt-5.6-sol",
 				Options:      acpsdk.SessionConfigSelectOptions{Ungrouped: &models},
+			},
+		}, {
+			Select: &acpsdk.SessionConfigOptionSelect{
+				Id:           "effort",
+				Name:         "Effort",
+				Type:         "select",
+				CurrentValue: "default",
+				Options:      acpsdk.SessionConfigSelectOptions{Ungrouped: &effort},
+			},
+		}, {
+			Boolean: &acpsdk.SessionConfigOptionBoolean{
+				Id:           "fast",
+				Name:         "Fast mode",
+				Type:         "boolean",
+				CurrentValue: false,
 			},
 		}},
 	}, nil
@@ -284,9 +308,13 @@ func (f *fakeAgent) ResumeSession(ctx context.Context, params acpsdk.ResumeSessi
 	return acpsdk.ResumeSessionResponse{}, acpsdk.NewMethodNotFound(acpsdk.AgentMethodSessionResume)
 }
 func (f *fakeAgent) SetSessionConfigOption(ctx context.Context, params acpsdk.SetSessionConfigOptionRequest) (acpsdk.SetSessionConfigOptionResponse, error) {
-	if params.ValueId == nil {
+	switch {
+	case params.ValueId != nil:
+		f.record(string(params.ValueId.ConfigId)+".txt", string(params.ValueId.Value))
+	case params.Boolean != nil:
+		f.record(string(params.Boolean.ConfigId)+".txt", strconv.FormatBool(params.Boolean.Value))
+	default:
 		return acpsdk.SetSessionConfigOptionResponse{}, acpsdk.NewMethodNotFound(acpsdk.AgentMethodSessionSetConfigOption)
 	}
-	f.record(string(params.ValueId.ConfigId)+".txt", string(params.ValueId.Value))
 	return acpsdk.SetSessionConfigOptionResponse{}, nil
 }

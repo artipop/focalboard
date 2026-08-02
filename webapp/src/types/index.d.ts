@@ -38,6 +38,7 @@ export interface IAppWindow extends Window {
                 SyncAgentUsers?(boardId: string): Promise<string>
                 ListAgentAdapters?(): Promise<string>
                 InstallAgentAdapter?(kind: string): Promise<string>
+                AgentOptions?(entryJSON: string, refresh: boolean): Promise<string>
                 ListDeployTargets(): Promise<string>
                 AddDeployTarget(entryJSON: string): Promise<string>
                 UpdateDeployTarget(entryJSON: string): Promise<string>

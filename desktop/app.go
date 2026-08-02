@@ -169,6 +169,31 @@ func (a *App) UpdateAgent(entryJSON string) (string, error) {
 	return string(out), nil
 }
 
+// AgentOptions asks the agent itself which settings it has — Fast mode, an
+// effort level, a permission mode — and returns them as JSON:
+// [{"id","name","type","current","values":[…]}, …]. The agent is started the
+// way a session would start it and asked nothing, so the dialog offers exactly
+// what this agent supports and no toggle for what it does not. refresh skips
+// the cached answer.
+func (a *App) AgentOptions(entryJSON string, refresh bool) (string, error) {
+	if a.mgr == nil {
+		return "[]", nil
+	}
+	var entry acp.AgentEntry
+	if err := json.Unmarshal([]byte(entryJSON), &entry); err != nil {
+		return "", err
+	}
+	options, err := a.mgr.AgentOptions(entry, refresh)
+	if err != nil {
+		return "", err
+	}
+	out, err := json.Marshal(options)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
 // RemoveAgent deletes an agent registry entry by name.
 func (a *App) RemoveAgent(name string) error {
 	if a.mgr == nil {

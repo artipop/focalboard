@@ -33,6 +33,15 @@ type AgentEntry struct {
 	Env     map[string]string `json:"env,omitempty"`     // per-process env (CODEX_HOME, OPENAI_API_KEY, …)
 	Args    []string          `json:"args,omitempty"`    // extra CLI args (sandbox/approval, etc.)
 
+	// Options are the agent's own settings — an ACP session config option id
+	// mapped to the value the entry asks for ("fast": "on", "effort": "high").
+	// They are not a list of ours: an agent declares what it has in its answer
+	// to session/new, so the dialog offers exactly that and nothing else, and
+	// an agent with no Fast mode has no Fast mode to switch. Applied after the
+	// kind's own mode and model, so a setting chosen here wins. See
+	// capabilities.go.
+	Options map[string]string `json:"options,omitempty"`
+
 	// AutoAllowTools overrides the global policy for this agent, so a trusted
 	// one can be let loose and a new one kept on a short leash without changing
 	// anything for the rest. Entries take the same form as autoAllowTools,
