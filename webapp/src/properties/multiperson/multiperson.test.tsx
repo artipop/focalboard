@@ -187,7 +187,7 @@ describe('properties/multiperson', () => {
         if (container) {
             // this is the actual element where the click event triggers
             // opening of the dropdown
-            const userProperty = container.querySelector('.MultiPerson > div > div:nth-child(1) > div:nth-child(3) > input')
+            const userProperty = container.querySelector(".MultiPerson input[role='combobox']")
             expect(userProperty).not.toBeNull()
 
             act(() => {

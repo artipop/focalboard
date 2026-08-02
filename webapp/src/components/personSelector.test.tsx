@@ -164,7 +164,7 @@ describe('properties/person', () => {
         if (container) {
             // this is the actual element where the click event triggers
             // opening of the dropdown
-            const userProperty = container.querySelector('.Person > div > div:nth-child(1) > div:nth-child(2) > input')
+            const userProperty = container.querySelector(".Person input[role='combobox']")
             expect(userProperty).not.toBeNull()
 
             act(() => {
@@ -208,7 +208,7 @@ describe('properties/person', () => {
         if (container) {
             // this is the actual element where the click event triggers
             // opening of the dropdown
-            const userProperty = container.querySelector('.Person > div > div:nth-child(1) > div:nth-child(2) > input')
+            const userProperty = container.querySelector(".Person input[role='combobox']")
             expect(userProperty).toBeNull()
         } else {
             throw new Error('container should have been initialized')
@@ -270,7 +270,7 @@ describe('properties/person', () => {
         if (container) {
             // this is the actual element where the click event triggers
             // opening of the dropdown
-            const userProperty = container.querySelector('.MultiPerson > div > div:nth-child(1) > div:nth-child(3) > input')
+            const userProperty = container.querySelector(".MultiPerson input[role='combobox']")
             expect(userProperty).not.toBeNull()
 
             act(() => {
@@ -314,7 +314,7 @@ describe('properties/person', () => {
         if (container) {
             // this is the actual element where the click event triggers
             // opening of the dropdown
-            const userProperty = container.querySelector('.Person > div > div:nth-child(1) > div:nth-child(2) > input')
+            const userProperty = container.querySelector(".Person input[role='combobox']")
             expect(userProperty).not.toBeNull()
             act(() => {
                 userEvent.click(userProperty as Element)

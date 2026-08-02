@@ -173,7 +173,7 @@ describe('properties/person', () => {
         if (container) {
             // this is the actual element where the click event triggers
             // opening of the dropdown
-            const userProperty = container.querySelector('.Person > div > div:nth-child(1) > div:nth-child(2) > input')
+            const userProperty = container.querySelector(".Person input[role='combobox']")
             expect(userProperty).not.toBeNull()
 
             act(() => {

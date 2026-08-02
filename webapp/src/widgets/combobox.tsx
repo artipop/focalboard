@@ -47,6 +47,7 @@ type Props<T> = {
     // translated here, so the widget needs no i18n provider above it — which is
     // also one less thing tied to React.
     resultsMessage?: (count: number) => string
+    clearLabel?: string
 
     className?: string
 
@@ -117,8 +118,11 @@ function Combobox<T>(props: Props<T>): JSX.Element {
         return filterRows(toRows(props.options || []), query, props.matches)
     }, [props.loadOptions, props.options, props.matches, loaded, query])
 
+    // Loaded on mount as well as on every query, which is what react-select's
+    // `defaultOptions` did: the list is expected to be there before the menu is
+    // opened, not fetched in the moment it opens.
     useEffect(() => {
-        if (!props.loadOptions || !isOpen) {
+        if (!props.loadOptions) {
             return undefined
         }
 
@@ -135,7 +139,7 @@ function Combobox<T>(props: Props<T>): JSX.Element {
         return () => {
             cancelled = true
         }
-    }, [props.loadOptions, query, isOpen])
+    }, [props.loadOptions, query])
 
     // Nothing is highlighted until the list has something to highlight, and a
     // list that changed under the cursor starts again at the top.
@@ -355,6 +359,19 @@ function Combobox<T>(props: Props<T>): JSX.Element {
                         onKeyDown={onKeyDown}
                     />
                 </div>
+                {props.isClearable && selected.length > 0 && !props.isDisabled && (
+                    <div
+                        className={`${classNamePrefix}__clear-indicator`}
+                        role='button'
+                        tabIndex={-1}
+                        aria-label={props.clearLabel}
+                        title={props.clearLabel}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => props.onChange(isMulti ? [] : null, 'clear')}
+                    >
+                        {'×'}
+                    </div>
+                )}
             </div>
             {isOpen && menu}
         </div>

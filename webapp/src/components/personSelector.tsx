@@ -1,14 +1,11 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {type JSX} from 'react'
+import React, {type JSX, useCallback} from 'react'
 import {useIntl} from 'react-intl'
-import Select from 'react-select/async'
-import {CSSObject} from '@emotion/serialize'
 
-import {ActionMeta} from 'react-select'
-
-import {getSelectBaseStyle} from '../theme'
+import Combobox, {type ComboboxAction} from '../widgets/combobox'
+import type {ComboboxItem, ComboboxOption} from '../combobox'
 import {IUser} from '../user'
 import {Utils} from '../utils'
 import {useAppSelector} from '../store/hooks'
@@ -34,42 +31,13 @@ type Props = {
     isMulti: boolean
     closeMenuOnSelect?: boolean
     showMe?: boolean
-    onChange: (items: any, action: ActionMeta<IUser>) => void
+
+    // On `remove` the list already excludes the person removed, so every action
+    // is answered by reading the list rather than by the action's own payload.
+    onChange: (items: IUser[] | IUser | null, action: ComboboxAction) => void
 }
 
-const baseStyles = getSelectBaseStyle()
-
-const selectStyles = {
-    ...baseStyles,
-    option: (provided: CSSObject, state: {isFocused: boolean}): CSSObject => ({
-        ...provided,
-        background: state.isFocused ? 'rgba(var(--center-channel-color-rgb), 0.1)' : 'rgb(var(--center-channel-bg-rgb))',
-        color: state.isFocused ? 'rgb(var(--center-channel-color-rgb))' : 'rgb(var(--center-channel-color-rgb))',
-        padding: '8px',
-    }),
-    control: (): CSSObject => ({
-        border: 0,
-        width: '100%',
-        margin: '0',
-    }),
-    valueContainer: (provided: CSSObject): CSSObject => ({
-        ...provided,
-        padding: 'unset',
-        overflow: 'unset',
-    }),
-    singleValue: (provided: CSSObject): CSSObject => ({
-        ...baseStyles.singleValue(provided),
-        position: 'static',
-        top: 'unset',
-        transform: 'unset',
-    }),
-    menu: (provided: CSSObject): CSSObject => ({
-        ...provided,
-        width: 'unset',
-        background: 'rgb(var(--center-channel-bg-rgb))',
-        minWidth: '260px',
-    }),
-}
+const asOption = (user: IUser): ComboboxOption<IUser> => ({id: user.id, label: user.username, data: user})
 
 const PersonSelector = (props: Props): JSX.Element => {
     const {readOnly, userIDs, allowAddUsers, isMulti, closeMenuOnSelect = true, emptyDisplayValue, showMe = false, onChange} = props
@@ -113,7 +81,7 @@ const PersonSelector = (props: Props): JSX.Element => {
         users = userIDs.map((id) => boardUsersById[id])
     }
 
-    const loadOptions = async (value: string) => {
+    const loadOptions = useCallback(async (value: string): Promise<Array<ComboboxItem<IUser>>> => {
         if (!allowAddUsers) {
             const returnUsers: IUser[] = []
             if (showMe && me) {
@@ -141,9 +109,9 @@ const PersonSelector = (props: Props): JSX.Element => {
                         u.lastname.toLowerCase().includes(value.toLowerCase()) ||
                         u.firstname.toLowerCase().includes(value.toLowerCase()) ||
                         u.nickname.toLowerCase().includes(value.toLowerCase())
-                })
+                }).map(asOption)
             }
-            return returnUsers
+            return returnUsers.map(asOption)
         }
         const excludeBots = true
         const allUsers = await client.searchTeamUsers(value, excludeBots)
@@ -157,10 +125,10 @@ const PersonSelector = (props: Props): JSX.Element => {
             }
         }
         return [
-            {label: intl.formatMessage({id: 'PersonProperty.board-members', defaultMessage: 'Board members'}), options: usersInsideBoard},
-            {label: intl.formatMessage({id: 'PersonProperty.non-board-members', defaultMessage: 'Not board members'}), options: usersOutsideBoard},
-        ]
-    }
+            {label: intl.formatMessage({id: 'PersonProperty.board-members', defaultMessage: 'Board members'}), options: usersInsideBoard.map(asOption)},
+            {label: intl.formatMessage({id: 'PersonProperty.non-board-members', defaultMessage: 'Not board members'}), options: usersOutsideBoard.map(asOption)},
+        ].filter((group) => group.options.length > 0)
+    }, [allowAddUsers, showMe, me, boardUsers, boardUsersById, intl])
 
     let primaryClass = 'Person'
     if (isMulti) {
@@ -180,27 +148,25 @@ const PersonSelector = (props: Props): JSX.Element => {
     }
 
     return (
-        <>
-            <Select
-                key={boardUsersKey}
-                loadOptions={loadOptions}
-                isMulti={isMulti}
-                defaultOptions={true}
-                isSearchable={true}
-                isClearable={true}
-                backspaceRemovesValue={true}
-                closeMenuOnSelect={closeMenuOnSelect}
-                className={`${primaryClass}${secondaryClass}`}
-                classNamePrefix={'react-select'}
-                formatOptionLabel={formatOptionLabel}
-                styles={selectStyles}
-                placeholder={emptyDisplayValue}
-                getOptionLabel={(o: IUser) => o.username}
-                getOptionValue={(a: IUser) => a.id}
-                value={users}
-                onChange={onChange}
-            />
-        </>
+        <Combobox
+            key={boardUsersKey}
+            loadOptions={loadOptions}
+            isMulti={isMulti}
+            isClearable={true}
+            closeMenuOnSelect={closeMenuOnSelect}
+            className={`${primaryClass}${secondaryClass}`}
+            classNamePrefix={'react-select'}
+            renderOption={(option) => formatOptionLabel(option.data)}
+            placeholder={emptyDisplayValue}
+            value={users.filter(Boolean).map(asOption)}
+            onChange={(value, action) => {
+                if (Array.isArray(value)) {
+                    onChange(value.map((option) => option.data), action)
+                } else {
+                    onChange(value ? value.data : null, action)
+                }
+            }}
+        />
     )
 }
 

@@ -4,8 +4,6 @@
 import React, {type JSX, useCallback, useState} from 'react'
 import {useIntl} from 'react-intl'
 
-import {ActionMeta, SingleValue, MultiValue} from 'react-select'
-
 import {IUser} from '../../user'
 import mutator from '../../mutator'
 import {useAppSelector} from '../../store/hooks'
@@ -39,34 +37,25 @@ const ConfirmPerson = (props: PropertyProps): JSX.Element => {
         userIDs = propertyValue
     }
 
-    const onChange = (items: SingleValue<IUser> | MultiValue<IUser>, action: ActionMeta<IUser>) => {
+    // Every action arrives as the list that is left, so only the newly chosen
+    // need confirming; removing and clearing are just the list, written back.
+    const onChange = (items: IUser[] | IUser | null) => {
         if (Array.isArray(items)) {
-            if (action.action === 'select-option') {
-                const confirmedIds: string[] = []
-                items.forEach((item) => {
-                    if (boardUsersById[item.id]) {
-                        confirmedIds.push(item.id)
-                    } else {
-                        setConfirmAddUser(item)
-                    }
-                })
-                changePropertyValue(confirmedIds)
-            } else if (action.action === 'clear') {
-                changePropertyValue([])
-            } else if (action.action === 'remove-value') {
-                changePropertyValue(items.filter((a) => a.id !== action.removedValue.id).map((b) => b.id) || [])
-            }
-        } else {
-            const item = items as IUser
-            if (action.action === 'select-option') {
-                if (boardUsersById[item?.id || '']) {
-                    changePropertyValue(item?.id || '')
+            const confirmedIds: string[] = []
+            items.forEach((item) => {
+                if (boardUsersById[item.id]) {
+                    confirmedIds.push(item.id)
                 } else {
                     setConfirmAddUser(item)
                 }
-            } else if (action.action === 'clear') {
-                changePropertyValue('')
-            }
+            })
+            changePropertyValue(confirmedIds)
+        } else if (!items) {
+            changePropertyValue('')
+        } else if (boardUsersById[items.id]) {
+            changePropertyValue(items.id)
+        } else {
+            setConfirmAddUser(items)
         }
     }
 

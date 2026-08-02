@@ -108,3 +108,14 @@
     clip-path: inset(50%);
     white-space: nowrap;
 }
+
+.Combobox [class$='__clear-indicator'] {
+    flex: 0 0 auto;
+    padding: 0 4px;
+    cursor: pointer;
+    opacity: 0.56;
+
+    &:hover {
+        opacity: 1;
+    }
+}
