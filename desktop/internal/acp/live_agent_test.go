@@ -108,3 +108,52 @@ func TestLiveAgentKeepsTheConversationAndCancels(t *testing.T) {
 	})
 	t.Logf("after cancel: %s", s.Status())
 }
+
+// What a permission prompt looks like by the time it reaches the console is the
+// one thing a fake agent cannot answer: the options, their kinds and their
+// labels are the vendor's, and the console styles its buttons by kind. Same
+// switch as the others:
+//
+//	FOCALBOARD_ACP_LIVE=claude go test ./internal/acp -run TestLivePermissionPrompt -v
+func TestLivePermissionPromptReachesTheConsole(t *testing.T) {
+	kind := os.Getenv("FOCALBOARD_ACP_LIVE")
+	if kind == "" {
+		t.Skip("set FOCALBOARD_ACP_LIVE=<kind> to run against a real agent")
+	}
+
+	m, _, _, _, emitter := testManagerWithEmitter(t, fakeClaudeHappy, func(c *Config) {
+		c.Agents = []AgentEntry{{
+			Name:    "live",
+			Kind:    kind,
+			BinPath: os.Getenv("FOCALBOARD_ACP_LIVE_BIN"),
+			// Nothing is allowed by policy, so every tool the agent wants has
+			// to be asked about — which is the point here.
+			AutoAllowTools: ToolPolicy{"nothing"},
+		}}
+		c.SessionTimeoutMinutes = 5
+	})
+
+	s := liveSession(t, m, "cardPerm")
+	if !m.AttachSession(s.ID) {
+		t.Fatal("AttachSession refused a live session")
+	}
+	if err := m.PromptSession(s.ID, "Create a file named perm-test.txt containing HI. Then say DONE."); err != nil {
+		t.Fatalf("prompt: %v", err)
+	}
+
+	var requestID string
+	waitFor(t, 3*time.Minute, "a permission prompt on the console", func() bool {
+		requestID = emitter.pendingPermissionID()
+		return requestID != ""
+	})
+	emitter.mu.Lock()
+	for i, name := range emitter.events {
+		if name == EventPermission {
+			t.Logf("permission payload: %#v", emitter.payloads[i])
+		}
+	}
+	emitter.mu.Unlock()
+	if err := m.AnswerPermission(s.ID, requestID, "allow"); err != nil {
+		t.Fatalf("answer permission: %v", err)
+	}
+}

@@ -9,6 +9,7 @@
 // The Wails runtime methods are PascalCase, not constructors.
 /* eslint-disable new-cap */
 import React, {useEffect, useRef, useState} from 'react'
+import {useIntl} from 'react-intl'
 
 import {Utils} from '../../utils'
 import Button from '../../widgets/buttons/button'
@@ -37,7 +38,7 @@ export type Entry =
     | {kind: 'prompt', text: string}
     | {kind: 'error', text: string}
     | {kind: 'tool', toolCallId: string, title?: string, status?: string}
-    | {kind: 'permission', requestId?: string, tool?: string, title?: string, options?: PermissionOption[], decision?: string}
+    | {kind: 'permission', requestId?: string, tool?: string, title?: string, options?: PermissionOption[], decision?: string, byPolicy?: boolean}
 
 export type SessionRecord = {
     id: string
@@ -99,6 +100,7 @@ export function entriesFromStored(events: StoredEvent[]): Entry[] {
                 title: p.title,
                 options: p.pending ? p.options : undefined,
                 decision: p.decision,
+                byPolicy: p.byPolicy,
             })
             break
         default:
@@ -207,7 +209,7 @@ export function useSessionStream(match: StreamMatch, onSession?: (payload: any) 
                         const pending = idx >= 0 ? prev[idx] : undefined
                         if (pending?.kind === 'permission') {
                             const next = [...prev]
-                            next[idx] = {...pending, requestId: undefined, options: undefined, decision: payload.decision}
+                            next[idx] = {...pending, requestId: undefined, options: undefined, decision: payload.decision, byPolicy: payload.byPolicy}
                             return next
                         }
                     }
@@ -218,6 +220,7 @@ export function useSessionStream(match: StreamMatch, onSession?: (payload: any) 
                         title: payload.title,
                         options: payload.options,
                         decision: payload.decision,
+                        byPolicy: payload.byPolicy,
                     })
                 })
             }),
@@ -250,6 +253,7 @@ type EntryProps = {
 
 export const ConsoleEntry = React.memo((props: EntryProps) => {
     const {entry, onAnswer} = props
+    const intl = useIntl()
 
     if (entry.kind === 'prompt') {
         return <div className='SessionConsole__entry SessionConsole__entry--prompt'>{entry.text}</div>
@@ -277,13 +281,16 @@ export const ConsoleEntry = React.memo((props: EntryProps) => {
         )
     }
 
-    // Permission: still pending (buttons) or already decided (a record).
+    // Permission: a question with buttons, or a record of one already settled.
+    // The two must not look alike — a decision the policy made needs no answer,
+    // and a box that looks like a prompt nobody can answer reads as broken.
+    const pending = Boolean(entry.requestId && entry.options)
     return (
-        <div className='SessionConsole__entry SessionConsole__entry--permission'>
+        <div className={`SessionConsole__entry SessionConsole__entry--permission${pending ? '' : ' SessionConsole__entry--permissionDecided'}`}>
             <div className='SessionConsole__permissionTitle'>{entry.title || entry.tool}</div>
-            {entry.requestId && entry.options ?
+            {pending ?
                 <div className='SessionConsole__permissionOptions'>
-                    {entry.options.map((opt) => (
+                    {entry.options!.map((opt) => (
                         <Button
                             key={opt.optionId}
                             filled={opt.kind === 'allow_once'}
@@ -293,7 +300,14 @@ export const ConsoleEntry = React.memo((props: EntryProps) => {
                         </Button>
                     ))}
                 </div> :
-                <span className='SessionConsole__permissionDecision'>{entry.decision}</span>}
+                <span className='SessionConsole__permissionDecision'>
+                    {entry.byPolicy ?
+                        intl.formatMessage(
+                            {id: 'SessionConsole.permission-by-policy', defaultMessage: '{decision} — automatically, by the tool policy'},
+                            {decision: entry.decision},
+                        ) :
+                        entry.decision}
+                </span>}
         </div>
     )
 })

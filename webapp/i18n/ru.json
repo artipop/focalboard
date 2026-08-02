@@ -385,6 +385,7 @@
   "SessionConsole.deploy-status": "деплой: {status}",
   "SessionConsole.open": "Открыть сессию",
   "SessionConsole.open-here": "Открыть здесь",
+  "SessionConsole.permission-by-policy": "{decision} — автоматически, по политике инструментов",
   "SessionConsole.placeholder": "Сообщение агенту — Enter отправляет, Shift+Enter переносит строку",
   "SessionConsole.send": "Отправить",
   "SessionConsole.title": "Сессия агента",

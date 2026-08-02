@@ -385,6 +385,7 @@
   "SessionConsole.deploy-status": "deploy: {status}",
   "SessionConsole.open": "Open session",
   "SessionConsole.open-here": "Open here",
+  "SessionConsole.permission-by-policy": "{decision} — automatically, by the tool policy",
   "SessionConsole.placeholder": "Message the agent — Enter to send, Shift+Enter for a new line",
   "SessionConsole.send": "Send",
   "SessionConsole.title": "Agent session",

@@ -133,7 +133,19 @@
 
     .SessionConsole__permissionDecision {
         font-size: 12px;
-        text-transform: uppercase;
+        color: rgba(var(--center-channel-color-rgb), 0.64);
+    }
+}
+
+// Nothing to answer here: it is a note about what already happened, so it does
+// not get the frame that says "you are being asked".
+.SessionConsole__entry--permissionDecided {
+    border: 0;
+    padding: 2px 0;
+    gap: 2px;
+
+    .SessionConsole__permissionTitle {
+        font-weight: 400;
         color: rgba(var(--center-channel-color-rgb), 0.64);
     }
 }

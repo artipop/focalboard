@@ -119,6 +119,33 @@ describe('components/acp/sessionConsole', () => {
         await waitFor(() => expect(bindings.AnswerPermission).toHaveBeenCalledWith('sess-3', 'req-1', 'allow'))
     })
 
+    // A call the policy allowed by itself is a note, not a question. Rendering
+    // it like a prompt — same frame, a bare word where the buttons go — reads as
+    // a broken dialog, which is exactly how it was reported.
+    test('shows a policy decision as a record rather than as a prompt', async () => {
+        const bindings = bindingsWith([{id: 'sess-4', status: 'running'}])
+        anyWindow.go = {main: {App: bindings}}
+        const handlers = fakeRuntime()
+
+        render(wrapIntl(<SessionConsole cardId='card1'/>))
+        await waitFor(() => expect(bindings.AttachSession).toHaveBeenCalledWith('sess-4'))
+
+        handlers['acp:permission']({
+            cardId: 'card1',
+            sessionId: 'sess-4',
+            tool: 'Write',
+            title: 'Write hello.txt',
+            decision: 'allow',
+            byPolicy: true,
+        })
+
+        await waitFor(() => expect(screen.getByText('Write hello.txt')).toBeInTheDocument())
+        expect(screen.getByText('allow — automatically, by the tool policy')).toBeInTheDocument()
+
+        // Nothing to press: there is no question here.
+        expect(screen.queryByRole('button', {name: 'Allow'})).not.toBeInTheDocument()
+    })
+
     test('attaches to a session that starts while the card is already open', async () => {
         // No session yet when the console mounts: the card was opened first and
         // the agent was triggered afterwards. Without attaching here the backend
