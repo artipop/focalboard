@@ -105,3 +105,34 @@
     text-overflow: ellipsis;
     display: inline-block;
 }
+
+// What the emotion `valueSelectorStyle` object used to say.
+.ValueSelector {
+    .ValueSelector__control {
+        width: 100%;
+        margin: 0;
+    }
+
+    .ValueSelector__value-container {
+        padding: 0 8px;
+    }
+
+    .ValueSelector__multi-value {
+        padding: 0;
+        margin: 0;
+        background: transparent;
+    }
+
+    .ValueSelector__multi-value__label {
+        display: flex;
+        padding: 0;
+    }
+}
+
+.ValueSelector__menu {
+    min-width: 260px;
+
+    .ValueSelector__option {
+        padding: 8px;
+    }
+}

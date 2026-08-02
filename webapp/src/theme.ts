@@ -1,7 +1,6 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import {CSSObject} from '@emotion/serialize'
 import isEqual from 'lodash/isEqual'
 import color from 'color'
 
@@ -220,78 +219,6 @@ export function initThemes(): void {
         darkThemeMq.addListener(changeHandler)
     }
     loadTheme()
-}
-
-export function getSelectBaseStyle() {
-    return {
-        dropdownIndicator: (provided: CSSObject): CSSObject => ({
-            ...provided,
-            display: 'none !important',
-        }),
-        indicatorSeparator: (provided: CSSObject): CSSObject => ({
-            ...provided,
-            display: 'none',
-        }),
-        loadingIndicator: (provided: CSSObject): CSSObject => ({
-            ...provided,
-            display: 'none',
-        }),
-        clearIndicator: (provided: CSSObject): CSSObject => ({
-            ...provided,
-            display: 'none',
-        }),
-        menu: (provided: CSSObject): CSSObject => ({
-            ...provided,
-            width: 'unset',
-            background: 'rgb(var(--center-channel-bg-rgb))',
-        }),
-        option: (provided: CSSObject, state: { isFocused: boolean }): CSSObject => ({
-            ...provided,
-            background: state.isFocused ? 'rgba(var(--center-channel-color-rgb), 0.1)' : 'rgb(var(--center-channel-bg-rgb))',
-            color: state.isFocused ? 'rgb(var(--center-channel-color-rgb))' : 'rgb(var(--center-channel-color-rgb))',
-            padding: '2px 8px',
-        }),
-        control: (): CSSObject => ({
-            border: 0,
-            width: '100%',
-            margin: '4px 0 0 0',
-
-            // display: 'flex',
-            // marginTop: 0,
-        }),
-        valueContainer: (provided: CSSObject): CSSObject => ({
-            ...provided,
-            padding: '0 5px',
-            overflow: 'unset',
-        }),
-        singleValue: (provided: CSSObject): CSSObject => ({
-            ...provided,
-            color: 'rgb(var(--center-channel-color-rgb))',
-            overflow: 'unset',
-            maxWidth: 'calc(100% - 20px)',
-        }),
-        input: (provided: CSSObject): CSSObject => ({
-            ...provided,
-            color: 'rgb(var(--center-channel-color-rgb))',
-            paddingBottom: 0,
-            paddingTop: 0,
-            marginBottom: 0,
-            marginTop: 0,
-        }),
-        placeholder: (provided: CSSObject): CSSObject => ({
-            ...provided,
-            color: 'rgba(var(--center-channel-color-rgb), 0.4)',
-        }),
-        multiValueLabel: (provided: CSSObject): CSSObject => ({
-            ...provided,
-            color: 'rgb(var(--center-channel-color-rgb))',
-        }),
-        menuList: (provided: CSSObject): CSSObject => ({
-            ...provided,
-            overflowY: 'auto',
-            overflowX: 'hidden',
-        }),
-    }
 }
 
 export function getActiveThemeName(): string {

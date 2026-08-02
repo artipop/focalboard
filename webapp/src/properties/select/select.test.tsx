@@ -168,6 +168,7 @@ describe('properties/select', () => {
 
         const clear = clearButton()
         expect(clear).toBeInTheDocument()
+        // eslint-disable-next-line no-console
         userEvent.click(clear!)
 
         expect(mockedMutator.changePropertyValue).toHaveBeenCalledWith(board.id, card, propertyTemplate.id, '')

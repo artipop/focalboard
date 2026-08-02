@@ -73,6 +73,10 @@ type Props<T> = {
     // letting it ignore them; said out loud, it is one flag.
     optionsOwnTheirClicks?: boolean
 
+    // Set when what `renderOption` draws for a chosen value already carries its
+    // own way of taking it off, so the widget adds none.
+    valuesOwnTheirRemove?: boolean
+
     onChange: (value: ComboboxOption<T> | Array<ComboboxOption<T>> | null, action: ComboboxAction) => void
     onCreate?: (label: string) => void
     onBlur?: () => void
@@ -312,23 +316,34 @@ function Combobox<T>(props: Props<T>): JSX.Element {
                         <div
                             key={option.id}
                             className={`${classNamePrefix}__multi-value`}
+
+                            // Keeps the focus on the input: a caller that draws
+                            // its own control inside a value would otherwise see
+                            // the blur close the editor, and its own click land
+                            // on a node no longer in the document.
+                            onMouseDown={(event) => event.preventDefault()}
                         >
                             <div className={`${classNamePrefix}__multi-value__label`}>
                                 {label(option, 'value')}
                             </div>
-                            <div
-                                className={`${classNamePrefix}__multi-value__remove`}
-                                role='button'
-                                tabIndex={-1}
-                                onMouseDown={(event) => event.preventDefault()}
-                                onClick={() => remove(option)}
-                            >
-                                {'×'}
-                            </div>
+                            {!props.valuesOwnTheirRemove && (
+                                <div
+                                    className={`${classNamePrefix}__multi-value__remove`}
+                                    role='button'
+                                    tabIndex={-1}
+                                    onMouseDown={(event) => event.preventDefault()}
+                                    onClick={() => remove(option)}
+                                >
+                                    {'×'}
+                                </div>
+                            )}
                         </div>
                     ))}
                     {!isMulti && selected.length > 0 && !query && (
-                        <div className={`${classNamePrefix}__single-value`}>
+                        <div
+                            className={`${classNamePrefix}__single-value`}
+                            onMouseDown={(event) => event.preventDefault()}
+                        >
                             {label(selected[0], 'value')}
                         </div>
                     )}

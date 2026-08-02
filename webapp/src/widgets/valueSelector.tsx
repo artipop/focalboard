@@ -2,17 +2,12 @@
 // See LICENSE.txt for license information.
 import React, {type JSX} from 'react'
 import {useIntl} from 'react-intl'
-import {ActionMeta, OnChangeValue} from 'react-select'
-import {FormatOptionLabelMeta} from 'react-select/base'
-import CreatableSelect from 'react-select/creatable'
-
-import {CSSObject} from '@emotion/serialize'
 
 import {IPropertyOption} from '../blocks/board'
 import {Constants} from '../constants'
+import type {ComboboxOption} from '../combobox'
 
-import {getSelectBaseStyle} from '../theme'
-
+import Combobox, {type ComboboxContext} from './combobox'
 import Menu from './menu'
 import MenuWrapper from './menuWrapper'
 import IconButton from './buttons/iconButton'
@@ -38,7 +33,7 @@ type Props = {
 
 type LabelProps = {
     option: IPropertyOption
-    meta: FormatOptionLabelMeta<IPropertyOption>
+    context: ComboboxContext
     onChangeColor: (option: IPropertyOption, color: string) => void
     onDeleteOption: (option: IPropertyOption) => void
     onDeleteValue?: (value: IPropertyOption) => void
@@ -46,9 +41,9 @@ type LabelProps = {
 }
 
 const ValueSelectorLabel = (props: LabelProps): JSX.Element => {
-    const {option, onDeleteValue, meta, isMulti} = props
+    const {option, onDeleteValue, context, isMulti} = props
     const intl = useIntl()
-    if (meta.context === 'value') {
+    if (context === 'value') {
         let className = onDeleteValue ? 'Label-no-padding' : 'Label-single-select'
         if (!isMulti) {
             className += ' Label-no-margin'
@@ -105,108 +100,65 @@ const ValueSelectorLabel = (props: LabelProps): JSX.Element => {
     )
 }
 
-const baseStyles = getSelectBaseStyle()
-
-const valueSelectorStyle = {
-    ...baseStyles,
-    option: (provided: CSSObject, state: {isFocused: boolean}): CSSObject => ({
-        ...provided,
-        background: state.isFocused ? 'rgba(var(--center-channel-color-rgb), 0.1)' : 'rgb(var(--center-channel-bg-rgb))',
-        color: state.isFocused ? 'rgb(var(--center-channel-color-rgb))' : 'rgb(var(--center-channel-color-rgb))',
-        padding: '8px',
-    }),
-    control: (): CSSObject => ({
-        border: 0,
-        width: '100%',
-        margin: '0',
-    }),
-    valueContainer: (provided: CSSObject): CSSObject => ({
-        ...provided,
-        padding: '0 8px',
-        overflow: 'unset',
-    }),
-    singleValue: (provided: CSSObject): CSSObject => ({
-        ...baseStyles.singleValue(provided),
-        position: 'static',
-        top: 'unset',
-        transform: 'unset',
-    }),
-    multiValue: (provided: CSSObject): CSSObject => ({
-        ...provided,
-        margin: 0,
-        padding: 0,
-        backgroundColor: 'transparent',
-    }),
-    multiValueLabel: (provided: CSSObject): CSSObject => ({
-        ...baseStyles.multiValueLabel(provided),
-        display: 'flex',
-        paddingLeft: 0,
-        padding: 0,
-    }),
-    multiValueRemove: (): CSSObject => ({
-        display: 'none',
-    }),
-    menu: (provided: CSSObject): CSSObject => ({
-        ...provided,
-        width: 'unset',
-        background: 'rgb(var(--center-channel-bg-rgb))',
-        minWidth: '260px',
-    }),
-}
-
 function ValueSelector(props: Props): JSX.Element {
     const intl = useIntl()
+
+    const asOption = (option: IPropertyOption): ComboboxOption<IPropertyOption> => ({
+        id: option.id,
+        label: option.value,
+        data: option,
+    })
+
+    let chosen: IPropertyOption[] = []
+    if (props.value) {
+        chosen = Array.isArray(props.value) ? props.value : [props.value]
+    }
+
     return (
-        <CreatableSelect
-            noOptionsMessage={() => intl.formatMessage({id: 'ValueSelector.noOptions', defaultMessage: 'No options. Start typing to add the first one!'})}
-            aria-label={intl.formatMessage({id: 'ValueSelector.valueSelector', defaultMessage: 'Value selector'})}
-            captureMenuScroll={true}
-            maxMenuHeight={1200}
+        <Combobox
+            className='ValueSelector'
+            classNamePrefix='ValueSelector'
+            ariaLabel={intl.formatMessage({id: 'ValueSelector.valueSelector', defaultMessage: 'Value selector'})}
+            noOptionsMessage={intl.formatMessage({id: 'ValueSelector.noOptions', defaultMessage: 'No options. Start typing to add the first one!'})}
             isMulti={props.isMulti}
             isClearable={true}
-            styles={valueSelectorStyle}
-            formatOptionLabel={(option: IPropertyOption, meta: FormatOptionLabelMeta<IPropertyOption>) => (
+            autoFocus={true}
+
+            // A multi-select keeps its list open between choices; a single one
+            // opens on the focus it takes and closes on the choice.
+            menuIsOpen={props.isMulti ? true : undefined}
+            options={props.options.map(asOption)}
+            value={chosen.map(asOption)}
+            valuesOwnTheirRemove={true}
+            renderOption={(option, context) => (
                 <ValueSelectorLabel
-                    option={option}
-                    meta={meta}
+                    option={option.data}
+                    context={context}
                     isMulti={props.isMulti}
                     onChangeColor={props.onChangeColor}
                     onDeleteOption={props.onDeleteOption}
                     onDeleteValue={props.onDeleteValue}
                 />
             )}
-            className='ValueSelector'
-            classNamePrefix='ValueSelector'
-            options={props.options}
-            getOptionLabel={(o: IPropertyOption) => o.value}
-            getOptionValue={(o: IPropertyOption) => o.id}
-            onChange={(value: OnChangeValue<IPropertyOption, true | false>, action: ActionMeta<IPropertyOption>): void => {
-                if (action.action === 'select-option' || action.action === 'pop-value') {
-                    if (Array.isArray(value)) {
-                        props.onChange((value as IPropertyOption[]).map((option) => option.id))
-                    } else {
-                        props.onChange((value as IPropertyOption).id)
-                        props.onBlur?.()
-                    }
-                } else if (action.action === 'clear') {
-                    props.onChange('')
-                }
-            }}
+            onCreate={props.onCreate}
             onKeyDown={(event) => {
                 if (event.key === 'Escape') {
                     props.onBlur?.()
                 }
             }}
             onBlur={props.onBlur}
-            onCreateOption={props.onCreate}
-            autoFocus={true}
-            value={props.value || null}
-            closeMenuOnSelect={!props.isMulti}
-            placeholder={props.emptyValue}
-            hideSelectedOptions={false}
-            defaultMenuIsOpen={true}
-            menuIsOpen={props.isMulti}
-            blurInputOnSelect={!props.isMulti}
+            onChange={(value, action) => {
+                if (action === 'clear') {
+                    props.onChange('')
+                    return
+                }
+                if (Array.isArray(value)) {
+                    props.onChange(value.map((option) => option.id))
+                } else if (value) {
+                    props.onChange(value.id)
+                    props.onBlur?.()
+                }
+            }}
         />
     )
 }

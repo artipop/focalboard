@@ -90,6 +90,7 @@ exports[`components/blocksEditor/rootInput should match Input snapshot with menu
           Introduce your text or your slash command
         </div>
         <input
+          aria-activedescendant="_r_2_-option-0"
           aria-controls="_r_2_"
           aria-expanded="true"
           autocomplete="off"
@@ -111,6 +112,7 @@ exports[`components/blocksEditor/rootInput should match Input snapshot with menu
         <div
           aria-selected="false"
           class="RootInput__option RootInput__option--is-focused"
+          id="_r_2_-option-0"
           role="option"
         >
           /title Creates a new Title block.
@@ -118,6 +120,7 @@ exports[`components/blocksEditor/rootInput should match Input snapshot with menu
         <div
           aria-selected="false"
           class="RootInput__option"
+          id="_r_2_-option-1"
           role="option"
         >
           /subtitle Creates a new Sub title block.
@@ -125,6 +128,7 @@ exports[`components/blocksEditor/rootInput should match Input snapshot with menu
         <div
           aria-selected="false"
           class="RootInput__option"
+          id="_r_2_-option-2"
           role="option"
         >
           /subsubtitle Creates a new Sub Sub title block.
@@ -132,6 +136,7 @@ exports[`components/blocksEditor/rootInput should match Input snapshot with menu
         <div
           aria-selected="false"
           class="RootInput__option"
+          id="_r_2_-option-3"
           role="option"
         >
           /image Creates a new Image block.
@@ -139,6 +144,7 @@ exports[`components/blocksEditor/rootInput should match Input snapshot with menu
         <div
           aria-selected="false"
           class="RootInput__option"
+          id="_r_2_-option-4"
           role="option"
         >
           /text Creates a new Text block.
@@ -146,6 +152,7 @@ exports[`components/blocksEditor/rootInput should match Input snapshot with menu
         <div
           aria-selected="false"
           class="RootInput__option"
+          id="_r_2_-option-5"
           role="option"
         >
           /divider Creates a new Divider block.
@@ -153,6 +160,7 @@ exports[`components/blocksEditor/rootInput should match Input snapshot with menu
         <div
           aria-selected="false"
           class="RootInput__option"
+          id="_r_2_-option-6"
           role="option"
         >
           /list-item Creates a new List item block.
@@ -160,6 +168,7 @@ exports[`components/blocksEditor/rootInput should match Input snapshot with menu
         <div
           aria-selected="false"
           class="RootInput__option"
+          id="_r_2_-option-7"
           role="option"
         >
           /attachment Creates a new Attachment block.
@@ -167,6 +176,7 @@ exports[`components/blocksEditor/rootInput should match Input snapshot with menu
         <div
           aria-selected="false"
           class="RootInput__option"
+          id="_r_2_-option-8"
           role="option"
         >
           /quote Creates a new Quote block.
@@ -174,6 +184,7 @@ exports[`components/blocksEditor/rootInput should match Input snapshot with menu
         <div
           aria-selected="false"
           class="RootInput__option"
+          id="_r_2_-option-9"
           role="option"
         >
           /video Creates a new Video block.
@@ -181,6 +192,7 @@ exports[`components/blocksEditor/rootInput should match Input snapshot with menu
         <div
           aria-selected="false"
           class="RootInput__option"
+          id="_r_2_-option-10"
           role="option"
         >
           /checkbox Creates a new Checkbox block.
