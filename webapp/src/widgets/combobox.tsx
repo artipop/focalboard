@@ -302,6 +302,10 @@ function Combobox<T>(props: Props<T>): JSX.Element {
             <div
                 ref={controlRef}
                 className={`${classNamePrefix}__control`}
+
+                // Anywhere on the control is the input, so clicking the
+                // placeholder or the gap beside a chip opens the list.
+                onClick={() => inputRef.current?.focus()}
             >
                 <div className={isMulti ? `${classNamePrefix}__value-container ${classNamePrefix}__value-container--is-multi` : `${classNamePrefix}__value-container`}>
                     {isMulti && selected.map((option) => (

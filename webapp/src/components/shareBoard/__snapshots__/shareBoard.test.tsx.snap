@@ -49,58 +49,36 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Copy l
               class="CompassIcon icon-magnify MagnifyIcon"
             />
             <div
-              class="userSearchInput css-b62m3t-container"
+              class="Combobox userSearchInput"
             >
-              <span
-                class="css-1f43avz-a11yText-A11yText"
-                id="react-select-4-live-region"
-              />
               <span
                 aria-atomic="false"
                 aria-live="polite"
                 aria-relevant="additions text"
-                class="css-1f43avz-a11yText-A11yText"
+                class="Combobox__live-region"
                 role="log"
               />
               <div
-                class="css-1lxuy2a"
+                class="userSearchInput__control"
               >
                 <div
-                  class="css-1neafsd"
+                  class="userSearchInput__value-container"
                 >
                   <div
-                    class="css-1yro3oh-placeholder"
-                    id="react-select-4-placeholder"
+                    class="userSearchInput__placeholder"
                   >
                     Search for people and channels
                   </div>
-                  <div
-                    class="css-85xuox"
-                    data-value=""
-                  >
-                    <input
-                      aria-activedescendant=""
-                      aria-autocomplete="list"
-                      aria-describedby="react-select-4-placeholder"
-                      aria-expanded="false"
-                      aria-haspopup="true"
-                      autocapitalize="none"
-                      autocomplete="off"
-                      autocorrect="off"
-                      class=""
-                      id="react-select-4-input"
-                      role="combobox"
-                      spellcheck="false"
-                      style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
-                      tabindex="0"
-                      type="text"
-                      value=""
-                    />
-                  </div>
+                  <input
+                    aria-controls="_r_2_"
+                    aria-expanded="false"
+                    autocomplete="off"
+                    class="userSearchInput__input"
+                    role="combobox"
+                    type="text"
+                    value=""
+                  />
                 </div>
-                <div
-                  class="css-1wy0on6"
-                />
               </div>
             </div>
           </div>
@@ -260,58 +238,36 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Copy l
               class="CompassIcon icon-magnify MagnifyIcon"
             />
             <div
-              class="userSearchInput css-b62m3t-container"
+              class="Combobox userSearchInput"
             >
-              <span
-                class="css-1f43avz-a11yText-A11yText"
-                id="react-select-4-live-region"
-              />
               <span
                 aria-atomic="false"
                 aria-live="polite"
                 aria-relevant="additions text"
-                class="css-1f43avz-a11yText-A11yText"
+                class="Combobox__live-region"
                 role="log"
               />
               <div
-                class="css-1lxuy2a"
+                class="userSearchInput__control"
               >
                 <div
-                  class="css-1neafsd"
+                  class="userSearchInput__value-container"
                 >
                   <div
-                    class="css-1yro3oh-placeholder"
-                    id="react-select-4-placeholder"
+                    class="userSearchInput__placeholder"
                   >
                     Search for people and channels
                   </div>
-                  <div
-                    class="css-85xuox"
-                    data-value=""
-                  >
-                    <input
-                      aria-activedescendant=""
-                      aria-autocomplete="list"
-                      aria-describedby="react-select-4-placeholder"
-                      aria-expanded="false"
-                      aria-haspopup="true"
-                      autocapitalize="none"
-                      autocomplete="off"
-                      autocorrect="off"
-                      class=""
-                      id="react-select-4-input"
-                      role="combobox"
-                      spellcheck="false"
-                      style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
-                      tabindex="0"
-                      type="text"
-                      value=""
-                    />
-                  </div>
+                  <input
+                    aria-controls="_r_2_"
+                    aria-expanded="false"
+                    autocomplete="off"
+                    class="userSearchInput__input"
+                    role="combobox"
+                    type="text"
+                    value=""
+                  />
                 </div>
-                <div
-                  class="css-1wy0on6"
-                />
               </div>
             </div>
           </div>
@@ -471,58 +427,36 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Regene
               class="CompassIcon icon-magnify MagnifyIcon"
             />
             <div
-              class="userSearchInput css-b62m3t-container"
+              class="Combobox userSearchInput"
             >
-              <span
-                class="css-1f43avz-a11yText-A11yText"
-                id="react-select-5-live-region"
-              />
               <span
                 aria-atomic="false"
                 aria-live="polite"
                 aria-relevant="additions text"
-                class="css-1f43avz-a11yText-A11yText"
+                class="Combobox__live-region"
                 role="log"
               />
               <div
-                class="css-1lxuy2a"
+                class="userSearchInput__control"
               >
                 <div
-                  class="css-1neafsd"
+                  class="userSearchInput__value-container"
                 >
                   <div
-                    class="css-1yro3oh-placeholder"
-                    id="react-select-5-placeholder"
+                    class="userSearchInput__placeholder"
                   >
                     Search for people and channels
                   </div>
-                  <div
-                    class="css-85xuox"
-                    data-value=""
-                  >
-                    <input
-                      aria-activedescendant=""
-                      aria-autocomplete="list"
-                      aria-describedby="react-select-5-placeholder"
-                      aria-expanded="false"
-                      aria-haspopup="true"
-                      autocapitalize="none"
-                      autocomplete="off"
-                      autocorrect="off"
-                      class=""
-                      id="react-select-5-input"
-                      role="combobox"
-                      spellcheck="false"
-                      style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
-                      tabindex="0"
-                      type="text"
-                      value=""
-                    />
-                  </div>
+                  <input
+                    aria-controls="_r_3_"
+                    aria-expanded="false"
+                    autocomplete="off"
+                    class="userSearchInput__input"
+                    role="combobox"
+                    type="text"
+                    value=""
+                  />
                 </div>
-                <div
-                  class="css-1wy0on6"
-                />
               </div>
             </div>
           </div>
@@ -705,58 +639,36 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
               class="CompassIcon icon-magnify MagnifyIcon"
             />
             <div
-              class="userSearchInput css-b62m3t-container"
+              class="Combobox userSearchInput"
             >
-              <span
-                class="css-1f43avz-a11yText-A11yText"
-                id="react-select-9-live-region"
-              />
               <span
                 aria-atomic="false"
                 aria-live="polite"
                 aria-relevant="additions text"
-                class="css-1f43avz-a11yText-A11yText"
+                class="Combobox__live-region"
                 role="log"
               />
               <div
-                class="css-1lxuy2a"
+                class="userSearchInput__control"
               >
                 <div
-                  class="css-1neafsd"
+                  class="userSearchInput__value-container"
                 >
                   <div
-                    class="css-1yro3oh-placeholder"
-                    id="react-select-9-placeholder"
+                    class="userSearchInput__placeholder"
                   >
                     Search for people and channels
                   </div>
-                  <div
-                    class="css-85xuox"
-                    data-value=""
-                  >
-                    <input
-                      aria-activedescendant=""
-                      aria-autocomplete="list"
-                      aria-describedby="react-select-9-placeholder"
-                      aria-expanded="false"
-                      aria-haspopup="true"
-                      autocapitalize="none"
-                      autocomplete="off"
-                      autocorrect="off"
-                      class=""
-                      id="react-select-9-input"
-                      role="combobox"
-                      spellcheck="false"
-                      style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
-                      tabindex="0"
-                      type="text"
-                      value=""
-                    />
-                  </div>
+                  <input
+                    aria-controls="_r_7_"
+                    aria-expanded="false"
+                    autocomplete="off"
+                    class="userSearchInput__input"
+                    role="combobox"
+                    type="text"
+                    value=""
+                  />
                 </div>
-                <div
-                  class="css-1wy0on6"
-                />
               </div>
             </div>
           </div>
@@ -902,93 +814,52 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
               class="CompassIcon icon-magnify MagnifyIcon"
             />
             <div
-              class="userSearchInput css-b62m3t-container"
+              class="Combobox userSearchInput"
             >
-              <span
-                class="css-1f43avz-a11yText-A11yText"
-                id="react-select-9-live-region"
-              />
               <span
                 aria-atomic="false"
                 aria-live="polite"
                 aria-relevant="additions text"
-                class="css-1f43avz-a11yText-A11yText"
+                class="Combobox__live-region"
                 role="log"
-              >
-                <span
-                  id="aria-selection"
-                />
-                <span
-                  id="aria-focused"
-                />
-                <span
-                  id="aria-results"
-                >
-                  4 results available.
-                </span>
-                <span
-                  id="aria-guidance"
-                >
-                  Use Up and Down to choose options, press Enter to select the currently focused option, press Escape to exit the menu, press Tab to select the option and exit the menu.
-                </span>
-              </span>
+              />
               <div
-                class="css-1lxuy2a"
+                class="userSearchInput__control"
               >
                 <div
-                  class="css-1neafsd"
+                  class="userSearchInput__value-container"
                 >
                   <div
-                    class="css-1yro3oh-placeholder"
-                    id="react-select-9-placeholder"
+                    class="userSearchInput__placeholder"
                   >
                     Search for people and channels
                   </div>
-                  <div
-                    class="css-85xuox"
-                    data-value=""
-                  >
-                    <input
-                      aria-activedescendant="react-select-9-option-0"
-                      aria-autocomplete="list"
-                      aria-controls="react-select-9-listbox"
-                      aria-describedby="react-select-9-placeholder"
-                      aria-expanded="true"
-                      aria-haspopup="true"
-                      autocapitalize="none"
-                      autocomplete="off"
-                      autocorrect="off"
-                      class=""
-                      id="react-select-9-input"
-                      role="combobox"
-                      spellcheck="false"
-                      style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
-                      tabindex="0"
-                      type="text"
-                      value=""
-                    />
-                  </div>
+                  <input
+                    aria-activedescendant="_r_7_-option-0"
+                    aria-controls="_r_7_"
+                    aria-expanded="true"
+                    autocomplete="off"
+                    class="userSearchInput__input"
+                    role="combobox"
+                    type="text"
+                    value=""
+                  />
                 </div>
-                <div
-                  class="css-1wy0on6"
-                />
               </div>
               <div
-                class="css-45h7mv-menu"
+                class="Combobox__menu userSearchInput__menu is-positioned"
+                style="min-width: 0px; max-height: -16px; transform: translate(8px, 4px);"
               >
                 <div
-                  aria-multiselectable="false"
-                  class="css-1fmksep"
-                  id="react-select-9-listbox"
+                  class="userSearchInput__menu-list"
+                  id="_r_7_"
                   role="listbox"
                 >
                   <div
-                    aria-disabled="false"
                     aria-selected="false"
-                    class="css-8e5kjb-option"
-                    id="react-select-9-option-0"
+                    class="userSearchInput__option userSearchInput__option--is-focused"
+                    id="_r_7_-option-0"
                     role="option"
-                    tabindex="-1"
                   >
                     <div
                       class="user-item"
@@ -1008,12 +879,10 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                     </div>
                   </div>
                   <div
-                    aria-disabled="false"
                     aria-selected="false"
-                    class="css-x3yilo-option"
-                    id="react-select-9-option-1"
+                    class="userSearchInput__option"
+                    id="_r_7_-option-1"
                     role="option"
-                    tabindex="-1"
                   >
                     <div
                       class="user-item"
@@ -1033,12 +902,10 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                     </div>
                   </div>
                   <div
-                    aria-disabled="false"
                     aria-selected="false"
-                    class="css-x3yilo-option"
-                    id="react-select-9-option-2"
+                    class="userSearchInput__option"
+                    id="_r_7_-option-2"
                     role="option"
-                    tabindex="-1"
                   >
                     <div
                       class="user-item"
@@ -1058,12 +925,10 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                     </div>
                   </div>
                   <div
-                    aria-disabled="false"
                     aria-selected="false"
-                    class="css-x3yilo-option"
-                    id="react-select-9-option-3"
+                    class="userSearchInput__option"
+                    id="_r_7_-option-3"
                     role="option"
-                    tabindex="-1"
                   >
                     <div
                       class="user-item"
@@ -1228,58 +1093,36 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
               class="CompassIcon icon-magnify MagnifyIcon"
             />
             <div
-              class="userSearchInput css-b62m3t-container"
+              class="Combobox userSearchInput"
             >
-              <span
-                class="css-1f43avz-a11yText-A11yText"
-                id="react-select-10-live-region"
-              />
               <span
                 aria-atomic="false"
                 aria-live="polite"
                 aria-relevant="additions text"
-                class="css-1f43avz-a11yText-A11yText"
+                class="Combobox__live-region"
                 role="log"
               />
               <div
-                class="css-1lxuy2a"
+                class="userSearchInput__control"
               >
                 <div
-                  class="css-1neafsd"
+                  class="userSearchInput__value-container"
                 >
                   <div
-                    class="css-1yro3oh-placeholder"
-                    id="react-select-10-placeholder"
+                    class="userSearchInput__placeholder"
                   >
                     Search for people and channels
                   </div>
-                  <div
-                    class="css-85xuox"
-                    data-value=""
-                  >
-                    <input
-                      aria-activedescendant=""
-                      aria-autocomplete="list"
-                      aria-describedby="react-select-10-placeholder"
-                      aria-expanded="false"
-                      aria-haspopup="true"
-                      autocapitalize="none"
-                      autocomplete="off"
-                      autocorrect="off"
-                      class=""
-                      id="react-select-10-input"
-                      role="combobox"
-                      spellcheck="false"
-                      style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
-                      tabindex="0"
-                      type="text"
-                      value=""
-                    />
-                  </div>
+                  <input
+                    aria-controls="_r_8_"
+                    aria-expanded="false"
+                    autocomplete="off"
+                    class="userSearchInput__input"
+                    role="combobox"
+                    type="text"
+                    value=""
+                  />
                 </div>
-                <div
-                  class="css-1wy0on6"
-                />
               </div>
             </div>
           </div>
@@ -1425,93 +1268,52 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
               class="CompassIcon icon-magnify MagnifyIcon"
             />
             <div
-              class="userSearchInput css-b62m3t-container"
+              class="Combobox userSearchInput"
             >
-              <span
-                class="css-1f43avz-a11yText-A11yText"
-                id="react-select-10-live-region"
-              />
               <span
                 aria-atomic="false"
                 aria-live="polite"
                 aria-relevant="additions text"
-                class="css-1f43avz-a11yText-A11yText"
+                class="Combobox__live-region"
                 role="log"
-              >
-                <span
-                  id="aria-selection"
-                />
-                <span
-                  id="aria-focused"
-                />
-                <span
-                  id="aria-results"
-                >
-                  4 results available.
-                </span>
-                <span
-                  id="aria-guidance"
-                >
-                  Use Up and Down to choose options, press Enter to select the currently focused option, press Escape to exit the menu, press Tab to select the option and exit the menu.
-                </span>
-              </span>
+              />
               <div
-                class="css-1lxuy2a"
+                class="userSearchInput__control"
               >
                 <div
-                  class="css-1neafsd"
+                  class="userSearchInput__value-container"
                 >
                   <div
-                    class="css-1yro3oh-placeholder"
-                    id="react-select-10-placeholder"
+                    class="userSearchInput__placeholder"
                   >
                     Search for people and channels
                   </div>
-                  <div
-                    class="css-85xuox"
-                    data-value=""
-                  >
-                    <input
-                      aria-activedescendant="react-select-10-option-0"
-                      aria-autocomplete="list"
-                      aria-controls="react-select-10-listbox"
-                      aria-describedby="react-select-10-placeholder"
-                      aria-expanded="true"
-                      aria-haspopup="true"
-                      autocapitalize="none"
-                      autocomplete="off"
-                      autocorrect="off"
-                      class=""
-                      id="react-select-10-input"
-                      role="combobox"
-                      spellcheck="false"
-                      style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
-                      tabindex="0"
-                      type="text"
-                      value=""
-                    />
-                  </div>
+                  <input
+                    aria-activedescendant="_r_8_-option-0"
+                    aria-controls="_r_8_"
+                    aria-expanded="true"
+                    autocomplete="off"
+                    class="userSearchInput__input"
+                    role="combobox"
+                    type="text"
+                    value=""
+                  />
                 </div>
-                <div
-                  class="css-1wy0on6"
-                />
               </div>
               <div
-                class="css-45h7mv-menu"
+                class="Combobox__menu userSearchInput__menu is-positioned"
+                style="min-width: 0px; max-height: -16px; transform: translate(8px, 4px);"
               >
                 <div
-                  aria-multiselectable="false"
-                  class="css-1fmksep"
-                  id="react-select-10-listbox"
+                  class="userSearchInput__menu-list"
+                  id="_r_8_"
                   role="listbox"
                 >
                   <div
-                    aria-disabled="false"
                     aria-selected="false"
-                    class="css-8e5kjb-option"
-                    id="react-select-10-option-0"
+                    class="userSearchInput__option userSearchInput__option--is-focused"
+                    id="_r_8_-option-0"
                     role="option"
-                    tabindex="-1"
                   >
                     <div
                       class="user-item"
@@ -1540,12 +1342,10 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                     </div>
                   </div>
                   <div
-                    aria-disabled="false"
                     aria-selected="false"
-                    class="css-x3yilo-option"
-                    id="react-select-10-option-1"
+                    class="userSearchInput__option"
+                    id="_r_8_-option-1"
                     role="option"
-                    tabindex="-1"
                   >
                     <div
                       class="user-item"
@@ -1574,12 +1374,10 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                     </div>
                   </div>
                   <div
-                    aria-disabled="false"
                     aria-selected="false"
-                    class="css-x3yilo-option"
-                    id="react-select-10-option-2"
+                    class="userSearchInput__option"
+                    id="_r_8_-option-2"
                     role="option"
-                    tabindex="-1"
                   >
                     <div
                       class="user-item"
@@ -1599,12 +1397,10 @@ exports[`src/components/shareBoard/shareBoard return shareBoard and click Select
                     </div>
                   </div>
                   <div
-                    aria-disabled="false"
                     aria-selected="false"
-                    class="css-x3yilo-option"
-                    id="react-select-10-option-3"
+                    class="userSearchInput__option"
+                    id="_r_8_-option-3"
                     role="option"
-                    tabindex="-1"
                   >
                     <div
                       class="user-item"
@@ -1769,58 +1565,36 @@ exports[`src/components/shareBoard/shareBoard return shareBoard template and cli
               class="CompassIcon icon-magnify MagnifyIcon"
             />
             <div
-              class="userSearchInput css-b62m3t-container"
+              class="Combobox userSearchInput"
             >
-              <span
-                class="css-1f43avz-a11yText-A11yText"
-                id="react-select-12-live-region"
-              />
               <span
                 aria-atomic="false"
                 aria-live="polite"
                 aria-relevant="additions text"
-                class="css-1f43avz-a11yText-A11yText"
+                class="Combobox__live-region"
                 role="log"
               />
               <div
-                class="css-1lxuy2a"
+                class="userSearchInput__control"
               >
                 <div
-                  class="css-1neafsd"
+                  class="userSearchInput__value-container"
                 >
                   <div
-                    class="css-1yro3oh-placeholder"
-                    id="react-select-12-placeholder"
+                    class="userSearchInput__placeholder"
                   >
                     Search for people
                   </div>
-                  <div
-                    class="css-85xuox"
-                    data-value=""
-                  >
-                    <input
-                      aria-activedescendant=""
-                      aria-autocomplete="list"
-                      aria-describedby="react-select-12-placeholder"
-                      aria-expanded="false"
-                      aria-haspopup="true"
-                      autocapitalize="none"
-                      autocomplete="off"
-                      autocorrect="off"
-                      class=""
-                      id="react-select-12-input"
-                      role="combobox"
-                      spellcheck="false"
-                      style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
-                      tabindex="0"
-                      type="text"
-                      value=""
-                    />
-                  </div>
+                  <input
+                    aria-controls="_r_a_"
+                    aria-expanded="false"
+                    autocomplete="off"
+                    class="userSearchInput__input"
+                    role="combobox"
+                    type="text"
+                    value=""
+                  />
                 </div>
-                <div
-                  class="css-1wy0on6"
-                />
               </div>
             </div>
           </div>
@@ -1915,93 +1689,52 @@ exports[`src/components/shareBoard/shareBoard return shareBoard template and cli
               class="CompassIcon icon-magnify MagnifyIcon"
             />
             <div
-              class="userSearchInput css-b62m3t-container"
+              class="Combobox userSearchInput"
             >
-              <span
-                class="css-1f43avz-a11yText-A11yText"
-                id="react-select-12-live-region"
-              />
               <span
                 aria-atomic="false"
                 aria-live="polite"
                 aria-relevant="additions text"
-                class="css-1f43avz-a11yText-A11yText"
+                class="Combobox__live-region"
                 role="log"
-              >
-                <span
-                  id="aria-selection"
-                />
-                <span
-                  id="aria-focused"
-                />
-                <span
-                  id="aria-results"
-                >
-                  4 results available.
-                </span>
-                <span
-                  id="aria-guidance"
-                >
-                  Use Up and Down to choose options, press Enter to select the currently focused option, press Escape to exit the menu, press Tab to select the option and exit the menu.
-                </span>
-              </span>
+              />
               <div
-                class="css-1lxuy2a"
+                class="userSearchInput__control"
               >
                 <div
-                  class="css-1neafsd"
+                  class="userSearchInput__value-container"
                 >
                   <div
-                    class="css-1yro3oh-placeholder"
-                    id="react-select-12-placeholder"
+                    class="userSearchInput__placeholder"
                   >
                     Search for people
                   </div>
-                  <div
-                    class="css-85xuox"
-                    data-value=""
-                  >
-                    <input
-                      aria-activedescendant="react-select-12-option-0"
-                      aria-autocomplete="list"
-                      aria-controls="react-select-12-listbox"
-                      aria-describedby="react-select-12-placeholder"
-                      aria-expanded="true"
-                      aria-haspopup="true"
-                      autocapitalize="none"
-                      autocomplete="off"
-                      autocorrect="off"
-                      class=""
-                      id="react-select-12-input"
-                      role="combobox"
-                      spellcheck="false"
-                      style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
-                      tabindex="0"
-                      type="text"
-                      value=""
-                    />
-                  </div>
+                  <input
+                    aria-activedescendant="_r_a_-option-0"
+                    aria-controls="_r_a_"
+                    aria-expanded="true"
+                    autocomplete="off"
+                    class="userSearchInput__input"
+                    role="combobox"
+                    type="text"
+                    value=""
+                  />
                 </div>
-                <div
-                  class="css-1wy0on6"
-                />
               </div>
               <div
-                class="css-45h7mv-menu"
+                class="Combobox__menu userSearchInput__menu is-positioned"
+                style="min-width: 0px; max-height: -16px; transform: translate(8px, 4px);"
               >
                 <div
-                  aria-multiselectable="false"
-                  class="css-1fmksep"
-                  id="react-select-12-listbox"
+                  class="userSearchInput__menu-list"
+                  id="_r_a_"
                   role="listbox"
                 >
                   <div
-                    aria-disabled="false"
                     aria-selected="false"
-                    class="css-8e5kjb-option"
-                    id="react-select-12-option-0"
+                    class="userSearchInput__option userSearchInput__option--is-focused"
+                    id="_r_a_-option-0"
                     role="option"
-                    tabindex="-1"
                   >
                     <div
                       class="user-item"
@@ -2021,12 +1754,10 @@ exports[`src/components/shareBoard/shareBoard return shareBoard template and cli
                     </div>
                   </div>
                   <div
-                    aria-disabled="false"
                     aria-selected="false"
-                    class="css-x3yilo-option"
-                    id="react-select-12-option-1"
+                    class="userSearchInput__option"
+                    id="_r_a_-option-1"
                     role="option"
-                    tabindex="-1"
                   >
                     <div
                       class="user-item"
@@ -2046,12 +1777,10 @@ exports[`src/components/shareBoard/shareBoard return shareBoard template and cli
                     </div>
                   </div>
                   <div
-                    aria-disabled="false"
                     aria-selected="false"
-                    class="css-x3yilo-option"
-                    id="react-select-12-option-2"
+                    class="userSearchInput__option"
+                    id="_r_a_-option-2"
                     role="option"
-                    tabindex="-1"
                   >
                     <div
                       class="user-item"
@@ -2071,12 +1800,10 @@ exports[`src/components/shareBoard/shareBoard return shareBoard template and cli
                     </div>
                   </div>
                   <div
-                    aria-disabled="false"
                     aria-selected="false"
-                    class="css-x3yilo-option"
-                    id="react-select-12-option-3"
+                    class="userSearchInput__option"
+                    id="_r_a_-option-3"
                     role="option"
-                    tabindex="-1"
                   >
                     <div
                       class="user-item"
@@ -2190,58 +1917,36 @@ exports[`src/components/shareBoard/shareBoard return shareBoard, and click switc
               class="CompassIcon icon-magnify MagnifyIcon"
             />
             <div
-              class="userSearchInput css-b62m3t-container"
+              class="Combobox userSearchInput"
             >
-              <span
-                class="css-1f43avz-a11yText-A11yText"
-                id="react-select-6-live-region"
-              />
               <span
                 aria-atomic="false"
                 aria-live="polite"
                 aria-relevant="additions text"
-                class="css-1f43avz-a11yText-A11yText"
+                class="Combobox__live-region"
                 role="log"
               />
               <div
-                class="css-1lxuy2a"
+                class="userSearchInput__control"
               >
                 <div
-                  class="css-1neafsd"
+                  class="userSearchInput__value-container"
                 >
                   <div
-                    class="css-1yro3oh-placeholder"
-                    id="react-select-6-placeholder"
+                    class="userSearchInput__placeholder"
                   >
                     Search for people and channels
                   </div>
-                  <div
-                    class="css-85xuox"
-                    data-value=""
-                  >
-                    <input
-                      aria-activedescendant=""
-                      aria-autocomplete="list"
-                      aria-describedby="react-select-6-placeholder"
-                      aria-expanded="false"
-                      aria-haspopup="true"
-                      autocapitalize="none"
-                      autocomplete="off"
-                      autocorrect="off"
-                      class=""
-                      id="react-select-6-input"
-                      role="combobox"
-                      spellcheck="false"
-                      style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
-                      tabindex="0"
-                      type="text"
-                      value=""
-                    />
-                  </div>
+                  <input
+                    aria-controls="_r_4_"
+                    aria-expanded="false"
+                    autocomplete="off"
+                    class="userSearchInput__input"
+                    role="combobox"
+                    type="text"
+                    value=""
+                  />
                 </div>
-                <div
-                  class="css-1wy0on6"
-                />
               </div>
             </div>
           </div>
@@ -2658,58 +2363,36 @@ exports[`src/components/shareBoard/shareBoard should match snapshot 1`] = `
               class="CompassIcon icon-magnify MagnifyIcon"
             />
             <div
-              class="userSearchInput css-b62m3t-container"
+              class="Combobox userSearchInput"
             >
-              <span
-                class="css-1f43avz-a11yText-A11yText"
-                id="react-select-2-live-region"
-              />
               <span
                 aria-atomic="false"
                 aria-live="polite"
                 aria-relevant="additions text"
-                class="css-1f43avz-a11yText-A11yText"
+                class="Combobox__live-region"
                 role="log"
               />
               <div
-                class="css-1lxuy2a"
+                class="userSearchInput__control"
               >
                 <div
-                  class="css-1neafsd"
+                  class="userSearchInput__value-container"
                 >
                   <div
-                    class="css-1yro3oh-placeholder"
-                    id="react-select-2-placeholder"
+                    class="userSearchInput__placeholder"
                   >
                     Search for people and channels
                   </div>
-                  <div
-                    class="css-85xuox"
-                    data-value=""
-                  >
-                    <input
-                      aria-activedescendant=""
-                      aria-autocomplete="list"
-                      aria-describedby="react-select-2-placeholder"
-                      aria-expanded="false"
-                      aria-haspopup="true"
-                      autocapitalize="none"
-                      autocomplete="off"
-                      autocorrect="off"
-                      class=""
-                      id="react-select-2-input"
-                      role="combobox"
-                      spellcheck="false"
-                      style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
-                      tabindex="0"
-                      type="text"
-                      value=""
-                    />
-                  </div>
+                  <input
+                    aria-controls="_r_0_"
+                    aria-expanded="false"
+                    autocomplete="off"
+                    class="userSearchInput__input"
+                    role="combobox"
+                    type="text"
+                    value=""
+                  />
                 </div>
-                <div
-                  class="css-1wy0on6"
-                />
               </div>
             </div>
           </div>
@@ -2869,58 +2552,36 @@ exports[`src/components/shareBoard/shareBoard should match snapshot with sharing
               class="CompassIcon icon-magnify MagnifyIcon"
             />
             <div
-              class="userSearchInput css-b62m3t-container"
+              class="Combobox userSearchInput"
             >
-              <span
-                class="css-1f43avz-a11yText-A11yText"
-                id="react-select-3-live-region"
-              />
               <span
                 aria-atomic="false"
                 aria-live="polite"
                 aria-relevant="additions text"
-                class="css-1f43avz-a11yText-A11yText"
+                class="Combobox__live-region"
                 role="log"
               />
               <div
-                class="css-1lxuy2a"
+                class="userSearchInput__control"
               >
                 <div
-                  class="css-1neafsd"
+                  class="userSearchInput__value-container"
                 >
                   <div
-                    class="css-1yro3oh-placeholder"
-                    id="react-select-3-placeholder"
+                    class="userSearchInput__placeholder"
                   >
                     Search for people and channels
                   </div>
-                  <div
-                    class="css-85xuox"
-                    data-value=""
-                  >
-                    <input
-                      aria-activedescendant=""
-                      aria-autocomplete="list"
-                      aria-describedby="react-select-3-placeholder"
-                      aria-expanded="false"
-                      aria-haspopup="true"
-                      autocapitalize="none"
-                      autocomplete="off"
-                      autocorrect="off"
-                      class=""
-                      id="react-select-3-input"
-                      role="combobox"
-                      spellcheck="false"
-                      style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
-                      tabindex="0"
-                      type="text"
-                      value=""
-                    />
-                  </div>
+                  <input
+                    aria-controls="_r_1_"
+                    aria-expanded="false"
+                    autocomplete="off"
+                    class="userSearchInput__input"
+                    role="combobox"
+                    type="text"
+                    value=""
+                  />
                 </div>
-                <div
-                  class="css-1wy0on6"
-                />
               </div>
             </div>
           </div>
@@ -3080,58 +2741,36 @@ exports[`src/components/shareBoard/shareBoard should match snapshot with sharing
               class="CompassIcon icon-magnify MagnifyIcon"
             />
             <div
-              class="userSearchInput css-b62m3t-container"
+              class="Combobox userSearchInput"
             >
-              <span
-                class="css-1f43avz-a11yText-A11yText"
-                id="react-select-8-live-region"
-              />
               <span
                 aria-atomic="false"
                 aria-live="polite"
                 aria-relevant="additions text"
-                class="css-1f43avz-a11yText-A11yText"
+                class="Combobox__live-region"
                 role="log"
               />
               <div
-                class="css-1lxuy2a"
+                class="userSearchInput__control"
               >
                 <div
-                  class="css-1neafsd"
+                  class="userSearchInput__value-container"
                 >
                   <div
-                    class="css-1yro3oh-placeholder"
-                    id="react-select-8-placeholder"
+                    class="userSearchInput__placeholder"
                   >
                     Search for people and channels
                   </div>
-                  <div
-                    class="css-85xuox"
-                    data-value=""
-                  >
-                    <input
-                      aria-activedescendant=""
-                      aria-autocomplete="list"
-                      aria-describedby="react-select-8-placeholder"
-                      aria-expanded="false"
-                      aria-haspopup="true"
-                      autocapitalize="none"
-                      autocomplete="off"
-                      autocorrect="off"
-                      class=""
-                      id="react-select-8-input"
-                      role="combobox"
-                      spellcheck="false"
-                      style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
-                      tabindex="0"
-                      type="text"
-                      value=""
-                    />
-                  </div>
+                  <input
+                    aria-controls="_r_6_"
+                    aria-expanded="false"
+                    autocomplete="off"
+                    class="userSearchInput__input"
+                    role="combobox"
+                    type="text"
+                    value=""
+                  />
                 </div>
-                <div
-                  class="css-1wy0on6"
-                />
               </div>
             </div>
           </div>
@@ -3291,58 +2930,36 @@ exports[`src/components/shareBoard/shareBoard should match snapshot with sharing
               class="CompassIcon icon-magnify MagnifyIcon"
             />
             <div
-              class="userSearchInput css-b62m3t-container"
+              class="Combobox userSearchInput"
             >
-              <span
-                class="css-1f43avz-a11yText-A11yText"
-                id="react-select-7-live-region"
-              />
               <span
                 aria-atomic="false"
                 aria-live="polite"
                 aria-relevant="additions text"
-                class="css-1f43avz-a11yText-A11yText"
+                class="Combobox__live-region"
                 role="log"
               />
               <div
-                class="css-1lxuy2a"
+                class="userSearchInput__control"
               >
                 <div
-                  class="css-1neafsd"
+                  class="userSearchInput__value-container"
                 >
                   <div
-                    class="css-1yro3oh-placeholder"
-                    id="react-select-7-placeholder"
+                    class="userSearchInput__placeholder"
                   >
                     Search for people and channels
                   </div>
-                  <div
-                    class="css-85xuox"
-                    data-value=""
-                  >
-                    <input
-                      aria-activedescendant=""
-                      aria-autocomplete="list"
-                      aria-describedby="react-select-7-placeholder"
-                      aria-expanded="false"
-                      aria-haspopup="true"
-                      autocapitalize="none"
-                      autocomplete="off"
-                      autocorrect="off"
-                      class=""
-                      id="react-select-7-input"
-                      role="combobox"
-                      spellcheck="false"
-                      style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
-                      tabindex="0"
-                      type="text"
-                      value=""
-                    />
-                  </div>
+                  <input
+                    aria-controls="_r_5_"
+                    aria-expanded="false"
+                    autocomplete="off"
+                    class="userSearchInput__input"
+                    role="combobox"
+                    type="text"
+                    value=""
+                  />
                 </div>
-                <div
-                  class="css-1wy0on6"
-                />
               </div>
             </div>
           </div>
@@ -3502,58 +3119,36 @@ exports[`src/components/shareBoard/shareBoard should match snapshot, with templa
               class="CompassIcon icon-magnify MagnifyIcon"
             />
             <div
-              class="userSearchInput css-b62m3t-container"
+              class="Combobox userSearchInput"
             >
-              <span
-                class="css-1f43avz-a11yText-A11yText"
-                id="react-select-11-live-region"
-              />
               <span
                 aria-atomic="false"
                 aria-live="polite"
                 aria-relevant="additions text"
-                class="css-1f43avz-a11yText-A11yText"
+                class="Combobox__live-region"
                 role="log"
               />
               <div
-                class="css-1lxuy2a"
+                class="userSearchInput__control"
               >
                 <div
-                  class="css-1neafsd"
+                  class="userSearchInput__value-container"
                 >
                   <div
-                    class="css-1yro3oh-placeholder"
-                    id="react-select-11-placeholder"
+                    class="userSearchInput__placeholder"
                   >
                     Search for people
                   </div>
-                  <div
-                    class="css-85xuox"
-                    data-value=""
-                  >
-                    <input
-                      aria-activedescendant=""
-                      aria-autocomplete="list"
-                      aria-describedby="react-select-11-placeholder"
-                      aria-expanded="false"
-                      aria-haspopup="true"
-                      autocapitalize="none"
-                      autocomplete="off"
-                      autocorrect="off"
-                      class=""
-                      id="react-select-11-input"
-                      role="combobox"
-                      spellcheck="false"
-                      style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
-                      tabindex="0"
-                      type="text"
-                      value=""
-                    />
-                  </div>
+                  <input
+                    aria-controls="_r_9_"
+                    aria-expanded="false"
+                    autocomplete="off"
+                    class="userSearchInput__input"
+                    role="combobox"
+                    type="text"
+                    value=""
+                  />
                 </div>
-                <div
-                  class="css-1wy0on6"
-                />
               </div>
             </div>
           </div>

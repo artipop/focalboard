@@ -1,12 +1,13 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
 
-import React, {type JSX, useState, useEffect} from 'react'
+import React, {type JSX, useCallback, useState, useEffect} from 'react'
 
 import {useIntl, FormattedMessage} from 'react-intl'
 import {generatePath, useRouteMatch} from 'react-router-dom'
-import Select from 'react-select/async'
-import {CSSObject} from '@emotion/serialize'
+
+import Combobox from '../../widgets/combobox'
+import type {ComboboxOption} from '../../combobox'
 
 import {useAppSelector} from '../../store/hooks'
 import {getCurrentBoard, getCurrentBoardMembers} from '../../store/boards'
@@ -36,7 +37,6 @@ import AdminBadge from '../../widgets/adminBadge/adminBadge'
 
 import TelemetryClient, {TelemetryActions, TelemetryCategory} from '../../telemetry/telemetryClient'
 
-import {getSelectBaseStyle} from '../../theme'
 import CompassIcon from '../../widgets/icons/compassIcon'
 import IconButton from '../../widgets/buttons/iconButton'
 import SearchIcon from '../../widgets/icons/search'
@@ -55,35 +55,6 @@ type Props = {
     enableSharedBoards: boolean
 }
 
-const baseStyles = getSelectBaseStyle()
-
-const styles = {
-    ...baseStyles,
-    control: (): CSSObject => ({
-        border: 0,
-        width: '100%',
-        height: '100%',
-        margin: '0',
-        display: 'flex',
-        flexDirection: 'row',
-    }),
-    menu: (provided: CSSObject): CSSObject => ({
-        ...provided,
-        minWidth: '100%',
-        width: 'max-content',
-        background: 'rgb(var(--center-channel-bg-rgb))',
-        left: '0',
-        marginBottom: '0',
-    }),
-    singleValue: (provided: CSSObject): CSSObject => ({
-        ...baseStyles.singleValue(provided),
-        opacity: '0.8',
-        fontSize: '12px',
-        right: '0',
-        textTransform: 'uppercase',
-    }),
-}
-
 function isLastAdmin(members: BoardMember[]) {
     let adminCount = 0
     for (const member of members) {
@@ -95,6 +66,14 @@ function isLastAdmin(members: BoardMember[]) {
     }
     return true
 }
+
+// A person or a channel, as a row of the list: the two carry their name under
+// different keys, which is what `getOptionLabel` used to reconcile.
+const asShareOption = (userOrChannel: IUser | Channel): ComboboxOption<IUser | Channel> => ({
+    id: userOrChannel.id,
+    label: (userOrChannel as IUser).username || (userOrChannel as Channel).display_name,
+    data: userOrChannel,
+})
 
 export default function ShareBoardDialog(props: Props): JSX.Element {
     const [wasCopiedPublic, setWasCopiedPublic] = useState(false)
@@ -293,6 +272,16 @@ export default function ShareBoardDialog(props: Props): JSX.Element {
         />
     )
 
+    // Somebody already an explicit member of the board is not offered again;
+    // a synthetic member is somebody the board only reaches through its channel,
+    // so they still are.
+    const loadShareOptions = useCallback(async (query: string) => {
+        const users = await client.searchTeamUsers(query) || []
+        return users.
+            filter((user) => (members[user.id] ? members[user.id].synthetic : true)).
+            map(asShareOption)
+    }, [members])
+
     const formatOptionLabel = (userOrChannel: IUser | Channel) => {
         if ((userOrChannel as IUser).username) {
             const user = userOrChannel as IUser
@@ -342,40 +331,21 @@ export default function ShareBoardDialog(props: Props): JSX.Element {
                 <div className='share-input__container'>
                     <div className='share-input'>
                         <SearchIcon/>
-                        <Select
-                            styles={styles}
-                            value={selectedUser}
+                        <Combobox
+                            value={selectedUser ? asShareOption(selectedUser) : null}
                             className={'userSearchInput'}
-                            cacheOptions={true}
-                            filterOption={(o) => {
-                                // render non-explicit members
-                                if (members[o.value]) {
-                                    return members[o.value].synthetic
-                                }
-
-                                // not a member, definitely render
-                                return true
-                            }}
-                            loadOptions={async (inputValue: string) => {
-                                const result = []
-                                const users = await client.searchTeamUsers(inputValue) || []
-                                result.push(...users)
-                                return result
-                            }}
-                            components={{DropdownIndicator: () => null, IndicatorSeparator: () => null}}
-                            defaultOptions={true}
-                            formatOptionLabel={formatOptionLabel}
-                            getOptionValue={(u) => u.id}
-                            getOptionLabel={(u: IUser|Channel) => (u as IUser).username || (u as Channel).display_name}
-                            isMulti={false}
+                            classNamePrefix={'userSearchInput'}
+                            loadOptions={loadShareOptions}
+                            renderOption={(option) => formatOptionLabel(option.data)}
                             placeholder={board.isTemplate ? intl.formatMessage({id: 'ShareTemplate.searchPlaceholder', defaultMessage: 'Search for people'}) : intl.formatMessage({id: 'ShareBoard.searchPlaceholder', defaultMessage: 'Search for people and channels'})
                             }
-                            onChange={(newValue) => {
-                                if (newValue && (newValue as IUser).username) {
-                                    addUser(newValue as IUser)
+                            onChange={(value) => {
+                                const chosen = (value as ComboboxOption<IUser | Channel> | null)?.data
+                                if (chosen && (chosen as IUser).username) {
+                                    addUser(chosen as IUser)
                                     setSelectedUser(null)
-                                } else if (newValue) {
-                                    onLinkBoard(newValue as Channel)
+                                } else if (chosen) {
+                                    onLinkBoard(chosen as Channel)
                                 }
                             }}
                         />
