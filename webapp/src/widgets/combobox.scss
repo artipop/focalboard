@@ -1,0 +1,110 @@
+@import '../styles/z-index';
+
+// What `getSelectBaseStyle()` in theme.ts used to say as an emotion object: the
+// look every select shares, in the one place a stylesheet belongs. Call sites
+// keep their own overrides, which is why almost nothing here is specific.
+.Combobox {
+    position: relative;
+    width: 100%;
+
+    input {
+        min-width: 2px;
+        flex: 1 1 auto;
+        padding: 0;
+        border: 0;
+        margin: 0;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        outline: none;
+    }
+
+    [class$='__control'] {
+        display: flex;
+        width: 100%;
+        align-items: center;
+    }
+
+    [class$='__value-container'] {
+        display: flex;
+        min-width: 0;
+        flex: 1 1 auto;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 2px;
+    }
+
+    [class$='__placeholder'] {
+        overflow: hidden;
+        color: rgba(var(--center-channel-color-rgb), 0.4);
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    [class$='__multi-value__remove'] {
+        cursor: pointer;
+        opacity: 0.56;
+
+        &:hover {
+            opacity: 1;
+        }
+    }
+}
+
+// The menu is placed by Floating UI, so it is out of flow wherever it is drawn
+// -- in place, or in a portal when it would otherwise be clipped.
+.Combobox__menu {
+    @include z-index(combobox-menu);
+    position: absolute;
+    top: 0;
+    left: 0;
+    overflow: hidden auto;
+    background: rgb(var(--center-channel-bg-rgb));
+    border-radius: var(--default-rad);
+    box-shadow: rgba(var(--center-channel-color-rgb), 0.1) 0 0 0 1px, rgba(var(--center-channel-color-rgb), 0.1) 0 4px 11px;
+    color: rgb(var(--center-channel-color-rgb));
+    visibility: hidden;
+
+    &.is-positioned {
+        visibility: visible;
+    }
+
+    [class$='__menu-list'] {
+        padding: 4px 0;
+    }
+
+    [class$='__group-heading'] {
+        padding: 6px 8px 2px;
+        color: rgba(var(--center-channel-color-rgb), 0.56);
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    [class$='__option'] {
+        padding: 2px 8px;
+        cursor: pointer;
+    }
+
+    [class*='__option--is-focused'] {
+        background: rgba(var(--center-channel-color-rgb), 0.1);
+    }
+
+    [class$='__no-options'] {
+        padding: 8px;
+        color: rgba(var(--center-channel-color-rgb), 0.56);
+    }
+}
+
+// Announced, not shown.
+.Combobox__live-region {
+    position: absolute;
+    overflow: hidden;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    border: 0;
+    margin: -1px;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}

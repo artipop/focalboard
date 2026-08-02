@@ -1,13 +1,14 @@
 // Copyright (c) 2015-present Mattermost, Inc. All Rights Reserved.
 // See LICENSE.txt for license information.
-import React, {useState} from 'react'
-import Select from 'react-select'
-import {CSSObject} from '@emotion/serialize'
+import React, {useMemo, useState} from 'react'
 
-import {getSelectBaseStyle} from '../../theme'
+import Combobox from '../../widgets/combobox'
+import type {ComboboxOption} from '../../combobox'
 
 import * as registry from './blocks/'
 import {ContentType} from './blocks/types'
+
+import './rootInput.scss'
 
 type Props = {
     onChange: (value: string) => void
@@ -16,70 +17,38 @@ type Props = {
     value: string
 }
 
-const baseStyles = getSelectBaseStyle()
-
-const styles = {
-    ...baseStyles,
-    control: (provided: CSSObject): CSSObject => ({
-        ...provided,
-        width: '100%',
-        height: '100%',
-        display: 'flex',
-        background: 'rgb(var(--center-channel-bg-rgb))',
-        color: 'rgb(var(--center-channel-color-rgb))',
-        flexDirection: 'row',
-    }),
-    input: (provided: CSSObject): CSSObject => ({
-        ...provided,
-        background: 'rgb(var(--center-channel-bg-rgb))',
-        color: 'rgb(var(--center-channel-color-rgb))',
-    }),
-    menu: (provided: CSSObject): CSSObject => ({
-        ...provided,
-        minWidth: '100%',
-        width: 'max-content',
-        background: 'rgb(var(--center-channel-bg-rgb))',
-        left: '0',
-        marginBottom: '0',
-    }),
-    menuPortal: (provided: CSSObject): CSSObject => ({
-        ...provided,
-        zIndex: 999,
-    }),
-}
-
 export default function RootInput(props: Props) {
     const [showMenu, setShowMenu] = useState(false)
 
+    const options: Array<ComboboxOption<ContentType>> = useMemo(() => registry.list().map((ct) => ({
+        id: ct.slashCommand,
+        label: `${ct.slashCommand} Creates a new ${ct.displayName} block.`,
+        data: ct,
+    })), [])
+
     return (
-        <Select
-            styles={styles}
-            components={{DropdownIndicator: () => null, IndicatorSeparator: () => null}}
+        <Combobox
             className='RootInput'
+            classNamePrefix='RootInput'
             placeholder={'Introduce your text or your slash command'}
             autoFocus={true}
             menuIsOpen={showMenu}
-            menuPortalTarget={document.getElementById('focalboard-root-portal')}
-            menuPosition={'fixed'}
-            options={registry.list()}
-            getOptionValue={(ct: ContentType) => ct.slashCommand}
-            getOptionLabel={(ct: ContentType) => ct.slashCommand + ' Creates a new ' + ct.displayName + ' block.'}
-            filterOption={(option: any, inputValue: string): boolean => {
-                return inputValue.startsWith(option.value) || option.value.startsWith(inputValue)
-            }}
+            portalTarget={document.getElementById('focalboard-root-portal')}
+            options={options}
+
+            // A slash command matches from either end, so `/i` finds `/image`
+            // and typing past the command keeps it on screen.
+            matches={(option, query) => query.startsWith(option.id) || option.id.startsWith(query)}
             inputValue={props.value}
-            onInputChange={(inputValue: string) => {
-                props.onChange(inputValue)
-                if (inputValue.startsWith('/')) {
-                    setShowMenu(true)
-                } else {
-                    setShowMenu(false)
-                }
+            onInputChange={(value: string) => {
+                props.onChange(value)
+                setShowMenu(value.startsWith('/'))
             }}
-            onChange={(ct: ContentType|null) => {
-                if (ct) {
+            onChange={(value) => {
+                const chosen = value as ComboboxOption<ContentType> | null
+                if (chosen) {
                     const args = props.value.split(' ').slice(1)
-                    ct.runSlashCommand(props.onChangeType, props.onChange, ...args)
+                    chosen.data.runSlashCommand(props.onChangeType, props.onChange, ...args)
                 }
             }}
             onBlur={() => {
@@ -91,8 +60,7 @@ export default function RootInput(props: Props) {
                 }
             }}
             onFocus={(e: React.FocusEvent) => {
-                const target = e.currentTarget
-                target.scrollIntoView({block: 'center'})
+                e.currentTarget.scrollIntoView({block: 'center'})
             }}
             onKeyDown={(e) => {
                 if (e.key === 'Escape') {
@@ -113,4 +81,3 @@ export default function RootInput(props: Props) {
         />
     )
 }
-

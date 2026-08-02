@@ -9,75 +9,36 @@ exports[`components/blocksEditor/blocksEditor should match snapshot on empty 1`]
       class="Editor"
     >
       <div
-        class="RootInput css-b62m3t-container"
+        class="Combobox RootInput"
       >
-        <span
-          class="css-1f43avz-a11yText-A11yText"
-          id="react-select-2-live-region"
-        >
-          <span
-            id="aria-selection"
-          >
-            option , selected.
-          </span>
-          <span
-            id="aria-focused"
-          />
-          <span
-            id="aria-results"
-          />
-          <span
-            id="aria-guidance"
-          >
-            Select is focused ,type to refine list, press Down to open the menu, 
-          </span>
-        </span>
         <span
           aria-atomic="false"
           aria-live="polite"
           aria-relevant="additions text"
-          class="css-1f43avz-a11yText-A11yText"
+          class="Combobox__live-region"
           role="log"
         />
         <div
-          class="css-a5687m-control"
+          class="RootInput__control"
         >
           <div
-            class="css-1neafsd"
+            class="RootInput__value-container"
           >
             <div
-              class="css-1yro3oh-placeholder"
-              id="react-select-2-placeholder"
+              class="RootInput__placeholder"
             >
               Introduce your text or your slash command
             </div>
-            <div
-              class="css-x14nly"
-              data-value=""
-            >
-              <input
-                aria-activedescendant=""
-                aria-autocomplete="list"
-                aria-describedby="react-select-2-placeholder"
-                aria-expanded="false"
-                aria-haspopup="true"
-                autocapitalize="none"
-                autocomplete="off"
-                autocorrect="off"
-                class=""
-                id="react-select-2-input"
-                role="combobox"
-                spellcheck="false"
-                style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
-                tabindex="0"
-                type="text"
-                value=""
-              />
-            </div>
+            <input
+              aria-controls="_r_0_"
+              aria-expanded="false"
+              autocomplete="off"
+              class="RootInput__input"
+              role="combobox"
+              type="text"
+              value=""
+            />
           </div>
-          <div
-            class="css-1wy0on6"
-          />
         </div>
       </div>
     </div>
@@ -402,75 +363,36 @@ exports[`components/blocksEditor/blocksEditor should match snapshot with blocks 
       class="Editor"
     >
       <div
-        class="RootInput css-b62m3t-container"
+        class="Combobox RootInput"
       >
-        <span
-          class="css-1f43avz-a11yText-A11yText"
-          id="react-select-3-live-region"
-        >
-          <span
-            id="aria-selection"
-          >
-            option , selected.
-          </span>
-          <span
-            id="aria-focused"
-          />
-          <span
-            id="aria-results"
-          />
-          <span
-            id="aria-guidance"
-          >
-            Select is focused ,type to refine list, press Down to open the menu, 
-          </span>
-        </span>
         <span
           aria-atomic="false"
           aria-live="polite"
           aria-relevant="additions text"
-          class="css-1f43avz-a11yText-A11yText"
+          class="Combobox__live-region"
           role="log"
         />
         <div
-          class="css-a5687m-control"
+          class="RootInput__control"
         >
           <div
-            class="css-1neafsd"
+            class="RootInput__value-container"
           >
             <div
-              class="css-1yro3oh-placeholder"
-              id="react-select-3-placeholder"
+              class="RootInput__placeholder"
             >
               Introduce your text or your slash command
             </div>
-            <div
-              class="css-x14nly"
-              data-value=""
-            >
-              <input
-                aria-activedescendant=""
-                aria-autocomplete="list"
-                aria-describedby="react-select-3-placeholder"
-                aria-expanded="false"
-                aria-haspopup="true"
-                autocapitalize="none"
-                autocomplete="off"
-                autocorrect="off"
-                class=""
-                id="react-select-3-input"
-                role="combobox"
-                spellcheck="false"
-                style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
-                tabindex="0"
-                type="text"
-                value=""
-              />
-            </div>
+            <input
+              aria-controls="_r_7_"
+              aria-expanded="false"
+              autocomplete="off"
+              class="RootInput__input"
+              role="combobox"
+              type="text"
+              value=""
+            />
           </div>
-          <div
-            class="css-1wy0on6"
-          />
         </div>
       </div>
     </div>
