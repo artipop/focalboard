@@ -1,21 +1,15 @@
 package acp
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
 
-// fakeCodexEnv emits codex exec --json events and echoes CODEX_HOME back in the
-// agent message, so the test can assert the per-agent env reached the process.
-const fakeCodexEnv = `#!/bin/sh
-printf '%s\n' '{"type":"thread.started"}'
-printf '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"codex home is %s"}}\n' "$CODEX_HOME"
-printf '%s\n' '{"type":"turn.completed"}'
-`
-
 func TestCodexAgentRunsWithIsolatedEnv(t *testing.T) {
-	codexScript := writeFakeClaude(t, fakeCodexEnv) // generic: writes an executable script
+	codexScript := writeFakeAgent(t, fakeCodexEnv)
 	m, writer, events, repo := testManager(t, fakeClaudeHappy, func(c *Config) {
 		c.Agents = []AgentEntry{{
 			Name:    "codexagent",
@@ -43,20 +37,20 @@ func TestCodexAgentRunsWithIsolatedEnv(t *testing.T) {
 	if !strings.Contains(last, "/custom/codexhome") {
 		t.Errorf("per-agent CODEX_HOME did not reach the codex process; final comment: %q", last)
 	}
-}
 
-// fakeCodexProxy echoes the proxy env back, so the test can assert the agent's
-// network settings reached the process.
-const fakeCodexProxy = `#!/bin/sh
-printf '%s\n' '{"type":"thread.started"}'
-printf '{"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"proxy=%s ca=%s"}}\n' "$HTTPS_PROXY" "$NODE_EXTRA_CA_CERTS"
-printf '%s\n' '{"type":"turn.completed"}'
-`
+	// The codex adapter starts read-only, so a session that was asked to do
+	// work has to be switched over — otherwise the turn is spent explaining
+	// that nothing can be edited.
+	mode, err := os.ReadFile(filepath.Join(fakeAgentDir(codexScript), "mode.txt"))
+	if err != nil || string(mode) != "auto" {
+		t.Errorf("session mode = %q (err %v), want auto", mode, err)
+	}
+}
 
 // A wrapper command in front of the CLI (proxychains and friends) plus per-agent
 // proxy settings: both must survive all the way to the spawned process.
 func TestCodexAgentWrapperCommandAndProxy(t *testing.T) {
-	script := writeFakeClaude(t, fakeCodexProxy)
+	script := writeFakeAgent(t, fakeCodexProxy)
 	m, writer, events, repo := testManager(t, fakeClaudeHappy, func(c *Config) {
 		c.Proxies = []ProxyEntry{{
 			Name: "office",

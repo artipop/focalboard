@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strconv"
-	"strings"
 
 	acpsdk "github.com/coder/acp-go-sdk"
 
@@ -18,9 +16,10 @@ import (
 // own binary re-invoked as `<self> mcp <name>`, configured entirely through
 // their environment, so the model picks steps but never targets.
 //
-// Every agent kind takes the same description by a different road: claude gets
-// --mcp-config, codex gets -c overrides, and an ACP-native agent gets the
-// servers in session/new, where the protocol has a field for them.
+// Every agent takes the same description by the same road: session/new, where
+// the protocol has a field for them. That is one of the things the vendor
+// adapters bought — the CLI-specific ways of declaring a server (a --mcp-config
+// flag, a set of -c overrides) are gone along with the bridges that needed them.
 
 // builtinMCPNames are the servers a session spawns itself, with per-session
 // configuration the agent must not be able to supply: the deploy target, the
@@ -103,50 +102,7 @@ func agentMCPServers(s *Session) []mcpServerSpec {
 	return specs
 }
 
-func claudeMCPArgs(specs []mcpServerSpec) ([]string, error) {
-	if len(specs) == 0 {
-		return nil, nil
-	}
-	type serverJSON struct {
-		Command string            `json:"command"`
-		Args    []string          `json:"args,omitempty"`
-		Env     map[string]string `json:"env,omitempty"`
-	}
-	servers := make(map[string]serverJSON, len(specs))
-	for _, s := range specs {
-		servers[s.Name] = serverJSON{Command: s.Command, Args: s.Args, Env: s.Env}
-	}
-	cfg, err := json.Marshal(map[string]any{"mcpServers": servers})
-	if err != nil {
-		return nil, err
-	}
-	return []string{"--mcp-config", string(cfg)}, nil
-}
-
-// codexMCPArgs renders the servers as codex config overrides. Codex has no
-// --mcp-config: `-c key=value` sets one config key per flag, the value being
-// TOML — hence dotted keys rather than one inline table, which keeps the
-// escaping to individual strings.
-func codexMCPArgs(specs []mcpServerSpec) []string {
-	var args []string
-	for _, s := range specs {
-		key := "mcp_servers." + s.Name
-		args = append(args, "-c", key+".command="+tomlString(s.Command))
-		if len(s.Args) > 0 {
-			quoted := make([]string, len(s.Args))
-			for i, a := range s.Args {
-				quoted[i] = tomlString(a)
-			}
-			args = append(args, "-c", key+".args=["+strings.Join(quoted, ", ")+"]")
-		}
-		for _, name := range sortedEnvNames(s.Env) {
-			args = append(args, "-c", key+".env."+name+"="+tomlString(s.Env[name]))
-		}
-	}
-	return args
-}
-
-// acpMCPServers renders the servers for session/new of an ACP-native agent.
+// acpMCPServers renders the servers for session/new.
 func acpMCPServers(specs []mcpServerSpec) []acpsdk.McpServer {
 	servers := make([]acpsdk.McpServer, 0, len(specs))
 	for _, s := range specs {
@@ -162,13 +118,6 @@ func acpMCPServers(specs []mcpServerSpec) []acpsdk.McpServer {
 		}})
 	}
 	return servers
-}
-
-// tomlString quotes a value for a TOML basic string. Go's own quoting escapes
-// the same characters TOML does, and leaves printable non-ASCII alone, which
-// TOML allows.
-func tomlString(s string) string {
-	return strconv.Quote(s)
 }
 
 // sortedEnvNames keeps generated argv stable between runs (map order is not).

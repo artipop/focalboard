@@ -36,6 +36,8 @@ export interface IAppWindow extends Window {
                 UpdateProxy(entryJSON: string): Promise<string>
                 RemoveProxy(name: string): Promise<void>
                 SyncAgentUsers?(boardId: string): Promise<string>
+                ListAgentAdapters?(): Promise<string>
+                InstallAgentAdapter?(kind: string): Promise<string>
                 ListDeployTargets(): Promise<string>
                 AddDeployTarget(entryJSON: string): Promise<string>
                 UpdateDeployTarget(entryJSON: string): Promise<string>
@@ -60,7 +62,6 @@ export interface IAppWindow extends Window {
                 StartCardSession(cardId: string, repoName: string): Promise<string>
                 PromptSession(sessionId: string, text: string): Promise<void>
                 AnswerPermission(sessionId: string, requestId: string, optionId: string): Promise<void>
-                AnswerQuestion(sessionId: string, requestId: string, text: string): Promise<void>
                 StartCardDeploy(cardId: string, branch: string): Promise<string>
                 StartPlanningSession(repoName: string, agentName: string): Promise<string>
                 ComposeTask(sessionId: string): Promise<string>

@@ -115,6 +115,23 @@
         }
     }
 
+    // Whether the chosen kind can start at all, said next to the choice.
+    .AgentsDialog__adapter {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 6px 8px;
+        border-radius: 4px;
+        background: rgba(var(--center-channel-color-rgb), 0.06);
+        font-size: 12px;
+
+        &--missing {
+            color: rgb(var(--error-text-color-rgb, 210, 75, 78));
+            background: rgba(var(--error-text-color-rgb, 210, 75, 78), 0.08);
+        }
+    }
+
     .AgentsDialog__error {
         color: rgb(var(--error-text-color-rgb, 210, 75, 78));
         padding-top: 8px;

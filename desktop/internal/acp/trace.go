@@ -109,8 +109,13 @@ func (t *Tracer) Line(sessionID, direction string, line []byte) {
 	}
 	kind := "raw"
 	if obj, ok := parsed.(map[string]any); ok {
-		if s, ok := obj["type"].(string); ok {
-			kind = s
+		// A JSON-RPC message is named by its method; a response carries none
+		// and is left as a raw line, which is enough to pair it with its id.
+		for _, key := range []string{"method", "type"} {
+			if s, ok := obj[key].(string); ok {
+				kind = s
+				break
+			}
 		}
 	}
 	t.Event(sessionID, direction, kind, parsed)

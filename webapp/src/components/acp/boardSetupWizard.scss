@@ -80,6 +80,15 @@
         background: rgba(var(--center-channel-color-rgb), 0.06);
     }
 
+    // The chosen kind cannot be started on this machine.
+    .BoardSetupWizard__warning {
+        font-size: 12px;
+        padding: 6px 10px;
+        border-radius: 4px;
+        color: rgb(var(--error-text-color-rgb, 210, 75, 78));
+        background: rgba(var(--error-text-color-rgb, 210, 75, 78), 0.08);
+    }
+
     .BoardSetupWizard__hint {
         font-size: 12px;
         color: rgba(var(--center-channel-color-rgb), 0.56);

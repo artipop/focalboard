@@ -13,7 +13,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/mattermost/focalboard/desktop/internal/acp/claudebridge"
 	"github.com/mattermost/focalboard/desktop/internal/dokku"
 	"github.com/mattermost/focalboard/desktop/internal/vcs"
 )
@@ -99,11 +98,12 @@ func NewManager(cfg Config, cfgPath string, st *Store, w BoardWriter, ui UIEmitt
 func (m *Manager) Start(ctx context.Context, events BoardEvents) error {
 	m.rootCtx, m.stop = context.WithCancel(ctx)
 
-	// Probe the built-in claude binary only when the empty-registry fallback
-	// would use it; registered agents resolve their own binaries at run time.
-	if len(m.cfg.Agents) == 0 && m.cfg.AgentMode != "acp-command" {
-		if _, err := m.findClaude(); err != nil {
-			m.log.Warn("acp: claude binary not found; sessions will fail until claudePath is configured", "err", err)
+	// Probe the fallback kind's adapter only when the empty registry would use
+	// it; registered agents resolve their own at run time.
+	if len(m.cfg.Agents) == 0 && m.cfg.AgentMode != agentModeCommand {
+		kind := firstNonEmpty(m.cfg.AgentMode, AgentKindClaude)
+		if _, err := m.adapterArgv(kind, ""); err != nil {
+			m.log.Warn("acp: the fallback agent cannot be started yet", "kind", kind, "err", err)
 		}
 	}
 
@@ -370,6 +370,10 @@ func (m *Manager) CancelSessionForCard(cardID, reason string) bool {
 	s.cancelSent = true
 	cancel := s.turnCancel
 	running := s.status == StatusRunning || s.status == StatusWaitingPermission
+	// The session may still be starting up — connecting to the agent takes a
+	// process spawn and a handshake — so there is nothing to cancel yet and the
+	// turn about to start has to be told.
+	s.cancelPending = !running
 	s.mu.Unlock()
 	if cancel != nil && running {
 		cancel()
@@ -677,57 +681,6 @@ func (m *Manager) forgetPermission(requestID string) {
 	m.permMu.Unlock()
 }
 
-// askUser shows the agent's questions on the console and waits for answers. It
-// fails rather than blocks when nobody is watching: an unattended session must
-// not sit on a question for the whole permission timeout.
-func (m *Manager) askUser(ctx context.Context, s *Session, questions []claudebridge.Question) (string, error) {
-	if !s.hasConsole() {
-		m.tr.Event(s.ID, TraceApp, "question_refused", map[string]any{"reason": "no console attached"})
-		return "", fmt.Errorf("консоль не открыта")
-	}
-	requestID := uuid.NewString()
-	answer := m.registerPermission(requestID, s.ID)
-	defer m.forgetPermission(requestID)
-
-	payload := map[string]any{
-		"sessionId": s.ID,
-		"cardId":    s.CardID,
-		"requestId": requestID,
-		"questions": questions,
-	}
-	s.appendEvent(m, "question", payload)
-	m.setStatus(s, StatusWaitingPermission)
-	m.ui.Emit(EventQuestion, payload)
-	defer m.setStatus(s, StatusRunning)
-
-	timeout := time.NewTimer(m.cfg.PermissionTimeout())
-	defer timeout.Stop()
-
-	select {
-	case answers := <-answer:
-		s.appendEvent(m, "answer", map[string]any{"requestId": requestID, "text": answers})
-		m.ui.Emit(EventAnswer, map[string]any{
-			"sessionId": s.ID, "cardId": s.CardID, "requestId": requestID, "text": answers,
-		})
-		return answers, nil
-	case <-timeout.C:
-		m.tr.Event(s.ID, TraceApp, "question_timeout", map[string]any{"requestId": requestID, "after": m.cfg.PermissionTimeout().String()})
-		return "", fmt.Errorf("пользователь не ответил за %s", m.cfg.PermissionTimeout())
-	case <-ctx.Done():
-		return "", ctx.Err()
-	}
-}
-
-// AnswerQuestion delivers the user's answers to a pending question. The text is
-// what the model will read, so the UI composes it from the picker.
-func (m *Manager) AnswerQuestion(sessionID, requestID, answers string) error {
-	m.tr.Event(sessionID, TraceFromUI, "AnswerQuestion", map[string]any{"requestId": requestID, "text": answers})
-	if strings.TrimSpace(answers) == "" {
-		return fmt.Errorf("пустой ответ")
-	}
-	return m.AnswerPermission(sessionID, requestID, answers)
-}
-
 // AnswerPermission delivers the user's choice for a pending permission prompt.
 func (m *Manager) AnswerPermission(sessionID, requestID, optionID string) error {
 	m.tr.Event(sessionID, TraceFromUI, "AnswerPermission", map[string]any{"requestId": requestID, "optionId": optionID})
@@ -854,42 +807,6 @@ func (m *Manager) commentCard(cardID, text string) {
 	}
 }
 
-// findClaude resolves the claude binary from the global config (no per-agent
-// override); used by the empty-registry fallback path and the startup probe.
-func (m *Manager) findClaude() (string, error) {
-	return m.resolveClaudeBin("")
-}
-
-// resolveClaudeBin resolves the claude binary: per-agent override, global
-// config, PATH, then common install locations (GUI apps get launchd's minimal
-// PATH).
-func (m *Manager) resolveClaudeBin(override string) (string, error) {
-	label := "agent binPath"
-	if override == "" {
-		override = m.cfg.ClaudePath
-		label = "claudePath"
-	}
-	if override != "" {
-		if _, err := os.Stat(override); err != nil {
-			return "", fmt.Errorf("%s %s: %w", label, override, err)
-		}
-		return override, nil
-	}
-	return lookupBin("claude", "claude binary not found (set binPath on the agent or claudePath in the acp config)")
-}
-
-// resolveCodexBin resolves the codex binary: per-agent override, PATH, then
-// common install locations.
-func (m *Manager) resolveCodexBin(override string) (string, error) {
-	if override != "" {
-		if _, err := os.Stat(override); err != nil {
-			return "", fmt.Errorf("codex binPath %s: %w", override, err)
-		}
-		return override, nil
-	}
-	return lookupBin("codex", "codex binary not found (set binPath on the agent)")
-}
-
 // firstNonEmpty returns the first non-empty string.
 func firstNonEmpty(vals ...string) string {
 	for _, v := range vals {
@@ -902,7 +819,11 @@ func firstNonEmpty(vals ...string) string {
 
 // lookupBin finds name on PATH or in common install locations. When name is an
 // absolute/explicit path (contains a separator) it is stat-checked directly.
+// notFoundMsg may be empty, in which case the name itself is the message.
 func lookupBin(name, notFoundMsg string) (string, error) {
+	if notFoundMsg == "" {
+		notFoundMsg = fmt.Sprintf("не найден %s", name)
+	}
 	if strings.ContainsRune(name, filepath.Separator) {
 		if _, err := os.Stat(name); err != nil {
 			return "", fmt.Errorf("%s: %w", name, err)
@@ -923,21 +844,6 @@ func lookupBin(name, notFoundMsg string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("%s", notFoundMsg)
-}
-
-// agentLaunchArgv returns the base argv a bridge builds its invocation on: the
-// agent's explicit Command when set — which is how a wrapper (a proxy launcher,
-// a per-account shim) gets in front of the CLI — otherwise the resolved binary.
-// The bridge appends its own protocol flags after it.
-func agentLaunchArgv(a AgentEntry, resolveBin func(override string) (string, error)) ([]string, error) {
-	if len(a.Command) == 0 {
-		bin, err := resolveBin(a.BinPath)
-		if err != nil {
-			return nil, err
-		}
-		return []string{bin}, nil
-	}
-	return resolveArgv0(a.Command), nil
 }
 
 // resolveArgv0 makes an argv runnable from a GUI process: a bare command name is

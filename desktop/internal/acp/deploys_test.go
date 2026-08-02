@@ -298,7 +298,7 @@ func TestMCPLaunchPromptIsOurs(t *testing.T) {
 	}
 }
 
-func TestMCPArgsPerAgentKind(t *testing.T) {
+func TestMCPServersForSessionNew(t *testing.T) {
 	specs := []mcpServerSpec{{
 		Name:    "dokku",
 		Command: "/Applications/Focalboard.app/Contents/MacOS/Focalboard",
@@ -306,43 +306,7 @@ func TestMCPArgsPerAgentKind(t *testing.T) {
 		Env:     map[string]string{"B_VAR": `{"json":"value"}`, "A_VAR": "1"},
 	}}
 
-	// claude: one --mcp-config flag carrying inline JSON.
-	args, err := claudeMCPArgs(specs)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(args) != 2 || args[0] != "--mcp-config" {
-		t.Fatalf("claude args: %v", args)
-	}
-	var cfg struct {
-		Servers map[string]struct {
-			Command string            `json:"command"`
-			Args    []string          `json:"args"`
-			Env     map[string]string `json:"env"`
-		} `json:"mcpServers"`
-	}
-	if err := json.Unmarshal([]byte(args[1]), &cfg); err != nil {
-		t.Fatalf("claude config is not valid JSON: %v", err)
-	}
-	server, ok := cfg.Servers["dokku"]
-	if !ok || server.Command != specs[0].Command || server.Env["B_VAR"] != `{"json":"value"}` {
-		t.Errorf("claude config lost the server: %+v", cfg.Servers)
-	}
-
-	// codex: one -c override per key, values as TOML, order stable.
-	codex := strings.Join(codexMCPArgs(specs), " ")
-	for _, want := range []string{
-		`-c mcp_servers.dokku.command="/Applications/Focalboard.app/Contents/MacOS/Focalboard"`,
-		`-c mcp_servers.dokku.args=["mcp", "dokku"]`,
-		`-c mcp_servers.dokku.env.A_VAR="1"`,
-		`-c mcp_servers.dokku.env.B_VAR="{\"json\":\"value\"}"`,
-	} {
-		if !strings.Contains(codex, want) {
-			t.Errorf("codex args %q missing %q", codex, want)
-		}
-	}
-
-	// ACP-native: the protocol carries the server itself.
+	// One road for every kind: the protocol carries the server itself.
 	servers := acpMCPServers(specs)
 	if len(servers) != 1 || servers[0].Stdio == nil {
 		t.Fatalf("acp servers: %+v", servers)
@@ -351,19 +315,16 @@ func TestMCPArgsPerAgentKind(t *testing.T) {
 	if stdio.Name != "dokku" || stdio.Command != specs[0].Command || len(stdio.Env) != 2 {
 		t.Errorf("acp stdio server: %+v", stdio)
 	}
+	if stdio.Args[0] != "mcp" || stdio.Args[1] != "dokku" {
+		t.Errorf("acp stdio args: %+v", stdio.Args)
+	}
 	if stdio.Env[0].Name != "A_VAR" {
 		t.Errorf("env order is not stable: %+v", stdio.Env)
 	}
+	if stdio.Env[1].Value != `{"json":"value"}` {
+		t.Errorf("env value was mangled: %+v", stdio.Env[1])
+	}
 }
-
-// fakeClaudeRecordingArgs writes the CLI arguments it was spawned with next to
-// itself, so a test can assert what the bridge actually passed.
-const fakeClaudeRecordingArgs = `#!/bin/sh
-printf '%s\n' "$@" > "$(dirname "$0")/args.txt"
-read line
-printf '%s\n' '{"type":"system","subtype":"init","session_id":"fake-deploy"}'
-printf '%s\n' '{"type":"result","is_error":false,"result":"deployed"}'
-`
 
 func deployMoveEvent(cardID, repo, column string) CardMoved {
 	return CardMoved{
@@ -408,13 +369,13 @@ func TestDeployColumnStartsASessionWithTheDokkuTools(t *testing.T) {
 		t.Errorf("an unconfirmed deploy must be called out: %q", all)
 	}
 
-	// The session must have been given the dokku MCP server on the CLI.
-	args, err := os.ReadFile(filepath.Join(filepath.Dir(m.cfg.ClaudePath), "args.txt"))
+	// The session must have been given the dokku MCP server in session/new.
+	servers, err := os.ReadFile(filepath.Join(fakeAgentDir(m.cfg.AgentCommand[0]), "mcp.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(args), "--mcp-config") || !strings.Contains(string(args), dokku.EnvTarget) {
-		t.Errorf("claude was not given the dokku MCP server:\n%s", args)
+	if !strings.Contains(string(servers), dokku.ServerName) || !strings.Contains(string(servers), dokku.EnvTarget) {
+		t.Errorf("the agent was not given the dokku MCP server:\n%s", servers)
 	}
 
 	// The branch it deploys is recorded, unlike an ordinary in-repo session.

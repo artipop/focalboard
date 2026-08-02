@@ -88,69 +88,72 @@ func TestAgentKindValidation(t *testing.T) {
 	}
 }
 
-func TestExternalACPCommand(t *testing.T) {
+func TestAgentLaunch(t *testing.T) {
 	m := agentManager(t, "")
+	bin := writeFakeAgent(t, fakeClaudeHappy) // any existing executable
 
 	// Explicit command overrides everything and appends Args.
-	argv, err := m.externalACPCommand(AgentEntry{Name: "gem", Kind: "acp", Command: []string{"gemini", "--acp"}, Args: []string{"--yolo"}})
+	l, err := m.agentLaunch(AgentEntry{Name: "gem", Kind: "acp", Command: []string{"gemini", "--acp"}, Args: []string{"--yolo"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(argv, " "); got != "gemini --acp --yolo" {
+	if got := strings.Join(l.argv, " "); got != "gemini --acp --yolo" {
 		t.Errorf("acp command argv = %q", got)
 	}
 
-	// A known ACP-native kind with an explicit binPath defaults to
-	// `<bin> <acp flag>` + model. Junie's flag takes a boolean value.
-	bin := writeFakeClaude(t, "#!/bin/sh\n") // any existing executable
+	// Each known kind is launched the way its own adapter wants: the CLIs take
+	// a flag and --model, the codex adapter takes codex's config override, and
+	// the claude adapter takes neither — its model rides in the environment.
 	for kind, want := range map[string]string{
 		"antigravity": bin + " --acp --model m1",
 		"copilot":     bin + " --acp --model m1",
 		"junie":       bin + " --acp=true --model m1",
+		"codex":       bin + ` -c model="m1"`,
+		"claude":      bin,
 	} {
-		argv, err = m.externalACPCommand(AgentEntry{Name: "g", Kind: kind, BinPath: bin, Model: "m1"})
+		l, err = m.agentLaunch(AgentEntry{Name: "g", Kind: kind, BinPath: bin, Model: "m1"})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if got := strings.Join(argv, " "); got != want {
+		if got := strings.Join(l.argv, " "); got != want {
 			t.Errorf("%s argv = %q, want %q", kind, got, want)
 		}
 
-		// A missing binary errors clearly, naming the CLI.
-		_, err = m.externalACPCommand(AgentEntry{Name: "g", Kind: kind, BinPath: "/no/such/" + kind})
-		if err == nil {
+		// A binPath that is not there errors rather than starting something else.
+		if _, err := m.agentLaunch(AgentEntry{Name: "g", Kind: kind, BinPath: "/no/such/" + kind}); err == nil {
 			t.Errorf("missing %s binary should error", kind)
 		}
 	}
-}
 
-func TestAgentLaunchArgvCustomCommand(t *testing.T) {
-	m := agentManager(t, "")
-	bin := writeFakeClaude(t, "#!/bin/sh\n")
-
-	// No command: the resolved binary, as before.
-	argv, err := agentLaunchArgv(AgentEntry{Name: "c", Kind: "claude", BinPath: bin}, m.resolveClaudeBin)
+	// The claude adapter refuses to run inside another Claude Code session, so
+	// the variable that says so must be dropped, and the model reaches it as
+	// ANTHROPIC_MODEL.
+	l, err = m.agentLaunch(AgentEntry{Name: "c", Kind: "claude", BinPath: bin, Model: "opus"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(argv, " "); got != bin {
-		t.Errorf("launch argv = %q, want %q", got, bin)
+	if len(l.env) != 1 || l.env[0] != "ANTHROPIC_MODEL=opus" {
+		t.Errorf("claude model env = %v", l.env)
+	}
+	if len(l.dropEnv) != 1 || l.dropEnv[0] != "CLAUDECODE" {
+		t.Errorf("claude dropEnv = %v", l.dropEnv)
 	}
 
-	// A wrapper command replaces the binary and keeps its own args; the bridge
-	// appends its protocol flags after it.
+	// The codex adapter starts read-only, so the session has to be switched.
+	l, _ = m.agentLaunch(AgentEntry{Name: "x", Kind: "codex", BinPath: bin})
+	if l.mode != "auto" {
+		t.Errorf("codex session mode = %q, want auto", l.mode)
+	}
+
+	// A wrapper command stands in front of the adapter — proxychains, a shim —
+	// and nothing of ours is appended to it.
 	wrapper := []string{"/bin/sh", "-c", "exec " + bin}
-	argv, err = agentLaunchArgv(AgentEntry{Name: "c", Kind: "claude", BinPath: bin, Command: wrapper}, m.resolveClaudeBin)
+	l, err = m.agentLaunch(AgentEntry{Name: "c", Kind: "claude", BinPath: bin, Command: wrapper})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := strings.Join(argv, " "); got != strings.Join(wrapper, " ") {
+	if got := strings.Join(l.argv, " "); got != strings.Join(wrapper, " ") {
 		t.Errorf("wrapped launch argv = %q", got)
-	}
-
-	// A missing binary still errors clearly when no command is set.
-	if _, err := agentLaunchArgv(AgentEntry{Name: "c", Kind: "codex", BinPath: "/no/such/codex"}, m.resolveCodexBin); err == nil {
-		t.Error("missing codex binary should error")
 	}
 }
 
@@ -421,12 +424,21 @@ func TestResolveAgentSingleAndFallback(t *testing.T) {
 		t.Fatalf("empty-registry fallback failed: got=%+v err=%v", got, err)
 	}
 
-	// Empty registry with acp-command mode → external kind.
+	// Empty registry with acp-command mode → the configured argv, as the
+	// generic acp kind: the mode names no agent of its own.
 	m3 := agentManager(t, "")
-	m3.cfg.AgentMode = "acp-command"
+	m3.cfg.AgentMode = agentModeCommand
+	m3.cfg.AgentCommand = []string{"gemini", "--acp"}
 	got, _ = m3.resolveAgent(CardMoved{Props: map[string]string{}})
-	if got.Kind != "acp-command" {
-		t.Fatalf("expected acp-command fallback, got %+v", got)
+	if got.Kind != AgentKindACP || strings.Join(got.Command, " ") != "gemini --acp" {
+		t.Fatalf("expected the configured argv, got %+v", got)
+	}
+
+	// The same mode with nothing configured is a mistake worth naming.
+	m4 := agentManager(t, "")
+	m4.cfg.AgentMode = agentModeCommand
+	if _, err := m4.resolveAgent(CardMoved{Props: map[string]string{}}); err == nil {
+		t.Error("acp-command with no agentCommand should error")
 	}
 }
 

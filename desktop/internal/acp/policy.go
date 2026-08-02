@@ -79,9 +79,15 @@ func splitPolicyEntry(entry string) (name, pattern string, hasPattern bool) {
 
 // policyArg pulls the argument a pattern applies to out of the tool input.
 func policyArg(tool string, input any) (string, bool) {
-	field, ok := patternArg[canonicalToolName(tool)]
+	name := canonicalToolName(tool)
+	field, ok := patternArg[name]
 	if !ok {
 		return "", false
+	}
+	// A shell command is the one argument agents disagree about the shape of,
+	// so it has its own reader.
+	if field == "command" {
+		return shellCommand(input)
 	}
 	fields, ok := input.(map[string]any)
 	if !ok {

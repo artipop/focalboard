@@ -7,11 +7,6 @@ import (
 	"time"
 )
 
-// fakeClaudeCrash exits before saying anything, which is how a session fails.
-const fakeClaudeCrash = `#!/bin/sh
-exit 1
-`
-
 // flowEvent is a card move onto a named column of the flow property.
 func flowEvent(cardID, repo, from, to string) CardMoved {
 	return CardMoved{
@@ -30,9 +25,9 @@ func flowEvent(cardID, repo, from, to string) CardMoved {
 }
 
 // flowManager is testManager with one route registered.
-func flowManager(t *testing.T, claudeScript string, flow FlowEntry) (*Manager, *fakeWriter, *fakeEvents, string) {
+func flowManager(t *testing.T, scenario string, flow FlowEntry) (*Manager, *fakeWriter, *fakeEvents, string) {
 	t.Helper()
-	m, w, ev, repo := testManager(t, claudeScript, func(c *Config) { c.Flows = []FlowEntry{flow} })
+	m, w, ev, repo := testManager(t, scenario, func(c *Config) { c.Flows = []FlowEntry{flow} })
 	// Re-reading a card gives back what it says, branch included — the real
 	// reader does, and the route asks it again on every transition.
 	m.SetBoardReader(&fakeReader{ev: CardMoved{

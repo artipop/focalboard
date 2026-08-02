@@ -39,8 +39,7 @@ func validateAgent(a AgentEntry) (AgentEntry, error) {
 		if len(a.Command) == 0 {
 			return AgentEntry{}, fmt.Errorf("для агента типа %q нужно задать команду запуска (argv ACP-агента)", AgentKindACP)
 		}
-	case a.Kind == AgentKindClaude || a.Kind == AgentKindCodex:
-	case IsExternalACP(a.Kind):
+	case knownAdapter(a.Kind):
 	default:
 		return AgentEntry{}, fmt.Errorf("неизвестный тип агента %q (допустимо: %s)", a.Kind, strings.Join(AgentKinds, ", "))
 	}
@@ -353,6 +352,17 @@ func (m *Manager) resolveSessionAgent(ev CardMoved, roster []string) (AgentEntry
 	kind := mode
 	if kind == "" {
 		kind = AgentKindClaude
+	}
+	if kind == agentModeCommand {
+		// The mode names no kind of its own — the argv in the config is the
+		// whole agent, which is exactly what the generic acp kind is.
+		m.cfgMu.RLock()
+		command := append([]string(nil), m.cfg.AgentCommand...)
+		m.cfgMu.RUnlock()
+		if len(command) == 0 {
+			return AgentEntry{}, false, fmt.Errorf("agentMode = %q, но agentCommand пуст", agentModeCommand)
+		}
+		return AgentEntry{Name: kind, Kind: AgentKindACP, Command: command}, false, nil
 	}
 	return AgentEntry{Name: kind, Kind: kind}, false, nil
 }

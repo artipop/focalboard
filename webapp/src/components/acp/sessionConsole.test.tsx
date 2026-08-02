@@ -35,7 +35,6 @@ function bindingsWith(sessions: any[], events: any[] = []) {
         DetachSession: jest.fn(),
         CloseSession: jest.fn().mockResolvedValue(undefined),
         CancelSession: jest.fn().mockResolvedValue(true),
-        AnswerQuestion: jest.fn().mockResolvedValue(undefined),
         StartCardDeploy: jest.fn().mockResolvedValue('sess-deploy'),
     }
 }
@@ -171,45 +170,6 @@ describe('components/acp/sessionConsole', () => {
             error: 'session/prompt: agent exited',
         })
         await waitFor(() => expect(screen.getByText('session/prompt: agent exited')).toBeInTheDocument())
-    })
-
-    test('answers the agent own questions through the picker', async () => {
-        const bindings = bindingsWith([{id: 'sess-q', status: 'running'}])
-        anyWindow.go = {main: {App: bindings}}
-        const handlers = fakeRuntime()
-
-        render(wrapIntl(<SessionConsole cardId='card1'/>))
-        await waitFor(() => expect(bindings.AttachSession).toHaveBeenCalledWith('sess-q'))
-
-        handlers['acp:question']({
-            cardId: 'card1',
-            sessionId: 'sess-q',
-            requestId: 'q-1',
-            questions: [{
-                question: 'Какая цель рефакторинга?',
-                header: 'Цель',
-                multiSelect: false,
-                options: [
-                    {label: 'Читаемость', description: 'структура'},
-                    {label: 'Скорость', description: 'перф'},
-                ],
-            }],
-        })
-
-        await waitFor(() => expect(screen.getByText('Какая цель рефакторинга?')).toBeInTheDocument())
-        expect(screen.getByText('структура')).toBeInTheDocument()
-
-        // Nothing is sent until something is picked.
-        expect(screen.getByRole('button', {name: 'Ответить'})).toBeDisabled()
-
-        userEvent.click(screen.getByText('Читаемость'))
-        userEvent.click(screen.getByRole('button', {name: 'Ответить'}))
-
-        await waitFor(() => expect(bindings.AnswerQuestion).toHaveBeenCalled())
-        const [sessionId, requestId, text] = bindings.AnswerQuestion.mock.calls[0]
-        expect(sessionId).toBe('sess-q')
-        expect(requestId).toBe('q-1')
-        expect(text).toContain('Цель: Читаемость')
     })
 
     test('offers a repository when the card does not name one', async () => {

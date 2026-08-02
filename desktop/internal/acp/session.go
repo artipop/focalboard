@@ -3,7 +3,6 @@ package acp
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -13,8 +12,6 @@ import (
 
 	acpsdk "github.com/coder/acp-go-sdk"
 
-	"github.com/mattermost/focalboard/desktop/internal/acp/claudebridge"
-	"github.com/mattermost/focalboard/desktop/internal/acp/codexbridge"
 	"github.com/mattermost/focalboard/desktop/internal/dokku"
 	"github.com/mattermost/focalboard/desktop/internal/procgroup"
 )
@@ -100,6 +97,7 @@ type Session struct {
 	outcomeText   string             // what to write on the card when the flow moves on
 	turnCancel    context.CancelFunc // cancels the in-flight turn
 	cancelSent    bool
+	cancelPending bool // cancelled before a turn existed; the next one is stopped at once
 	allowTools    map[string]bool
 	allowPrefixes []string // tool prefixes of MCP servers the user wired in
 	interactive   bool     // opened as a console, or attached to while running
@@ -518,24 +516,11 @@ func (m *Manager) openConnection(ctx context.Context, s *Session) (*acpsdk.Clien
 	if err != nil {
 		return nil, "", nil, err
 	}
-	var (
-		conn    *acpsdk.ClientSideConnection
-		cleanup func()
-	)
-	switch {
-	case s.Agent.Kind == AgentKindCodex:
-		conn, cleanup, err = m.connectCodex(ctx, s, specs)
-	case s.Agent.Kind == AgentKindClaude:
-		conn, cleanup, err = m.connectClaude(ctx, s, specs)
-	case IsExternalACP(s.Agent.Kind):
-		var argv []string
-		if argv, err = m.externalACPCommand(s.Agent); err == nil {
-			conn, cleanup, err = m.connectACPAgent(ctx, s, argv)
-		}
-	default:
-		// Backward-compat fallback: the global acp-command external agent.
-		conn, cleanup, err = m.connectExternal(ctx, s)
+	launch, err := m.agentLaunch(s.Agent)
+	if err != nil {
+		return nil, "", nil, err
 	}
+	conn, cleanup, err := m.connectACPAgent(ctx, s, launch)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -550,18 +535,15 @@ func (m *Manager) openConnection(ctx context.Context, s *Session) (*acpsdk.Clien
 		return nil, "", nil, fmt.Errorf("initialize: %w", err)
 	}
 
-	// Only an ACP-native agent is told about MCP servers here: the claude and
-	// codex bridges translate ACP into their CLI's own protocol and pass their
-	// servers on the command line instead.
-	mcpServers := []acpsdk.McpServer{}
-	if IsExternalACP(s.Agent.Kind) {
-		mcpServers = acpMCPServers(specs)
-	}
-	sess, err := conn.NewSession(ctx, acpsdk.NewSessionRequest{Cwd: s.Worktree.Path, McpServers: mcpServers})
+	sess, err := conn.NewSession(ctx, acpsdk.NewSessionRequest{
+		Cwd:        s.Worktree.Path,
+		McpServers: acpMCPServers(specs),
+	})
 	if err != nil {
 		cleanup()
 		return nil, "", nil, fmt.Errorf("session/new: %w", err)
 	}
+	m.selectSessionMode(ctx, s, conn, sess)
 	worktreePath := ""
 	if s.usedWorktree {
 		worktreePath = s.Worktree.Path
@@ -594,11 +576,20 @@ func (m *Manager) runTurn(s *Session, conn *acpsdk.ClientSideConnection, acpSess
 
 	s.mu.Lock()
 	s.turnCancel = cancel
-	s.cancelSent = false
+	// A cancel that arrived before this turn existed still applies to it: the
+	// card was dragged out of the column while the agent was starting up, and
+	// there was no turn to stop yet. Starting the work anyway would leave a
+	// session nobody asked for holding the repository.
+	pending := s.cancelPending
+	s.cancelPending = false
+	s.cancelSent = pending
 	s.status = StatusRunning
 	s.turnNo++
 	s.mu.Unlock()
 	m.persistStatus(s, StatusRunning, "")
+	if pending {
+		cancel()
+	}
 
 	// Each turn reports only its own output.
 	s.finalMu.Lock()
@@ -666,141 +657,127 @@ func (h *minLevelHandler) WithGroup(name string) slog.Handler {
 	return &minLevelHandler{next: h.next.WithGroup(name), min: h.min}
 }
 
-// connectClaude wires the in-process claude bridge over io.Pipe.
-func (m *Manager) connectClaude(ctx context.Context, s *Session, mcpSpecs []mcpServerSpec) (*acpsdk.ClientSideConnection, func(), error) {
-	launch, err := agentLaunchArgv(s.Agent, m.resolveClaudeBin)
-	if err != nil {
-		return nil, nil, err
-	}
-	var extraArgs []string
-	if s.Agent.Model != "" {
-		extraArgs = append(extraArgs, "--model", s.Agent.Model)
-	}
-	mcpArgs, err := claudeMCPArgs(mcpSpecs)
-	if err != nil {
-		return nil, nil, err
-	}
-	extraArgs = append(extraArgs, mcpArgs...)
-	extraArgs = append(extraArgs, s.Agent.Args...)
-	env, drop := spawnEnv(s.Agent, s.Net)
-	bridge := claudebridge.New(claudebridge.Options{
-		Launch:    launch,
-		ExtraArgs: extraArgs,
-		Env:       env,
-		DropEnv:   drop,
-		Logger:    m.log,
-		Trace: func(direction string, line []byte) {
-			m.tr.Line(s.ID, direction, line)
-		},
-		AskUser: func(ctx context.Context, questions []claudebridge.Question) (string, error) {
-			return m.askUser(ctx, s, questions)
-		},
-	})
-
-	clientIn, agentOut := io.Pipe() // agent writes → client reads
-	agentIn, clientOut := io.Pipe() // client writes → agent reads
-
-	agentConn := acpsdk.NewAgentSideConnection(bridge, agentOut, agentIn)
-	agentConn.SetLogger(m.sdkLogger(s.ID))
-	bridge.SetConn(agentConn)
-	clientConn := acpsdk.NewClientSideConnection(&sessionClient{m: m, s: s}, clientOut, clientIn)
-	clientConn.SetLogger(m.sdkLogger(s.ID))
-
-	cleanup := func() {
-		bridge.KillAll(2 * time.Second)
-		_ = clientOut.Close()
-		_ = agentOut.Close()
-	}
-	return clientConn, cleanup, nil
-}
-
-// connectCodex wires the in-process codex bridge over io.Pipe. The codex CLI
-// has no ACP mode, so the bridge drives `codex exec --json` and translates its
-// event stream; per-agent env (CODEX_HOME/OPENAI_API_KEY) is injected at spawn.
-func (m *Manager) connectCodex(ctx context.Context, s *Session, mcpSpecs []mcpServerSpec) (*acpsdk.ClientSideConnection, func(), error) {
-	launch, err := agentLaunchArgv(s.Agent, m.resolveCodexBin)
-	if err != nil {
-		return nil, nil, err
-	}
-	env, drop := spawnEnv(s.Agent, s.Net)
-	bridge := codexbridge.New(codexbridge.Options{
-		Launch:    launch,
-		Model:     s.Agent.Model,
-		ExtraArgs: append(codexMCPArgs(mcpSpecs), s.Agent.Args...),
-		Env:       env,
-		DropEnv:   drop,
-		Logger:    m.log,
-	})
-
-	clientIn, agentOut := io.Pipe() // agent writes → client reads
-	agentIn, clientOut := io.Pipe() // client writes → agent reads
-
-	agentConn := acpsdk.NewAgentSideConnection(bridge, agentOut, agentIn)
-	agentConn.SetLogger(m.sdkLogger(s.ID))
-	bridge.SetConn(agentConn)
-	clientConn := acpsdk.NewClientSideConnection(&sessionClient{m: m, s: s}, clientOut, clientIn)
-	clientConn.SetLogger(m.sdkLogger(s.ID))
-
-	cleanup := func() {
-		bridge.KillAll(2 * time.Second)
-		_ = clientOut.Close()
-		_ = agentOut.Close()
-	}
-	return clientConn, cleanup, nil
-}
-
-// connectExternal spawns the global acp-command external ACP agent (config
-// agentMode "acp-command") — the empty-registry backward-compat fallback.
-func (m *Manager) connectExternal(ctx context.Context, s *Session) (*acpsdk.ClientSideConnection, func(), error) {
-	if len(m.cfg.AgentCommand) == 0 {
-		return nil, nil, fmt.Errorf("agentMode is acp-command but agentCommand is empty")
-	}
-	return m.connectACPAgent(ctx, s, m.cfg.AgentCommand)
-}
-
-// externalACPCommand builds the argv for an ACP-native external agent (the
-// kinds in acpNative, or the generic acp kind). Command overrides everything;
-// a known kind defaults to `<bin> <acp flag>` plus `--model` when set. Args are
-// appended in both cases.
-func (m *Manager) externalACPCommand(a AgentEntry) ([]string, error) {
+// agentLaunch resolves how an agent is started: the argv to spawn and the
+// environment the kind needs on top of the agent's own.
+//
+// Command overrides everything, because it is how a wrapper (a proxy launcher,
+// a per-account shim) gets in front of the adapter; a known kind is otherwise
+// its binary plus whatever selects ACP and the model. Args are appended in both
+// cases, and the generic acp kind has nothing but its Command.
+func (m *Manager) agentLaunch(a AgentEntry) (launch, error) {
+	def, known := acpNative[a.Kind]
 	var argv []string
-	switch def, known := acpNative[a.Kind]; {
+	switch {
 	case len(a.Command) > 0:
 		argv = append(argv, a.Command...)
 	case known:
-		bin, err := lookupBin(firstNonEmpty(a.BinPath, def.bin), fmt.Sprintf("%s binary not found (set binPath or command on the agent)", def.bin))
+		bin, err := m.adapterArgv(a.Kind, a.BinPath)
 		if err != nil {
-			return nil, err
+			return launch{}, err
 		}
-		argv = append(argv, bin, def.acpFlag)
-		if a.Model != "" {
-			argv = append(argv, "--model", a.Model)
+		argv = append(argv, bin...)
+		argv = append(argv, def.acpArgs...)
+		if a.Model != "" && def.modelArgs != nil {
+			argv = append(argv, def.modelArgs(a.Model)...)
 		}
 	default:
-		return nil, fmt.Errorf("agent %q (kind %s) has no launch command", a.Name, a.Kind)
+		return launch{}, fmt.Errorf("у агента %q (тип %s) нет команды запуска", a.Name, a.Kind)
 	}
-	return append(argv, a.Args...), nil
+	l := launch{argv: append(argv, a.Args...), dropEnv: def.dropEnv, mode: def.mode}
+	// A model asked for through the environment is set whichever way the agent
+	// was launched: a wrapper replaces the argv, not the model.
+	if a.Model != "" && def.modelEnv != "" {
+		l.env = []string{def.modelEnv + "=" + a.Model}
+	}
+	return l, nil
 }
 
-// connectACPAgent spawns an ACP-native external agent (argv) over stdio with
-// the agent's per-process env, and talks pure ACP to it — no bridge.
-func (m *Manager) connectACPAgent(ctx context.Context, s *Session, argv []string) (*acpsdk.ClientSideConnection, func(), error) {
-	if len(argv) == 0 {
-		return nil, nil, fmt.Errorf("empty agent command")
+// launch is how one agent process is started, once the kind's table row and the
+// registry entry have been folded together.
+type launch struct {
+	argv    []string
+	env     []string // kind-specific, overridden by the agent's own env
+	dropEnv []string
+	mode    string // session mode to select once connected
+}
+
+// adapterArgv resolves the adapter binary for a kind. An installed binary wins;
+// failing that, a vendor adapter published on npm is run through npx, so a
+// machine with Node.js needs no install step at all. Nothing else is guessed:
+// an agent that cannot be started says so here rather than at the first turn.
+func (m *Manager) adapterArgv(kind, override string) ([]string, error) {
+	def := acpNative[kind]
+	bin, err := lookupBin(firstNonEmpty(override, def.bin), "")
+	if err == nil {
+		return []string{bin}, nil
+	}
+	// A binPath the user typed is an instruction, not a hint: fall back from it
+	// and the agent would silently run something else.
+	if override != "" {
+		return nil, fmt.Errorf("binPath %s: %w", override, err)
+	}
+	if def.npmPackage == "" {
+		return nil, fmt.Errorf("не найден %s — укажите binPath или command у агента", def.bin)
+	}
+	if npx, err := lookupBin("npx", ""); err == nil {
+		return []string{npx, "--yes", def.npmPackage}, nil
+	}
+	return nil, fmt.Errorf("не найден %s: установите его командой `npm install -g %s` "+
+		"(или поставьте Node.js, тогда адаптер запустится через npx)", def.bin, def.npmPackage)
+}
+
+// connectACPAgent spawns the agent over stdio and talks pure ACP to it. The
+// wire is teed into the session trace, so the debug log records the actual
+// protocol for every kind.
+func (m *Manager) connectACPAgent(ctx context.Context, s *Session, l launch) (*acpsdk.ClientSideConnection, func(), error) {
+	if len(l.argv) == 0 {
+		return nil, nil, fmt.Errorf("пустая команда запуска агента")
 	}
 	env, drop := spawnEnv(s.Agent, s.Net)
-	argv = resolveArgv0(argv)
+	// The kind's own variables sit under the agent's, which is what lets an
+	// entry override a model the table would have set.
+	env = append(append([]string{}, l.env...), env...)
+	drop = append(drop, l.dropEnv...)
+	argv := resolveArgv0(l.argv)
 	proc, err := procgroup.Spawn(m.rootCtx, argv, s.Worktree.Path, env, drop...)
 	if err != nil {
 		return nil, nil, fmt.Errorf("spawn agent %q: %w", argv[0], err)
 	}
-	conn := acpsdk.NewClientSideConnection(&sessionClient{m: m, s: s}, proc.Stdin, proc.Stdout)
+	conn := acpsdk.NewClientSideConnection(&sessionClient{m: m, s: s},
+		m.traceWriter(s.ID, proc.Stdin), m.traceReader(s.ID, proc.Stdout))
 	conn.SetLogger(m.sdkLogger(s.ID))
 	cleanup := func() {
 		proc.KillGroup(2 * time.Second)
 		_ = proc.Wait()
 	}
 	return conn, cleanup, nil
+}
+
+// selectSessionMode switches the agent into the mode its kind asks for. It is
+// advisory: an agent that offers no such mode is left in the one it chose, and
+// a refusal is logged rather than failing the session, since the mode is a
+// preference and the turn may well work without it.
+func (m *Manager) selectSessionMode(ctx context.Context, s *Session, conn *acpsdk.ClientSideConnection, sess acpsdk.NewSessionResponse) {
+	mode := acpNative[s.Agent.Kind].mode
+	if mode == "" || sess.Modes == nil || string(sess.Modes.CurrentModeId) == mode {
+		return
+	}
+	offered := false
+	for _, available := range sess.Modes.AvailableModes {
+		if string(available.Id) == mode {
+			offered = true
+			break
+		}
+	}
+	if !offered {
+		return
+	}
+	if _, err := conn.SetSessionMode(ctx, acpsdk.SetSessionModeRequest{
+		SessionId: sess.SessionId,
+		ModeId:    acpsdk.SessionModeId(mode),
+	}); err != nil {
+		m.log.Warn("acp: agent refused the session mode", "session", s.ID, "mode", mode, "err", err)
+	}
 }
 
 func (s *Session) markCancelled() {

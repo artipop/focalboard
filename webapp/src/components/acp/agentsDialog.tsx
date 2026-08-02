@@ -55,11 +55,22 @@ type AgentEntry = {
     proxyName?: string
 }
 
-// Launch command placeholders per kind: for claude/codex the command wraps the
-// CLI (a proxy launcher, a per-account shim); the ACP kinds spawn it directly.
+// Whether a kind can be started on this machine, as the manager reports it.
+export type AdapterStatus = {
+    kind: string
+    package?: string
+    path?: string
+    ready: boolean
+    viaNpx?: boolean
+    detail?: string
+}
+
+// Launch command placeholders per kind. Every kind is an ACP agent spawned over
+// stdio; the command replaces the adapter binary, which is how a wrapper (a
+// proxy launcher, a per-account shim) gets in front of it.
 const commandPlaceholders: {[kind: string]: string} = {
-    claude: 'proxychains4 -q -f /etc/myproxy.conf claude',
-    codex: 'proxychains4 -q -f /etc/myproxy.conf codex',
+    claude: 'proxychains4 -q -f /etc/myproxy.conf claude-code-acp',
+    codex: 'proxychains4 -q -f /etc/myproxy.conf codex-acp',
     antigravity: 'antigravity --acp',
     copilot: 'copilot --acp',
     junie: 'junie --acp=true',
@@ -190,6 +201,8 @@ const AgentsDialog = (props: Props) => {
     const [argsText, setArgsText] = useState('')
     const [commandText, setCommandText] = useState('')
     const [editingName, setEditingName] = useState<string | null>(null)
+    const [adapters, setAdapters] = useState<AdapterStatus[]>([])
+    const [installing, setInstalling] = useState('')
     const [error, setError] = useState('')
 
     const refresh = useCallback(async () => {
@@ -203,6 +216,12 @@ const AgentsDialog = (props: Props) => {
             }
             if (bindings.GetAgentSystemPrompt) {
                 setSystemPrompt(await bindings.GetAgentSystemPrompt())
+            }
+
+            // Whether the chosen kind can start at all is knowable here, and
+            // the alternative is finding out on a card an hour later.
+            if (bindings.ListAgentAdapters) {
+                setAdapters(JSON.parse(await bindings.ListAgentAdapters()) || [])
             }
         } catch (e) {
             setError(String(e))
@@ -238,6 +257,31 @@ const AgentsDialog = (props: Props) => {
     useEffect(() => {
         refresh()
     }, [refresh])
+
+    // The adapter for the kind being edited, and the one action that fixes it.
+    const adapter = adapters.find((a) => a.kind === form?.kind)
+    const installAdapter = useCallback(async () => {
+        if (!bindings?.InstallAgentAdapter || !form?.kind) {
+            return
+        }
+        setInstalling(form.kind)
+        setError('')
+        try {
+            await bindings.InstallAgentAdapter(form.kind)
+            sendFlashMessage({
+                content: intl.formatMessage(
+                    {id: 'Agents.adapter-installed', defaultMessage: 'Adapter installed: {package}'},
+                    {package: adapter?.package || form.kind},
+                ),
+                severity: 'normal',
+            })
+            await refresh()
+        } catch (e) {
+            setError(String(e))
+        } finally {
+            setInstalling('')
+        }
+    }, [bindings, form?.kind, adapter?.package, intl, refresh])
 
     const startAdd = useCallback(() => {
         setForm({...emptyForm})
@@ -420,6 +464,21 @@ const AgentsDialog = (props: Props) => {
                                 ))}
                             </select>
                         </label>
+                        {adapter && (!adapter.ready || adapter.viaNpx) && (
+                            <div className={`AgentsDialog__adapter${adapter.ready ? '' : ' AgentsDialog__adapter--missing'}`}>
+                                <span>{adapter.detail}</span>
+                                {adapter.package && bindings?.InstallAgentAdapter && (
+                                    <Button
+                                        onClick={installAdapter}
+                                        disabled={Boolean(installing)}
+                                    >
+                                        {installing === adapter.kind ?
+                                            intl.formatMessage({id: 'Agents.adapter-installing', defaultMessage: 'Installing…'}) :
+                                            intl.formatMessage({id: 'Agents.adapter-install', defaultMessage: 'Install adapter'})}
+                                    </Button>
+                                )}
+                            </div>
+                        )}
                         <label>
                             {intl.formatMessage({id: 'Agents.model', defaultMessage: 'Model (optional)'})}
                             <input
