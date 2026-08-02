@@ -135,7 +135,7 @@ describe('src/components/gallery/GalleryCard', () => {
             ))
             const galleryCardElement = container.querySelector('.GalleryCard')
             userEvent.click(galleryCardElement!)
-            expect(mockedOnClick).toBeCalledTimes(1)
+            expect(mockedOnClick).toHaveBeenCalledTimes(1)
         })
         test('return GalleryCard and delete card', () => {
             const {container} = render(wrapDNDIntl(
@@ -183,8 +183,8 @@ describe('src/components/gallery/GalleryCard', () => {
             const buttonDuplicate = screen.getByRole('button', {name: 'Duplicate'})
             userEvent.click(buttonDuplicate)
             expect(container).toMatchSnapshot()
-            expect(mockedMutator.duplicateCard).toBeCalledTimes(1)
-            expect(mockedMutator.duplicateCard).toBeCalledWith(card.id, board.id)
+            expect(mockedMutator.duplicateCard).toHaveBeenCalledTimes(1)
+            expect(mockedMutator.duplicateCard).toHaveBeenCalledWith(card.id, board.id)
         })
         test('return GalleryCard and copy link', () => {
             const {container} = render(wrapDNDIntl(
@@ -208,7 +208,7 @@ describe('src/components/gallery/GalleryCard', () => {
             const buttonCopyLink = screen.getByRole('button', {name: 'Copy link'})
             userEvent.click(buttonCopyLink)
             expect(container).toMatchSnapshot()
-            expect(mockedUtils.copyTextToClipboard).toBeCalledTimes(1)
+            expect(mockedUtils.copyTextToClipboard).toHaveBeenCalledTimes(1)
         })
         test('return GalleryCard and cancel', () => {
             const {container} = render(wrapDNDIntl(

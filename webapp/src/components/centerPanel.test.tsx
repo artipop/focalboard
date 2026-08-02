@@ -370,7 +370,7 @@ describe('components/centerPanel', () => {
 
             //delete
             fireEvent.keyDown(baseElement, {keyCode: 8})
-            expect(mockedMutator.performAsUndoGroup).toBeCalledTimes(1)
+            expect(mockedMutator.performAsUndoGroup).toHaveBeenCalledTimes(1)
         })
         test('press touch ctrl+d for one card selected', () => {
             activeView.fields.viewType = 'table'
@@ -398,7 +398,7 @@ describe('components/centerPanel', () => {
 
             //ctrl+d
             fireEvent.keyDown(baseElement, {ctrlKey: true, keyCode: 68})
-            expect(mockedMutator.performAsUndoGroup).toBeCalledTimes(1)
+            expect(mockedMutator.performAsUndoGroup).toHaveBeenCalledTimes(1)
         })
         test('click on card to show card', () => {
             activeView.fields.viewType = 'board'
@@ -424,7 +424,7 @@ describe('components/centerPanel', () => {
             const kanbanCardElement = kanbanCardElements[0]
             userEvent.click(kanbanCardElement)
             expect(container).toMatchSnapshot()
-            expect(mockedShowCard).toBeCalledWith(card1.id)
+            expect(mockedShowCard).toHaveBeenCalledWith(card1.id)
         })
         test('click on new card to add card', () => {
             activeView.fields.viewType = 'table'
@@ -446,7 +446,7 @@ describe('components/centerPanel', () => {
             const buttonWithMenuElement = container.querySelector('.ButtonWithMenu')
             expect(buttonWithMenuElement).not.toBeNull()
             userEvent.click(buttonWithMenuElement!)
-            expect(mockedMutator.performAsUndoGroup).toBeCalledTimes(1)
+            expect(mockedMutator.performAsUndoGroup).toHaveBeenCalledTimes(1)
         })
         test('click on new card to add card template', () => {
             activeView.fields.viewType = 'table'
@@ -470,7 +470,7 @@ describe('components/centerPanel', () => {
             userEvent.click(elementMenuWrapper!)
             const buttonNewTemplate = within(elementMenuWrapper!.parentElement!).getByRole('button', {name: 'New template'})
             userEvent.click(buttonNewTemplate)
-            expect(mockedMutator.insertBlock).toBeCalledTimes(1)
+            expect(mockedMutator.insertBlock).toHaveBeenCalledTimes(1)
         })
 
         test('click on new card to add card from template', () => {
@@ -497,7 +497,7 @@ describe('components/centerPanel', () => {
             const elementCard1 = within(elementMenuWrapper!.parentElement!).getByRole('button', {name: 'card1'})
             expect(elementCard1).not.toBeNull()
             userEvent.click(elementCard1)
-            expect(mockedMutator.performAsUndoGroup).toBeCalledTimes(1)
+            expect(mockedMutator.performAsUndoGroup).toHaveBeenCalledTimes(1)
         })
 
         test('click on new card to edit template', () => {

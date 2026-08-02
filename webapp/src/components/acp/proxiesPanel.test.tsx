@@ -46,7 +46,7 @@ describe('components/acp/proxiesPanel', () => {
         userEvent.type(screen.getByPlaceholderText('/etc/ssl/my-ca.pem'), '/etc/ssl/my-ca.pem')
 
         userEvent.click(screen.getByRole('button', {name: 'Save'}))
-        await waitFor(() => expect(bindings.AddProxy).toBeCalled())
+        await waitFor(() => expect(bindings.AddProxy).toHaveBeenCalled())
         expect(JSON.parse(bindings.AddProxy.mock.calls[0][0])).toMatchObject({
             name: 'lab',
             proxy: 'socks5://127.0.0.1:1080',

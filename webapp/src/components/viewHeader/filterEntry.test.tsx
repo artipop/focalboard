@@ -168,7 +168,7 @@ describe('components/viewHeader/filterEntry', () => {
         expect(container).toMatchSnapshot()
         const buttonStatus = screen.getByRole('button', {name: 'Status'})
         userEvent.click(buttonStatus)
-        expect(mockedMutator.changeViewFilter).toBeCalledTimes(1)
+        expect(mockedMutator.changeViewFilter).toHaveBeenCalledTimes(1)
     })
     test('return filterEntry and click on includes', () => {
         const {container} = render(
@@ -188,7 +188,7 @@ describe('components/viewHeader/filterEntry', () => {
         expect(container).toMatchSnapshot()
         const buttonIncludes = screen.getAllByRole('button', {name: 'includes'})[1]
         userEvent.click(buttonIncludes)
-        expect(mockedConditionClicked).toBeCalledTimes(1)
+        expect(mockedConditionClicked).toHaveBeenCalledTimes(1)
     })
     test('return filterEntry and click on doesn\'t include', () => {
         const {container} = render(
@@ -208,7 +208,7 @@ describe('components/viewHeader/filterEntry', () => {
         expect(container).toMatchSnapshot()
         const buttonNotInclude = screen.getByRole('button', {name: 'doesn\'t include'})
         userEvent.click(buttonNotInclude)
-        expect(mockedConditionClicked).toBeCalledTimes(1)
+        expect(mockedConditionClicked).toHaveBeenCalledTimes(1)
     })
     test('return filterEntry and click on is empty', () => {
         const {container} = render(
@@ -228,7 +228,7 @@ describe('components/viewHeader/filterEntry', () => {
         expect(container).toMatchSnapshot()
         const buttonEmpty = screen.getByRole('button', {name: 'is empty'})
         userEvent.click(buttonEmpty)
-        expect(mockedConditionClicked).toBeCalledTimes(1)
+        expect(mockedConditionClicked).toHaveBeenCalledTimes(1)
     })
     test('return filterEntry and click on is not empty', () => {
         const {container} = render(
@@ -248,7 +248,7 @@ describe('components/viewHeader/filterEntry', () => {
         expect(container).toMatchSnapshot()
         const buttonNotEmpty = screen.getByRole('button', {name: 'is not empty'})
         userEvent.click(buttonNotEmpty)
-        expect(mockedConditionClicked).toBeCalledTimes(1)
+        expect(mockedConditionClicked).toHaveBeenCalledTimes(1)
     })
     test('return filterEntry and click on delete', () => {
         const {container} = render(
@@ -268,7 +268,7 @@ describe('components/viewHeader/filterEntry', () => {
         expect(container).toMatchSnapshot()
         const allButton = screen.getAllByRole('button')
         userEvent.click(allButton[allButton.length - 1])
-        expect(mockedMutator.changeViewFilter).toBeCalledTimes(1)
+        expect(mockedMutator.changeViewFilter).toHaveBeenCalledTimes(1)
     })
     test('return filterEntry and click on different property type', () => {
         activeView.fields.filter.filters = [statusFilter]
@@ -289,7 +289,7 @@ describe('components/viewHeader/filterEntry', () => {
         expect(container).toMatchSnapshot()
         const buttonDate = screen.getByRole('button', {name: 'Property 3'})
         userEvent.click(buttonDate)
-        expect(mockedMutator.changeViewFilter).toBeCalledWith(
+        expect(mockedMutator.changeViewFilter).toHaveBeenCalledWith(
             board.id, activeView.id,
             {operation: 'and', filters: [statusFilter]},
             {operation: 'and', filters: [dateFilter]})
@@ -313,7 +313,7 @@ describe('components/viewHeader/filterEntry', () => {
         expect(container).toMatchSnapshot()
         const buttonDate = screen.getByRole('button', {name: 'Property 3'})
         userEvent.click(buttonDate)
-        expect(mockedMutator.changeViewFilter).toBeCalledWith(
+        expect(mockedMutator.changeViewFilter).toHaveBeenCalledWith(
             board.id, activeView.id,
             {operation: 'and', filters: [booleanFilter]},
             {operation: 'and',

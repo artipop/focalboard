@@ -1,4 +1,4 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`components/viewHeader/viewHeader return viewHeader 1`] = `
 <div>
@@ -62,6 +62,7 @@ exports[`components/viewHeader/viewHeader return viewHeader 1`] = `
           Group by: 
           <span
             id="groupByLabel"
+            style="color: rgb(var(--center-channel-color-rgb));"
           >
             Status
           </span>

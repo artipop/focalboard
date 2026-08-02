@@ -362,7 +362,7 @@ describe('components/sidebarSidebar', () => {
         const {container} = render(component)
         expect(container).toMatchSnapshot()
 
-        expect(mockedOctoClient.moveBoardToCategory).toBeCalledWith('team-id', 'board2', 'default_category', '')
+        expect(mockedOctoClient.moveBoardToCategory).toHaveBeenCalledWith('team-id', 'board2', 'default_category', '')
     })
 
     test('shouldnt do any category assignment is board is in a category', () => {
@@ -424,7 +424,7 @@ describe('components/sidebarSidebar', () => {
         const {container} = render(component)
         expect(container).toMatchSnapshot()
 
-        expect(mockedOctoClient.moveBoardToCategory).toBeCalledTimes(0)
+        expect(mockedOctoClient.moveBoardToCategory).toHaveBeenCalledTimes(0)
     })
 
     // TODO: Fix this later

@@ -492,7 +492,7 @@ describe('src/cardFilter', () => {
         test('should return Utils.assertFailure and filterClause propertyId ', () => {
             const filterClauseIsNotEmpty = createFilterClause({propertyId: 'propertyId', condition: 'isNotEmpty', values: ['Status']})
             const result = CardFilter.propertyThatMeetsFilterClause(filterClauseIsNotEmpty, [])
-            expect(mockedUtils.assertFailure).toBeCalledTimes(1)
+            expect(mockedUtils.assertFailure).toHaveBeenCalledTimes(1)
             expect(result.id).toEqual(filterClauseIsNotEmpty.propertyId)
         })
         test('should return filterClause propertyId with non-select template and isNotEmpty clause ', () => {

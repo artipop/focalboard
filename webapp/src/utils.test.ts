@@ -195,7 +195,7 @@ describe('utils', () => {
 
             Utils.showBoard('board_id_2', match, history)
 
-            expect(history.push).toBeCalledWith('/team/team_id_1/board_id_2')
+            expect(history.push).toHaveBeenCalledWith('/team/team_id_1/board_id_2')
         })
     })
 

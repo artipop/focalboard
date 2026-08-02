@@ -56,11 +56,11 @@ describe('components/blocksEditor/rootInput', () => {
             />,
         )
 
-        expect(onChange).not.toBeCalled()
+        expect(onChange).not.toHaveBeenCalled()
 
         const input = screen.getByDisplayValue('test-value')
         fireEvent.change(input, {target: {value: 'test-value-'}})
-        expect(onChange).toBeCalled()
+        expect(onChange).toHaveBeenCalled()
     })
 
     test('should not emit onChangeType event when value is not empty and hit backspace', async () => {
@@ -74,10 +74,10 @@ describe('components/blocksEditor/rootInput', () => {
             />,
         )
 
-        expect(onChangeType).not.toBeCalled()
+        expect(onChangeType).not.toHaveBeenCalled()
         const input = screen.getByDisplayValue('test-value')
         fireEvent.keyDown(input, {key: 'Backspace'})
-        expect(onChangeType).not.toBeCalled()
+        expect(onChangeType).not.toHaveBeenCalled()
     })
 
     test('should emit onSave event hit enter', async () => {
@@ -91,10 +91,10 @@ describe('components/blocksEditor/rootInput', () => {
             />,
         )
 
-        expect(onSave).not.toBeCalled()
+        expect(onSave).not.toHaveBeenCalled()
         const input = screen.getByDisplayValue('test-value')
         fireEvent.keyDown(input, {key: 'Enter'})
-        expect(onSave).toBeCalled()
+        expect(onSave).toHaveBeenCalled()
     })
 
     test('should emit onChangeType event on menu option selected', async () => {
@@ -114,6 +114,6 @@ describe('components/blocksEditor/rootInput', () => {
         const option = screen.getByText('/title Creates a new Title block.')
         fireEvent.click(option)
 
-        expect(onChangeType).toBeCalledWith(expect.objectContaining({name: 'h1'}))
+        expect(onChangeType).toHaveBeenCalledWith(expect.objectContaining({name: 'h1'}))
     })
 })

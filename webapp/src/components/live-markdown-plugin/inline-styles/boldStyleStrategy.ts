@@ -6,7 +6,7 @@ import findRangesWithRegex from '../utils/findRangesWithRegex'
 // Bold can be delimited by: **, __, ***, and ___
 const createBoldStyleStrategy = (): InlineStrategy => {
     const asteriskDelimitedRegex =
-		'(\\*\\*\\*)(.+?)(\\*\\*\\*)|(\\*\\*)(.+?)(\\*\\*)(?!\\*)'
+        '(\\*\\*\\*)(.+?)(\\*\\*\\*)|(\\*\\*)(.+?)(\\*\\*)(?!\\*)'
     const underscoreDelimitedRegex = '(___)(.+?)(___)|(__)(.+?)(__)(?!_)'
     const boldRegex = new RegExp(
         `${asteriskDelimitedRegex}|${underscoreDelimitedRegex}`,

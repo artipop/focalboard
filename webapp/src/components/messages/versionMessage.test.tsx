@@ -129,7 +129,7 @@ describe('components/messages/VersionMessage', () => {
             render(component)
             const buttonElement = screen.getByRole('button', {name: 'Close dialog'})
             userEvent.click(buttonElement)
-            expect(mockedOctoClient.patchUserConfig).toBeCalledWith('user-id-1', {
+            expect(mockedOctoClient.patchUserConfig).toHaveBeenCalledWith('user-id-1', {
                 updatedFields: {
                     [versionProperty]: 'true',
                 },

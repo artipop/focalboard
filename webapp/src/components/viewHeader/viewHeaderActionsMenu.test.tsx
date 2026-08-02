@@ -80,7 +80,7 @@ describe('components/viewHeader/viewHeaderActionsMenu', () => {
         expect(container).toMatchSnapshot()
         const buttonExportCSV = screen.getByRole('button', {name: 'Export to CSV'})
         userEvent.click(buttonExportCSV)
-        expect(mockedCsvExporter.exportTableCsv).toBeCalledTimes(1)
+        expect(mockedCsvExporter.exportTableCsv).toHaveBeenCalledTimes(1)
     })
 
     test('return menu and verify call to board archive', () => {
@@ -100,7 +100,7 @@ describe('components/viewHeader/viewHeaderActionsMenu', () => {
         expect(container).toMatchSnapshot()
         const buttonExportBoardArchive = screen.getByRole('button', {name: 'Export board archive'})
         userEvent.click(buttonExportBoardArchive)
-        expect(mockedArchiver.exportBoardArchive).toBeCalledTimes(1)
-        expect(mockedArchiver.exportBoardArchive).toBeCalledWith(board)
+        expect(mockedArchiver.exportBoardArchive).toHaveBeenCalledTimes(1)
+        expect(mockedArchiver.exportBoardArchive).toHaveBeenCalledWith(board)
     })
 })

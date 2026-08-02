@@ -72,7 +72,7 @@ describe('components/viewHeader/emptyCardButton', () => {
         expect(container).toMatchSnapshot()
         const buttonEmpty = screen.getByRole('button', {name: 'Empty card'})
         userEvent.click(buttonEmpty)
-        expect(mockFunction).toBeCalledTimes(1)
+        expect(mockFunction).toHaveBeenCalledTimes(1)
     })
     test('return EmptyCardButton and Set Template', () => {
         const {container} = render(
@@ -89,6 +89,6 @@ describe('components/viewHeader/emptyCardButton', () => {
         expect(container).toMatchSnapshot()
         const buttonDefault = screen.getByRole('button', {name: 'Set as default'})
         userEvent.click(buttonDefault)
-        expect(mockedMutator.clearDefaultTemplate).toBeCalledTimes(1)
+        expect(mockedMutator.clearDefaultTemplate).toHaveBeenCalledTimes(1)
     })
 })

@@ -10,8 +10,7 @@ import {Card} from './card'
 
 const BoardTypeOpen = 'O'
 const BoardTypePrivate = 'P'
-const boardTypes = [BoardTypeOpen, BoardTypePrivate]
-type BoardTypes = typeof boardTypes[number]
+type BoardTypes = typeof BoardTypeOpen | typeof BoardTypePrivate
 
 enum MemberRole {
     Viewer = 'viewer',

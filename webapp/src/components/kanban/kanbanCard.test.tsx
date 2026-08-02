@@ -144,7 +144,7 @@ describe('src/components/kanban/kanbanCard', () => {
         expect(confirmButton).toBeDefined()
         userEvent.click(confirmButton)
 
-        expect(mockedMutator.deleteBlock).toBeCalledWith(card, 'delete card')
+        expect(mockedMutator.deleteBlock).toHaveBeenCalledWith(card, 'delete card')
     })
 
     test('return kanbanCard and click on duplicate menu ', () => {
@@ -170,7 +170,7 @@ describe('src/components/kanban/kanbanCard', () => {
         const elementButtonDuplicate = within(elementMenuWrapper).getByRole('button', {name: 'Duplicate'})
         expect(elementButtonDuplicate).not.toBeNull()
         userEvent.click(elementButtonDuplicate)
-        expect(mockedMutator.duplicateCard).toBeCalledTimes(1)
+        expect(mockedMutator.duplicateCard).toHaveBeenCalledTimes(1)
     })
 
     test('return kanbanCard and click on copy link menu ', () => {
@@ -196,6 +196,6 @@ describe('src/components/kanban/kanbanCard', () => {
         const elementButtonCopyLink = within(elementMenuWrapper).getByRole('button', {name: 'Copy link'})
         expect(elementButtonCopyLink).not.toBeNull()
         userEvent.click(elementButtonCopyLink)
-        expect(mockedUtils.copyTextToClipboard).toBeCalledTimes(1)
+        expect(mockedUtils.copyTextToClipboard).toHaveBeenCalledTimes(1)
     })
 })

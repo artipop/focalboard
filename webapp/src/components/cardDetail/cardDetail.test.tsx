@@ -295,7 +295,7 @@ describe('components/cardDetail/CardDetail', () => {
         await act(async () => {
             userEvent.click(nextBtn!)
         })
-        expect(mockedOctoClient.patchUserConfig).toBeCalledWith(
+        expect(mockedOctoClient.patchUserConfig).toHaveBeenCalledWith(
             'user_id_1',
             {
                 updatedFields: {
@@ -402,7 +402,7 @@ describe('components/cardDetail/CardDetail', () => {
         await act(async () => {
             userEvent.click(nextBtn!)
         })
-        expect(mockedOctoClient.patchUserConfig).toBeCalledWith(
+        expect(mockedOctoClient.patchUserConfig).toHaveBeenCalledWith(
             'user_id_1',
             {
                 updatedFields: {
@@ -513,7 +513,7 @@ describe('components/cardDetail/CardDetail', () => {
         await act(async () => {
             userEvent.click(nextBtn!)
         })
-        expect(mockedOctoClient.patchUserConfig).toBeCalledWith(
+        expect(mockedOctoClient.patchUserConfig).toHaveBeenCalledWith(
             'user_id_1',
             {
                 updatedFields: {

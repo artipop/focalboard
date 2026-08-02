@@ -83,8 +83,8 @@ describe('components/viewHeader/newCardButtonTemplateItem', () => {
         expect(container).toMatchSnapshot()
         const buttonEdit = screen.getByRole('button', {name: 'Edit'})
         userEvent.click(buttonEdit)
-        expect(mockFunction).toBeCalledTimes(1)
-        expect(mockFunction).toBeCalledWith(card.id)
+        expect(mockFunction).toHaveBeenCalledTimes(1)
+        expect(mockFunction).toHaveBeenCalledWith(card.id)
     })
 
     test('return NewCardButtonTemplateItem and add Card from template', () => {
@@ -102,7 +102,7 @@ describe('components/viewHeader/newCardButtonTemplateItem', () => {
         const buttonAdd = screen.getByRole('button', {name: 'title'})
         userEvent.click(buttonAdd)
         expect(container).toMatchSnapshot()
-        expect(mockFunction).toBeCalledTimes(1)
+        expect(mockFunction).toHaveBeenCalledTimes(1)
     })
     test('return NewCardButtonTemplateItem and delete', () => {
         const {container} = render(
@@ -121,7 +121,7 @@ describe('components/viewHeader/newCardButtonTemplateItem', () => {
         expect(container).toMatchSnapshot()
         const buttonDelete = screen.getByRole('button', {name: 'Delete'})
         userEvent.click(buttonDelete)
-        expect(mockedMutator.performAsUndoGroup).toBeCalledTimes(1)
+        expect(mockedMutator.performAsUndoGroup).toHaveBeenCalledTimes(1)
     })
     test('return NewCardButtonTemplateItem and Set as default', () => {
         const {container} = render(
@@ -140,7 +140,7 @@ describe('components/viewHeader/newCardButtonTemplateItem', () => {
         expect(container).toMatchSnapshot()
         const buttonSetAsDefault = screen.getByRole('button', {name: 'Set as default'})
         userEvent.click(buttonSetAsDefault)
-        expect(mockedMutator.setDefaultTemplate).toBeCalledTimes(1)
-        expect(mockedMutator.setDefaultTemplate).toBeCalledWith(activeView.boardId, activeView.id, activeView.fields.defaultTemplateId, card.id)
+        expect(mockedMutator.setDefaultTemplate).toHaveBeenCalledTimes(1)
+        expect(mockedMutator.setDefaultTemplate).toHaveBeenCalledWith(activeView.boardId, activeView.id, activeView.fields.defaultTemplateId, card.id)
     })
 })

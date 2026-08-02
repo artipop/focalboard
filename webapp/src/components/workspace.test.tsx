@@ -243,7 +243,7 @@ describe('src/components/workspace', () => {
             userEvent.click(cardElement)
         })
         expect(container).toMatchSnapshot()
-        expect(mockedUtils.getReadToken).toBeCalledTimes(1)
+        expect(mockedUtils.getReadToken).toHaveBeenCalledTimes(1)
     })
 
     test('return workspace with BoardTemplateSelector component', async () => {

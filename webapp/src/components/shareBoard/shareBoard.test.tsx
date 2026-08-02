@@ -290,7 +290,7 @@ describe('src/components/shareBoard/shareBoard', () => {
             userEvent.click(copyLinkElement!)
         })
 
-        expect(mockedUtils.copyTextToClipboard).toBeCalledTimes(1)
+        expect(mockedUtils.copyTextToClipboard).toHaveBeenCalledTimes(1)
         expect(container).toMatchSnapshot()
 
         const copiedLinkElement = screen.getByText('Copied!')
@@ -341,7 +341,7 @@ describe('src/components/shareBoard/shareBoard', () => {
         await act(async () => {
             jest.runOnlyPendingTimers()
         })
-        expect(mockedOctoClient.setSharing).toBeCalledTimes(1)
+        expect(mockedOctoClient.setSharing).toHaveBeenCalledTimes(1)
         expect(container).toMatchSnapshot()
     })
 
@@ -380,8 +380,8 @@ describe('src/components/shareBoard/shareBoard', () => {
             userEvent.click(switchElement!)
         })
 
-        expect(mockedOctoClient.setSharing).toBeCalledTimes(1)
-        expect(mockedOctoClient.getSharing).toBeCalledTimes(2)
+        expect(mockedOctoClient.setSharing).toHaveBeenCalledTimes(1)
+        expect(mockedOctoClient.getSharing).toHaveBeenCalledTimes(2)
         expect(container).toMatchSnapshot()
     })
 
@@ -431,9 +431,9 @@ describe('src/components/shareBoard/shareBoard', () => {
                     </ReduxProvider>))
         })
 
-        expect(mockedOctoClient.setSharing).toBeCalledTimes(1)
-        expect(mockedOctoClient.getSharing).toBeCalledTimes(2)
-        expect(mockedUtils.createGuid).toBeCalledTimes(1)
+        expect(mockedOctoClient.setSharing).toHaveBeenCalledTimes(1)
+        expect(mockedOctoClient.getSharing).toHaveBeenCalledTimes(2)
+        expect(mockedUtils.createGuid).toHaveBeenCalledTimes(1)
         expect(container).toMatchSnapshot()
     })
 
@@ -669,7 +669,7 @@ describe('src/components/shareBoard/shareBoard', () => {
             userEvent.click(selectElement!)
         })
 
-        expect(mockedOctoClient.searchUserChannels).not.toBeCalled()
+        expect(mockedOctoClient.searchUserChannels).not.toHaveBeenCalled()
         expect(container).toMatchSnapshot()
     })
 })

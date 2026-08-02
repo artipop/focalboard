@@ -1,4 +1,4 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`src/components/workspace return workspace and showcard 1`] = `
 <div>
@@ -427,6 +427,7 @@ exports[`src/components/workspace return workspace and showcard 1`] = `
                   Group by: 
                   <span
                     id="groupByLabel"
+                    style="color: rgb(var(--center-channel-color-rgb));"
                   >
                     Property 2
                   </span>
@@ -1538,6 +1539,7 @@ exports[`src/components/workspace should match snapshot 1`] = `
                   Group by: 
                   <span
                     id="groupByLabel"
+                    style="color: rgb(var(--center-channel-color-rgb));"
                   >
                     Property 2
                   </span>

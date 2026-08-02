@@ -80,9 +80,9 @@ describe('components/blocksEditor/blocks/video', () => {
             />,
         )
 
-        expect(onSave).not.toBeCalled()
+        expect(onSave).not.toHaveBeenCalled()
         const input = screen.getByTestId('video-input')
         fireEvent.change(input, {target: {files: ['test-file']}})
-        expect(onSave).toBeCalledWith({file: 'test-file'})
+        expect(onSave).toHaveBeenCalledWith({file: 'test-file'})
     })
 })

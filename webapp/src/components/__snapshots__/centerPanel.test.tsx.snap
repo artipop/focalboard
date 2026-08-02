@@ -1,4 +1,4 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`components/centerPanel Clicking on the Hidden card count should open a dailog 1`] = `
 <div>
@@ -172,6 +172,7 @@ exports[`components/centerPanel Clicking on the Hidden card count should open a 
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -880,6 +881,7 @@ exports[`components/centerPanel return centerPanel and click on card to show car
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -1433,6 +1435,7 @@ exports[`components/centerPanel return centerPanel and click on new card to edit
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -2490,6 +2493,7 @@ exports[`components/centerPanel return centerPanel and press touch ctrl+d for on
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -3148,6 +3152,7 @@ exports[`components/centerPanel return centerPanel and press touch del for one c
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -3806,6 +3811,7 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -4464,6 +4470,7 @@ exports[`components/centerPanel return centerPanel and press touch esc for one c
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -5122,6 +5129,7 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -5780,6 +5788,7 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -6438,6 +6447,7 @@ exports[`components/centerPanel return centerPanel and press touch esc for two c
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -7096,6 +7106,7 @@ exports[`components/centerPanel return centerPanel and select one card and click
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -7754,6 +7765,7 @@ exports[`components/centerPanel return centerPanel and select one card and click
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -8687,6 +8699,7 @@ exports[`components/centerPanel should match snapshot for Kanban 1`] = `
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -9206,6 +9219,7 @@ exports[`components/centerPanel should match snapshot for Kanban, not shared 1`]
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>
@@ -9725,6 +9739,7 @@ exports[`components/centerPanel should match snapshot for Table 1`] = `
               Group by: 
               <span
                 id="groupByLabel"
+                style="color: rgb(var(--center-channel-color-rgb));"
               >
                 name
               </span>

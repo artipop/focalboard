@@ -79,7 +79,7 @@ describe('components/blockIconSelector', () => {
         const buttonRandom = screen.queryByRole('button', {name: 'Random'})
         expect(buttonRandom).not.toBeNull()
         userEvent.click(buttonRandom!)
-        expect(mockedMutator.changeBlockIcon).toBeCalledTimes(1)
+        expect(mockedMutator.changeBlockIcon).toHaveBeenCalledTimes(1)
     })
 
     test('return a new icon after click on EmojiPicker', () => {
@@ -101,8 +101,8 @@ describe('components/blockIconSelector', () => {
 
         const allButtonThumbUp = getAllByRole('button', {name: /thumbsup/i})
         userEvent.click(allButtonThumbUp[0])
-        expect(mockedMutator.changeBlockIcon).toBeCalledTimes(1)
-        expect(mockedMutator.changeBlockIcon).toBeCalledWith(card.boardId, card.id, card.fields.icon, '👍')
+        expect(mockedMutator.changeBlockIcon).toHaveBeenCalledTimes(1)
+        expect(mockedMutator.changeBlockIcon).toHaveBeenCalledWith(card.boardId, card.id, card.fields.icon, '👍')
     })
 
     test('return no icon after click on remove menu', () => {
@@ -116,8 +116,8 @@ describe('components/blockIconSelector', () => {
         const buttonRemove = screen.queryByRole('button', {name: 'Remove icon'})
         expect(buttonRemove).not.toBeNull()
         userEvent.click(buttonRemove!)
-        expect(mockedMutator.changeBlockIcon).toBeCalledTimes(1)
-        expect(mockedMutator.changeBlockIcon).toBeCalledWith(card.boardId, card.id, card.fields.icon, '', 'remove icon')
+        expect(mockedMutator.changeBlockIcon).toHaveBeenCalledTimes(1)
+        expect(mockedMutator.changeBlockIcon).toHaveBeenCalledWith(card.boardId, card.id, card.fields.icon, '', 'remove icon')
 
         //simulate reset icon
         card.fields.icon = ''

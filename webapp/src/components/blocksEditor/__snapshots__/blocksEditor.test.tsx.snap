@@ -1,4 +1,4 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`components/blocksEditor/blocksEditor should match snapshot on empty 1`] = `
 <div>
@@ -14,7 +14,24 @@ exports[`components/blocksEditor/blocksEditor should match snapshot on empty 1`]
         <span
           class="css-1f43avz-a11yText-A11yText"
           id="react-select-2-live-region"
-        />
+        >
+          <span
+            id="aria-selection"
+          >
+            option , selected.
+          </span>
+          <span
+            id="aria-focused"
+          />
+          <span
+            id="aria-results"
+          />
+          <span
+            id="aria-guidance"
+          >
+            Select is focused ,type to refine list, press Down to open the menu, 
+          </span>
+        </span>
         <span
           aria-atomic="false"
           aria-live="polite"
@@ -23,7 +40,7 @@ exports[`components/blocksEditor/blocksEditor should match snapshot on empty 1`]
           role="log"
         />
         <div
-          class="css-1haocjs-control"
+          class="css-a5687m-control"
         >
           <div
             class="css-1neafsd"
@@ -51,7 +68,7 @@ exports[`components/blocksEditor/blocksEditor should match snapshot on empty 1`]
                 id="react-select-2-input"
                 role="combobox"
                 spellcheck="false"
-                style="opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
+                style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
                 tabindex="0"
                 type="text"
                 value=""
@@ -396,7 +413,24 @@ exports[`components/blocksEditor/blocksEditor should match snapshot with blocks 
         <span
           class="css-1f43avz-a11yText-A11yText"
           id="react-select-3-live-region"
-        />
+        >
+          <span
+            id="aria-selection"
+          >
+            option , selected.
+          </span>
+          <span
+            id="aria-focused"
+          />
+          <span
+            id="aria-results"
+          />
+          <span
+            id="aria-guidance"
+          >
+            Select is focused ,type to refine list, press Down to open the menu, 
+          </span>
+        </span>
         <span
           aria-atomic="false"
           aria-live="polite"
@@ -405,7 +439,7 @@ exports[`components/blocksEditor/blocksEditor should match snapshot with blocks 
           role="log"
         />
         <div
-          class="css-1haocjs-control"
+          class="css-a5687m-control"
         >
           <div
             class="css-1neafsd"
@@ -433,7 +467,7 @@ exports[`components/blocksEditor/blocksEditor should match snapshot with blocks 
                 id="react-select-3-input"
                 role="combobox"
                 spellcheck="false"
-                style="opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
+                style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
                 tabindex="0"
                 type="text"
                 value=""

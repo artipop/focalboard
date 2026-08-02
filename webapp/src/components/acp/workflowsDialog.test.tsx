@@ -146,7 +146,7 @@ describe('components/acp/workflowsDialog', () => {
         await waitFor(() => expect(screen.getByDisplayValue('ветка влита в основную')).toBeInTheDocument())
 
         userEvent.click(screen.getByRole('button', {name: 'Save'}))
-        await waitFor(() => expect(bindings.UpdateFlow).toBeCalled())
+        await waitFor(() => expect(bindings.UpdateFlow).toHaveBeenCalled())
 
         const saved = JSON.parse(bindings.UpdateFlow.mock.calls[0][0])
         expect(saved.name).toBe('feature')
@@ -183,13 +183,13 @@ describe('components/acp/workflowsDialog', () => {
                 onClose={jest.fn()}
             />,
         ))
-        await waitFor(() => expect(bindings.ListFlows).toBeCalledWith(board.id))
+        await waitFor(() => expect(bindings.ListFlows).toHaveBeenCalledWith(board.id))
 
         userEvent.click(screen.getByRole('button', {name: 'Edit'}))
         await waitFor(() => expect(screen.getByDisplayValue('feature')).toBeInTheDocument())
         userEvent.click(screen.getByRole('button', {name: 'Save'}))
 
-        await waitFor(() => expect(bindings.UpdateFlow).toBeCalled())
+        await waitFor(() => expect(bindings.UpdateFlow).toHaveBeenCalled())
         expect(JSON.parse(bindings.UpdateFlow.mock.calls[0][0]).boardId).toBe(board.id)
     })
 
@@ -224,7 +224,7 @@ describe('components/acp/workflowsDialog', () => {
         await waitFor(() => expect(screen.getByText('feature')).toBeInTheDocument())
 
         userEvent.click(screen.getByRole('button', {name: 'Remove'}))
-        await waitFor(() => expect(bindings.RemoveFlow).toBeCalledWith('feature'))
+        await waitFor(() => expect(bindings.RemoveFlow).toHaveBeenCalledWith('feature'))
     })
 })
 

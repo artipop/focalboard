@@ -117,6 +117,6 @@ describe('components/sidebar/SidebarSettingsMenu', () => {
         expect(container).toMatchSnapshot()
 
         userEvent.click(container.querySelector('[aria-label="Asana"]') as Element)
-        expect(mockedTelemetry.trackEvent).toBeCalledWith(TelemetryCategory, TelemetryActions.ImportAsana)
+        expect(mockedTelemetry.trackEvent).toHaveBeenCalledWith(TelemetryCategory, TelemetryActions.ImportAsana)
     })
 })

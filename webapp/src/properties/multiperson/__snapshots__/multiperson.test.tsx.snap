@@ -1,4 +1,4 @@
-// Jest Snapshot v1, https://goo.gl/fbAQLP
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
 exports[`properties/multiperson not readonly 1`] = `
 <div>
@@ -100,7 +100,7 @@ exports[`properties/multiperson not readonly 1`] = `
             id="react-select-3-input"
             role="combobox"
             spellcheck="false"
-            style="opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
+            style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
             tabindex="0"
             type="text"
             value=""
@@ -198,7 +198,7 @@ exports[`properties/multiperson not readonly not existing user 1`] = `
             id="react-select-2-input"
             role="combobox"
             spellcheck="false"
-            style="opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
+            style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
             tabindex="0"
             type="text"
             value=""
@@ -371,7 +371,7 @@ exports[`properties/multiperson user dropdown open 1`] = `
             id="react-select-4-input"
             role="combobox"
             spellcheck="false"
-            style="opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
+            style="color: inherit; background: 0px; opacity: 1; width: 100%; grid-area: 1 / 2; min-width: 2px; border: 0px; margin: 0px; outline: 0; padding: 0px;"
             tabindex="0"
             type="text"
             value=""

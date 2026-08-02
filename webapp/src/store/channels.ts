@@ -9,8 +9,8 @@ export const ChannelTypeOpen = 'O'
 export const ChannelTypePrivate = 'P'
 export const ChannelTypeDirectMessage = 'D'
 export const ChannelTypeGroupMessage = 'G'
-const channelTypes = [ChannelTypeOpen, ChannelTypePrivate, ChannelTypeDirectMessage, ChannelTypeGroupMessage]
-type ChannelType = typeof channelTypes[number]
+type ChannelType = typeof ChannelTypeOpen | typeof ChannelTypePrivate |
+    typeof ChannelTypeDirectMessage | typeof ChannelTypeGroupMessage
 
 export interface Channel {
     id: string

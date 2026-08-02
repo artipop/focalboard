@@ -128,7 +128,7 @@ describe('components/viewHeader/viewHeaderGroupByMenu', () => {
         const buttonStatus = screen.getByRole('button', {name: 'Status'})
         userEvent.click(buttonStatus)
         expect(container).toMatchSnapshot()
-        expect(mockedMutator.changeViewGroupById).toBeCalledTimes(1)
+        expect(mockedMutator.changeViewGroupById).toHaveBeenCalledTimes(1)
     })
     test('return groupBy menu, hideEmptyGroups and ungroup in viewType table', () => {
         activeView.fields.viewType = 'table'
@@ -151,17 +151,17 @@ describe('components/viewHeader/viewHeaderGroupByMenu', () => {
         const hideEmptyGroupsButton = screen.getByRole('button', {name: /Hide.+groups/i})
         expect(hideEmptyGroupsButton)
         userEvent.click(hideEmptyGroupsButton)
-        expect(mockedMutator.hideViewColumns).toBeCalledTimes(1)
+        expect(mockedMutator.hideViewColumns).toHaveBeenCalledTimes(1)
 
         userEvent.click(menuButton)
         const showHiddenGroupsButton = screen.getByRole('button', {name: /Show.+groups/i})
         userEvent.click(showHiddenGroupsButton)
-        expect(mockedMutator.unhideViewColumns).toBeCalledTimes(1)
+        expect(mockedMutator.unhideViewColumns).toHaveBeenCalledTimes(1)
 
         userEvent.click(menuButton)
         const ungroupButton = screen.getByRole('button', {name: 'Ungroup'})
         userEvent.click(ungroupButton)
-        expect(mockedMutator.changeViewGroupById).toBeCalledTimes(1)
+        expect(mockedMutator.changeViewGroupById).toHaveBeenCalledTimes(1)
     })
 
     test('For viewType table render only HideEmptyGroupsButton when hiddenGroups is empty', () => {

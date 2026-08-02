@@ -39,7 +39,7 @@ describe('components/dialog', () => {
         ))
         const buttonClose = screen.getByRole('button', {name: 'Close dialog'})
         userEvent.click(buttonClose)
-        expect(onCloseMethod).toBeCalledTimes(1)
+        expect(onCloseMethod).toHaveBeenCalledTimes(1)
     })
     test('should return dialog and click to close on wrapper', () => {
         const onCloseMethod = jest.fn()
@@ -61,7 +61,7 @@ describe('components/dialog', () => {
         ))
         const buttonClose = container.querySelector('.wrapper')!
         userEvent.click(buttonClose)
-        expect(onCloseMethod).toBeCalledTimes(1)
+        expect(onCloseMethod).toHaveBeenCalledTimes(1)
     })
 
     test('should return dialog and click on test button', () => {
@@ -87,7 +87,7 @@ describe('components/dialog', () => {
         userEvent.click(buttonMenu)
         const buttonTest = screen.getByRole('button', {name: 'Test'})
         userEvent.click(buttonTest)
-        expect(onTest).toBeCalledTimes(1)
+        expect(onTest).toHaveBeenCalledTimes(1)
     })
     test('should return dialog and click on cancel button', () => {
         const {container} = render(wrapDNDIntl(

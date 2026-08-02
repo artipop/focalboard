@@ -81,7 +81,7 @@ describe('components/acp/columnSettingsDialog', () => {
         userEvent.click(screen.getByLabelText('dev-2'))
         userEvent.click(screen.getByRole('button', {name: 'Save'}))
 
-        await waitFor(() => expect(bindings.SaveBoardColumn).toBeCalled())
+        await waitFor(() => expect(bindings.SaveBoardColumn).toHaveBeenCalled())
         const saved = JSON.parse(bindings.SaveBoardColumn.mock.calls[0][0])
         expect(saved.agents).toEqual(['dev-1', 'dev-2'])
 

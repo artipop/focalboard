@@ -104,7 +104,7 @@ describe('components/acp/planningDialog', () => {
         await waitFor(() => expect(start).toBeEnabled())
         userEvent.click(start)
 
-        await waitFor(() => expect(bindings.StartPlanningSession).toBeCalledWith('app', 'planner'))
+        await waitFor(() => expect(bindings.StartPlanningSession).toHaveBeenCalledWith('app', 'planner'))
     })
 
     test('plans without a repository when one is not chosen', async () => {
@@ -129,7 +129,7 @@ describe('components/acp/planningDialog', () => {
         expect(start).toBeEnabled()
         userEvent.click(start)
 
-        await waitFor(() => expect(bindings.StartPlanningSession).toBeCalledWith('', 'planner'))
+        await waitFor(() => expect(bindings.StartPlanningSession).toHaveBeenCalledWith('', 'planner'))
     })
 
     test('composes a task, lets it be edited, and creates the card in the first column', async () => {
@@ -148,7 +148,7 @@ describe('components/acp/planningDialog', () => {
         ))
 
         userEvent.click(await screen.findByRole('button', {name: 'Start planning'}))
-        await waitFor(() => expect(bindings.StartPlanningSession).toBeCalled())
+        await waitFor(() => expect(bindings.StartPlanningSession).toHaveBeenCalled())
 
         // The session announces itself and says something, which is what makes
         // "Create task" meaningful.
@@ -157,22 +157,22 @@ describe('components/acp/planningDialog', () => {
         await waitFor(() => expect(screen.getByText('Что именно кешируем?')).toBeInTheDocument())
 
         userEvent.click(screen.getByRole('button', {name: 'Create task'}))
-        await waitFor(() => expect(bindings.ComposeTask).toBeCalledWith('plan-1'))
+        await waitFor(() => expect(bindings.ComposeTask).toHaveBeenCalledWith('plan-1'))
 
         // The answer is split into a title and a body for review, not written
         // straight to the board.
         const title = await screen.findByDisplayValue('Кэшировать список досок')
         expect(screen.getByDisplayValue('Добавить кеш в store.')).toBeInTheDocument()
-        expect(mockedMutator.insertBlock).not.toBeCalled()
+        expect(mockedMutator.insertBlock).not.toHaveBeenCalled()
 
         userEvent.type(title, ' (v2)')
         userEvent.click(screen.getByRole('button', {name: 'Create card'}))
 
-        await waitFor(() => expect(mockedMutator.insertBlock).toBeCalled())
+        await waitFor(() => expect(mockedMutator.insertBlock).toHaveBeenCalled())
         const card = mockedMutator.insertBlock.mock.calls[0][1] as any
         expect(card.title).toBe('Кэшировать список досок (v2)')
         expect(card.fields.properties.status).toBe('backlog')
-        await waitFor(() => expect(onClose).toBeCalled())
+        await waitFor(() => expect(onClose).toHaveBeenCalled())
     })
 
     test('closes the session when the dialog goes away', async () => {
@@ -190,9 +190,9 @@ describe('components/acp/planningDialog', () => {
         ))
 
         userEvent.click(await screen.findByRole('button', {name: 'Start planning'}))
-        await waitFor(() => expect(bindings.StartPlanningSession).toBeCalled())
+        await waitFor(() => expect(bindings.StartPlanningSession).toHaveBeenCalled())
 
         unmount()
-        expect(bindings.CloseSession).toBeCalledWith('plan-1')
+        expect(bindings.CloseSession).toHaveBeenCalledWith('plan-1')
     })
 })

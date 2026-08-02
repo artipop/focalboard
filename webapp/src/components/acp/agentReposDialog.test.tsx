@@ -47,11 +47,11 @@ describe('components/acp/agentReposDialog', () => {
         await waitFor(() => expect(screen.getByText('alpha')).toBeInTheDocument())
 
         userEvent.click(screen.getByRole('button', {name: 'Add repository…'}))
-        await waitFor(() => expect(bindings.PickDirectory).toBeCalled())
+        await waitFor(() => expect(bindings.PickDirectory).toHaveBeenCalled())
         await waitFor(() => expect(screen.getByDisplayValue('beta')).toBeInTheDocument())
 
         userEvent.click(screen.getByRole('button', {name: 'Add'}))
-        await waitFor(() => expect(bindings.AddAgentRepo).toBeCalledWith('beta', '/tmp/beta'))
+        await waitFor(() => expect(bindings.AddAgentRepo).toHaveBeenCalledWith('beta', '/tmp/beta'))
     })
 
     test('creates a Repositories field and adds missing repo options', async () => {
@@ -77,7 +77,7 @@ describe('components/acp/agentReposDialog', () => {
 
         // No button to press: opening the dialog is what puts the registry into
         // the board's field.
-        await waitFor(() => expect(mockedMutator.updateBoardCardProperties).toBeCalledTimes(1))
+        await waitFor(() => expect(mockedMutator.updateBoardCardProperties).toHaveBeenCalledTimes(1))
 
         const newProps = mockedMutator.updateBoardCardProperties.mock.calls[0][2]
         const repoProp = newProps.find((p) => p.name === 'Repositories')!
@@ -113,7 +113,7 @@ describe('components/acp/agentReposDialog', () => {
             />,
         ))
         await waitFor(() => expect(screen.getByText('beta')).toBeInTheDocument())
-        await waitFor(() => expect(mockedMutator.updateBoardCardProperties).toBeCalledTimes(1))
+        await waitFor(() => expect(mockedMutator.updateBoardCardProperties).toHaveBeenCalledTimes(1))
 
         const newProps = mockedMutator.updateBoardCardProperties.mock.calls[0][2]
         const repoProps = newProps.filter((p) => p.name === 'Repositories')
@@ -147,6 +147,6 @@ describe('components/acp/agentReposDialog', () => {
 
         // Nothing to add: the board is not patched, so the undo history and the
         // websocket stay quiet every time the dialog is opened.
-        expect(mockedMutator.updateBoardCardProperties).not.toBeCalled()
+        expect(mockedMutator.updateBoardCardProperties).not.toHaveBeenCalled()
     })
 })

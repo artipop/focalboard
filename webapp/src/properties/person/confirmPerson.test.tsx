@@ -175,7 +175,7 @@ describe('properties/person', () => {
             expect(confirmButton).toBeDefined()
             userEvent.click(confirmButton)
 
-            expect(mockedMutator.createBoardMember).toBeCalled()
+            expect(mockedMutator.createBoardMember).toHaveBeenCalled()
         } else {
             throw new Error('container should have been initialized')
         }
@@ -229,7 +229,7 @@ describe('properties/person', () => {
             expect(cancelButton).toBeDefined()
             userEvent.click(cancelButton)
 
-            expect(mockedMutator.createBoardMember).not.toBeCalled()
+            expect(mockedMutator.createBoardMember).not.toHaveBeenCalled()
         } else {
             throw new Error('container should have been initialized')
         }

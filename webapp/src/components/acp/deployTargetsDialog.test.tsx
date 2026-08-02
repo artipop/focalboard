@@ -53,7 +53,7 @@ describe('components/acp/deployTargetsDialog', () => {
         expect(screen.getByText('A branch is served at reponame-my-branch.dokku.example.com')).toBeInTheDocument()
 
         userEvent.click(screen.getByRole('button', {name: 'Save'}))
-        await waitFor(() => expect(bindings.AddDeployTarget).toBeCalled())
+        await waitFor(() => expect(bindings.AddDeployTarget).toHaveBeenCalled())
         const sent = JSON.parse(bindings.AddDeployTarget.mock.calls[0][0])
         expect(sent).toMatchObject({
             name: 'preview',
@@ -84,13 +84,13 @@ describe('components/acp/deployTargetsDialog', () => {
         await waitFor(() => expect(screen.getByDisplayValue('staging')).toBeDisabled())
 
         userEvent.click(screen.getByRole('button', {name: 'Save'}))
-        await waitFor(() => expect(bindings.UpdateDeployTarget).toBeCalled())
+        await waitFor(() => expect(bindings.UpdateDeployTarget).toHaveBeenCalled())
         expect(JSON.parse(bindings.UpdateDeployTarget.mock.calls[0][0])).toMatchObject({
             name: 'staging',
             baseApp: 'api',
             baseDomain: 'preview.example.com',
         })
-        expect(bindings.AddDeployTarget).not.toBeCalled()
+        expect(bindings.AddDeployTarget).not.toHaveBeenCalled()
     })
 
     test('shows the backend validation error', async () => {

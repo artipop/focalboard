@@ -74,9 +74,9 @@ describe('components/acp/sessionConsole', () => {
         expect(screen.getByText('Read src/app.go')).toBeInTheDocument()
 
         // A terminal session is not attached to and offers a fresh one.
-        expect(bindings.AttachSession).not.toBeCalled()
+        expect(bindings.AttachSession).not.toHaveBeenCalled()
         userEvent.click(screen.getByRole('button', {name: 'Open session'}))
-        await waitFor(() => expect(bindings.StartCardSession).toBeCalledWith('card1', ''))
+        await waitFor(() => expect(bindings.StartCardSession).toHaveBeenCalledWith('card1', ''))
     })
 
     test('attaches to a live session and sends a follow-up turn', async () => {
@@ -85,13 +85,13 @@ describe('components/acp/sessionConsole', () => {
         fakeRuntime()
 
         render(wrapIntl(<SessionConsole cardId='card1'/>))
-        await waitFor(() => expect(bindings.AttachSession).toBeCalledWith('sess-2'))
+        await waitFor(() => expect(bindings.AttachSession).toHaveBeenCalledWith('sess-2'))
 
         const box = screen.getByPlaceholderText(/Message the agent/)
         userEvent.type(box, 'also update the docs')
         userEvent.click(screen.getByRole('button', {name: 'Send'}))
 
-        await waitFor(() => expect(bindings.PromptSession).toBeCalledWith('sess-2', 'also update the docs'))
+        await waitFor(() => expect(bindings.PromptSession).toHaveBeenCalledWith('sess-2', 'also update the docs'))
     })
 
     test('answers a permission prompt pushed over the event bus', async () => {
@@ -100,7 +100,7 @@ describe('components/acp/sessionConsole', () => {
         const handlers = fakeRuntime()
 
         render(wrapIntl(<SessionConsole cardId='card1'/>))
-        await waitFor(() => expect(bindings.AttachSession).toBeCalledWith('sess-3'))
+        await waitFor(() => expect(bindings.AttachSession).toHaveBeenCalledWith('sess-3'))
 
         handlers['acp:permission']({
             cardId: 'card1',
@@ -117,7 +117,7 @@ describe('components/acp/sessionConsole', () => {
 
         await waitFor(() => expect(screen.getByText('Bash: rm -rf build')).toBeInTheDocument())
         userEvent.click(screen.getByRole('button', {name: 'Allow once'}))
-        await waitFor(() => expect(bindings.AnswerPermission).toBeCalledWith('sess-3', 'req-1', 'allow'))
+        await waitFor(() => expect(bindings.AnswerPermission).toHaveBeenCalledWith('sess-3', 'req-1', 'allow'))
     })
 
     test('attaches to a session that starts while the card is already open', async () => {
@@ -129,15 +129,15 @@ describe('components/acp/sessionConsole', () => {
         const handlers = fakeRuntime()
 
         render(wrapIntl(<SessionConsole cardId='card1'/>))
-        await waitFor(() => expect(bindings.GetCardSessions).toBeCalled())
-        expect(bindings.AttachSession).not.toBeCalled()
+        await waitFor(() => expect(bindings.GetCardSessions).toHaveBeenCalled())
+        expect(bindings.AttachSession).not.toHaveBeenCalled()
 
         handlers['acp:session']({cardId: 'card1', sessionId: 'sess-late', status: 'running'})
-        await waitFor(() => expect(bindings.AttachSession).toBeCalledWith('sess-late'))
+        await waitFor(() => expect(bindings.AttachSession).toHaveBeenCalledWith('sess-late'))
 
         // Terminal status releases the attachment again.
         handlers['acp:session']({cardId: 'card1', sessionId: 'sess-late', status: 'done'})
-        await waitFor(() => expect(bindings.DetachSession).toBeCalledWith('sess-late'))
+        await waitFor(() => expect(bindings.DetachSession).toHaveBeenCalledWith('sess-late'))
     })
 
     test('renders the agent answer as markdown, not as source', async () => {
@@ -161,7 +161,7 @@ describe('components/acp/sessionConsole', () => {
         const handlers = fakeRuntime()
 
         render(wrapIntl(<SessionConsole cardId='card1'/>))
-        await waitFor(() => expect(bindings.AttachSession).toBeCalled())
+        await waitFor(() => expect(bindings.AttachSession).toHaveBeenCalled())
 
         // The session stays live, so only this event tells the user it failed.
         handlers['acp:session']({
@@ -179,7 +179,7 @@ describe('components/acp/sessionConsole', () => {
         const handlers = fakeRuntime()
 
         render(wrapIntl(<SessionConsole cardId='card1'/>))
-        await waitFor(() => expect(bindings.AttachSession).toBeCalledWith('sess-q'))
+        await waitFor(() => expect(bindings.AttachSession).toHaveBeenCalledWith('sess-q'))
 
         handlers['acp:question']({
             cardId: 'card1',
@@ -205,7 +205,7 @@ describe('components/acp/sessionConsole', () => {
         userEvent.click(screen.getByText('Читаемость'))
         userEvent.click(screen.getByRole('button', {name: 'Ответить'}))
 
-        await waitFor(() => expect(bindings.AnswerQuestion).toBeCalled())
+        await waitFor(() => expect(bindings.AnswerQuestion).toHaveBeenCalled())
         const [sessionId, requestId, text] = bindings.AnswerQuestion.mock.calls[0]
         expect(sessionId).toBe('sess-q')
         expect(requestId).toBe('q-1')
@@ -236,7 +236,7 @@ describe('components/acp/sessionConsole', () => {
         const handlers = fakeRuntime()
 
         render(wrapIntl(<SessionConsole cardId='card1'/>))
-        await waitFor(() => expect(bindings.AttachSession).toBeCalled())
+        await waitFor(() => expect(bindings.AttachSession).toHaveBeenCalled())
 
         handlers['acp:chunk']({cardId: 'other-card', sessionId: 'sess-9', text: 'not mine'})
         expect(screen.queryByText('not mine')).not.toBeInTheDocument()
@@ -247,10 +247,10 @@ describe('components/acp/sessionConsole', () => {
         anyWindow.go = {main: {App: bindings}}
 
         const {unmount} = render(wrapIntl(<SessionConsole cardId='card1'/>))
-        await waitFor(() => expect(bindings.AttachSession).toBeCalledWith('sess-5'))
+        await waitFor(() => expect(bindings.AttachSession).toHaveBeenCalledWith('sess-5'))
 
         unmount()
-        expect(bindings.DetachSession).toBeCalledWith('sess-5')
+        expect(bindings.DetachSession).toHaveBeenCalledWith('sess-5')
     })
 
     test('shows the session branch and deploys it', async () => {
@@ -259,7 +259,7 @@ describe('components/acp/sessionConsole', () => {
         anyWindow.go = {main: {App: bindings}}
 
         render(wrapIntl(<SessionConsole cardId='card1'/>))
-        await waitFor(() => expect(bindings.GetCardSessions).toBeCalled())
+        await waitFor(() => expect(bindings.GetCardSessions).toHaveBeenCalled())
 
         // A session without a worktree yet has no branch to show or publish.
         expect(screen.queryByRole('button', {name: 'Deploy'})).not.toBeInTheDocument()
@@ -275,7 +275,7 @@ describe('components/acp/sessionConsole', () => {
         await waitFor(() => expect(screen.getByText('acp/login-via-sso-1a2b3c4d')).toBeInTheDocument())
 
         userEvent.click(screen.getByRole('button', {name: 'Deploy'}))
-        await waitFor(() => expect(bindings.StartCardDeploy).toBeCalledWith('card1', 'acp/login-via-sso-1a2b3c4d'))
+        await waitFor(() => expect(bindings.StartCardDeploy).toHaveBeenCalledWith('card1', 'acp/login-via-sso-1a2b3c4d'))
     })
 
     test('a deploy session reports separately and does not take over the console', async () => {
@@ -293,7 +293,7 @@ describe('components/acp/sessionConsole', () => {
 
         // The card's own session is still the one being attached to and shown.
         expect(screen.queryByText('pushing to dokku')).not.toBeInTheDocument()
-        expect(bindings.AttachSession).not.toBeCalledWith('sess-deploy')
+        expect(bindings.AttachSession).not.toHaveBeenCalledWith('sess-deploy')
     })
 
     test('surfaces a failed deploy start', async () => {
