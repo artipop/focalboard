@@ -254,6 +254,14 @@ function DateRange(props: PropertyProps): JSX.Element {
                                     start: dateFrom,
                                     end: dateTo || dateFrom,
                                 }}
+
+                                // A modifier of our own gets no class unless it
+                                // is named one: version 10 only derives them for
+                                // its own flags and selection states.
+                                modifiersClassNames={{
+                                    start: 'is-start',
+                                    end: 'is-end',
+                                }}
                                 footer={
                                     <Button
                                         onClick={() => {

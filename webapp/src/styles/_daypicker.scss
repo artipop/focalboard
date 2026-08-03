@@ -1,0 +1,103 @@
+// The calendar's look, written against the class names react-day-picker 10
+// actually renders.
+//
+// Both date pickers used to carry ~120 duplicated lines of this styling the
+// `.DayPicker-*` names of version 7, which the library stopped emitting three
+// major versions ago — so none of it reached the calendar and both screens have
+// been showing the library's stock stylesheet. This is that styling, restored:
+// one copy, `.rdp-*`, and the range built out of the modifiers the call site
+// sets rather than out of names nobody emits.
+//
+// Version 10 splits a day in two: `.rdp-day` is the cell, which carries the
+// modifiers and therefore the band of a range, and `.rdp-day_button` is the
+// control inside it, which carries the round chip.
+
+@mixin focalboard-daypicker {
+    .rdp-root {
+        --rdp-accent-color: rgb(var(--button-bg-rgb));
+        --rdp-day-width: 36px;
+        --rdp-day-height: 36px;
+
+        font-size: inherit;
+    }
+
+    .rdp-month_caption {
+        text-transform: capitalize;
+    }
+
+    .rdp-weekday {
+        width: 36px;
+        height: 36px;
+        color: rgba(var(--center-channel-color-rgb), 0.56);
+        font-size: 12px;
+        font-weight: 400;
+        text-transform: capitalize;
+    }
+
+    .rdp-day {
+        width: 36px;
+        height: 36px;
+        padding: 0;
+    }
+
+    .rdp-day_button {
+        display: flex;
+        width: 36px;
+        height: 36px;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        border-radius: 50%;
+        color: inherit;
+        font-size: inherit;
+
+        &:hover {
+            background: rgba(var(--button-bg-rgb), 0.08);
+            color: rgb(var(--button-bg-rgb));
+        }
+    }
+
+    .rdp-today:not(.rdp-selected) .rdp-day_button {
+        background: transparent;
+        color: #c74655;
+    }
+
+    // The middle of a range is a light band; only its two ends are filled.
+    .rdp-selected:not(.rdp-disabled):not(.rdp-outside) .rdp-day_button {
+        background: rgba(var(--button-bg-rgb), 0.08);
+        border-radius: 0;
+        color: rgb(var(--button-bg-rgb));
+
+        &:hover {
+            background: rgba(var(--button-bg-rgb), 0.08);
+        }
+    }
+
+    .rdp-day.is-start .rdp-day_button,
+    .rdp-day.is-end .rdp-day_button {
+        background: rgb(var(--button-bg-rgb));
+        color: rgb(var(--button-color-rgb));
+
+        &:hover {
+            background: rgb(var(--button-bg-rgb));
+            color: rgb(var(--button-color-rgb));
+        }
+    }
+
+    .rdp-day.is-start .rdp-day_button {
+        border-top-left-radius: 50%;
+        border-bottom-left-radius: 50%;
+    }
+
+    .rdp-day.is-end .rdp-day_button {
+        border-top-right-radius: 50%;
+        border-bottom-right-radius: 50%;
+    }
+
+    // A single day is both ends at once, which rounds it back to a circle.
+    .rdp-day.is-start.is-end .rdp-day_button {
+        border-radius: 50%;
+    }
+}

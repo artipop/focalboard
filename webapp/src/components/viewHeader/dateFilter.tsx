@@ -178,6 +178,12 @@ function DateFilter(props: Props): JSX.Element {
                                 showOutsideDays={false}
                                 locale={calendarLocale}
                                 selected={offsetDate}
+
+                                // The one selected day is both ends of a range
+                                // of one, so it is drawn filled and round like
+                                // the ends of a real range in the date property.
+                                modifiers={{start: offsetDate, end: offsetDate}}
+                                modifiersClassNames={{start: 'is-start', end: 'is-end'}}
                                 footer={
                                     <Button
                                         onClick={() => {
